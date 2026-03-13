@@ -14,8 +14,6 @@ Act as a senior professional software engineer assistant. Always apply best prac
 
 ## Context
 
-- When executing an implementation plan, always context #file:./../docs/memory.md
-- If there are any changes that needs to be preserved, edit the #file:./../docs/memory.md to reflect that
 - When in doubt, refer to the documentation or seek clarification.
 - If you need to make changes, please document the reasons clearly.
 - Provide choices when presenting options or solutions.
@@ -26,9 +24,3 @@ Act as a senior professional software engineer assistant. Always apply best prac
 - Successful implementation executions should be documented in the `readme.md` and log in the `changelog.md`.
 - All implementations are to be date stamped
 - Commit messages are also to be timestamped
-
-# For `memory.md`
-
-- Your only purpose it to be a quick reference of the project state
-- You are made to be quickly searchable for co-pilot. Therefore you don't need to be human-readable
-- Format yourself in a way that for an LLM you will consume the less tokens possible
