@@ -1,139 +1,111 @@
 # AI Workflow Template
 
-A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.
+Publishable AI workflow starter pack for GitHub Copilot. This package distributes the `.github/` experience, auto-bumps versions through Husky, and publishes to npm on merges to `main`.
 
-## 📋 Overview
+## What This Package Does
 
-This template repository is designed to accelerate project setup and maintain consistency across your AI-assisted development projects. It includes battle-tested configurations, coding standards, and reusable AI workflows that help you work more efficiently with GitHub Copilot and other AI coding assistants.
+This repository is designed to be installed as an npm package instead of cloned as a one-off template. When a consuming project installs it, the package can copy its `.github/` folder into the consumer project and keep that folder in sync over time.
 
-## 🏗️ Repository Structure
+### Included capabilities
 
-```
-.github/
-├── co-pilot.instructions.md    # Main GitHub Copilot configuration
-├── skills/                      # Reusable domain-specific knowledge modules
-├── prompts/                     # Task-specific prompt templates
-├── agents/                      # Multi-step autonomous task handlers
-└── instructions/                # Language and framework coding standards
-```
+- Copilot instructions and workspace guidance in `.github/co-pilot.instructions.md`
+- Reusable skills in `.github/skills/`
+- Prompt templates in `.github/prompts/`
+- Custom agents in `.github/agents/`
+- Language and framework instructions in `.github/instructions/`
+- Version auto-bumping via Husky pre-commit hook
+- npm publishing workflow on merge to `main`
 
-## ✨ Features
+## Install
 
-### 🎯 Skills
+Install the package in the project that should receive the shared Copilot configuration.
 
-Domain-specific knowledge modules that provide specialized capabilities:
-
-- **gh-cli** - Comprehensive GitHub CLI reference for all GitHub operations
-- **git-commit** - Conventional commit message generation with intelligent staging
-- **github-issues** - Create and manage GitHub issues using best practices
-
-### 📝 Prompts
-
-Pre-configured prompt templates for common development tasks:
-
-- **copilot-instructions-blueprint-generator** - Generate custom Copilot instruction files
-- **documentation-writer** - Create comprehensive project documentation
-- **editconfig** - Configure editor settings and preferences
-- **playwright-explore** - Explore web applications with Playwright
-- **playwright-generate-test** - Generate automated E2E tests
-
-### 🤖 Agents
-
-Autonomous task handlers for complex, multi-step workflows:
-
-- **plan** - High-level project planning and task breakdown
-- **implementation-plan** - Detailed implementation planning with technical specifications
-- **research-spike** - Research and exploration for technical decisions
-
-### 📚 Instructions
-
-Coding standards and best practices for various technologies:
-
-- **angular** - Angular-specific coding standards and conventions
-- **html-to-css-guide** - Accessible design and styling guidelines
-- **playwright-typescript** - Playwright test generation best practices
-- **prompt** - Guidelines for creating high-quality prompt files
-- **security-owasp** - OWASP Top 10 security guidelines for all languages
-- **typescript** - TypeScript development standards (ES2022/TS5.x)
-
-## 🚀 Getting Started
-
-### Using This Template
-
-1. Click the "Use this template" button at the top of this repository
-2. Create a new repository from this template
-3. Clone your new repository:
-   ```bash
-   git clone <your-repo-url>
-   cd <your-repo-name>
-   ```
-
-### Customizing for Your Project
-
-1. **Update co-pilot.instructions.md** - Modify the main Copilot configuration with your project-specific context
-2. **Add project documentation** - Create `docs/memory.md` for project state tracking
-3. **Select relevant instructions** - Remove or add instruction files based on your tech stack
-4. **Customize skills** - Extend or modify skills for your specific workflows
-5. **Add project-specific prompts** - Create new prompt files for recurring tasks in your project
-
-## 📖 How to Use
-
-### With GitHub Copilot
-
-GitHub Copilot will automatically discover and use the `.github/co-pilot.instructions.md` file and the instructions in the `.github/instructions/` directory. The AI will apply these guidelines when generating code suggestions.
-
-### Skills
-
-Skills are triggered automatically when relevant tasks are detected. For example:
-
-- Type `/commit` or ask to "commit changes" to use the git-commit skill
-- Ask to "create an issue" to use the github-issues skill
-
-### Prompts
-
-Reference prompts directly in your conversations with AI assistants:
-
-```
-@workspace Use the playwright-generate-test prompt to create tests for the login page
+```bash
+npm install ai-workflow-template
 ```
 
-### Agents
+If you publish under a scoped name, use that name instead.
 
-Delegate complex tasks to agents:
+## Sync Behavior
 
+The package runs `scripts/sync.js` during `postinstall`.
+
+- New `.github` files are copied into the consumer project
+- Files that have not been edited locally are refreshed from the package
+- Files that were modified locally are skipped by default
+
+### Manual sync
+
+Use the sync script directly when you want to refresh the consumer project on demand.
+
+```bash
+npm run sync
 ```
-Use the implementation-plan agent to create a detailed plan for the user authentication feature
+
+Force overwrite of tracked files when you want the package version to win.
+
+```bash
+npm run sync -- --force
 ```
 
-## 🔒 Security
+Preview the sync without writing files.
 
-This template includes comprehensive OWASP-based security guidelines in `.github/instructions/security-owasp.instructions.md`. All code generation follows security-first principles including:
+```bash
+npm run sync -- --dry-run
+```
 
-- Input validation and sanitization
-- Parameterized queries to prevent SQL injection
-- Secure authentication and session management
-- Protection against XSS, CSRF, and other common vulnerabilities
+## Versioning
 
-## 🤝 Contributing
+Husky runs a pre-commit hook that bumps the package version automatically.
 
-When contributing to projects using this template:
+- Normal commits increment the minor version and reset patch to `0`
+- If the major version changes, the script resets the version to `<major>.0.0`
 
-1. Follow the coding standards defined in `.github/instructions/`
-2. Use conventional commit messages (see git-commit skill)
-3. Document changes in project changelog
-4. Update `docs/memory.md` for significant project state changes
+Example:
 
-## 📄 License
+```text
+1.2.0 -> 1.3.0
+2.0.0 -> 2.1.0 on the next commit
+```
 
-This template is provided as-is for use in your projects. Customize it freely to meet your needs.
+## Publish Flow
 
-## 🔍 Additional Resources
+GitHub Actions publishes the package to npm when changes are merged into `main`.
 
-- [GitHub Copilot Documentation](https://docs.github.com/en/copilot)
-- [Conventional Commits](https://www.conventionalcommits.org/)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Playwright Documentation](https://playwright.dev/)
+### Required secret
 
----
+Add `NPM_TOKEN` in GitHub repository settings:
 
-**Ready to start?** Use this template for your next project and experience AI-assisted development with pre-configured best practices and workflows.
+1. Open your repository on GitHub
+2. Go to Settings
+3. Open Secrets and variables, then Actions
+4. Add a new repository secret named `NPM_TOKEN`
+5. Paste an npm automation token
+
+## Local Development
+
+Install dependencies once to activate Husky hooks.
+
+```bash
+npm install
+```
+
+Recommended checks:
+
+```bash
+npm run sync -- --dry-run
+npm pack --json
+```
+
+## Updating the Shared Template
+
+1. Edit the files in `.github/` that should be distributed to consumer projects
+2. Commit your changes
+3. Merge to `main` to publish the updated package
+4. Consumers can run `npm install` again to pull the latest distributed files
+
+## Notes
+
+- The sync script uses `INIT_CWD` so installation runs against the consuming project, not the package directory
+- Local changes in a consuming repo are preserved unless you explicitly use `--force`
+- The publish workflow assumes the package is public on npm
