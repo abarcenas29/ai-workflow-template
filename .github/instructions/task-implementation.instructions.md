@@ -11,6 +11,14 @@ Implementation progress MUST be tracked in a corresponding changes files located
 
 ## Core Implementation Process
 
+### Markdown Audit Trail
+
+All planning, implementation, and execution work must be recorded in Markdown files.
+
+- Keep the plan file, the changes file, and any task-specific notes current as work progresses.
+- Do not rely on chat alone for durable tracking of implementation decisions or progress.
+- Treat the Markdown record as the source of truth for auditability and session recovery.
+
 ### 1. Plan Analysis and Preparation
 
 **MUST complete before starting implementation:**

@@ -125,6 +125,20 @@ flowchart TD
     Complete -->|No| Execute
 ```
 
+### Audit Trail Requirement
+
+All planning, implementation, and execution work must be recorded in Markdown files.
+
+For every task:
+
+- Create or update a task file in `tasks/` with the request, plan, progress, and decisions.
+- Record implementation progress in the task progress log as work advances.
+- Keep `tasks/_index.md` current.
+- Use `progress.md` and `activeContext.md` for broader project status when relevant.
+- Do not rely on chat alone for durable tracking of plans or execution history.
+
+The Markdown record is the source of truth for auditing, traceability, and recovery after session resets.
+
 ## Documentation Updates
 
 Memory Bank updates occur when:
