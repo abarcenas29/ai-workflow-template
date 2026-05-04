@@ -9,6 +9,7 @@ const sourceGithubDir = resolve(packageRoot, '.github')
 const consumerRoot = process.env.INIT_CWD ? resolve(process.env.INIT_CWD) : process.cwd()
 const targetGithubDir = resolve(consumerRoot, '.github')
 const manifestPath = resolve(consumerRoot, '.github-sync-manifest.json')
+const excludedRelativePaths = new Set(['workflows/npm-publish.yml'])
 const args = new Set(process.argv.slice(2))
 const forceOverwrite = args.has('--force')
 const dryRun = args.has('--dry-run')
@@ -88,6 +89,10 @@ let added = 0
 
 for (const sourceFile of sourceFiles) {
   const relativePath = relative(sourceGithubDir, sourceFile)
+  if (excludedRelativePaths.has(relativePath)) {
+    continue
+  }
+
   const targetFile = resolve(targetGithubDir, relativePath)
   const sourceHash = hashFile(sourceFile)
   const existingHash = existsSync(targetFile) ? hashFile(targetFile) : null
