@@ -1,1 +1,5 @@
 *.tgz
+opencode.json
+opencode.mcp.json
+.agents-sync-manifest.json
+node_modules/
