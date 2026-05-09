@@ -1,6 +1,6 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.",
   "main": "index.js",
   "scripts": {

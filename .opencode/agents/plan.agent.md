@@ -1,16 +1,15 @@
 ---
 description: "Strategic planning and architecture assistant focused on thoughtful analysis before implementation. Helps developers understand codebases, clarify requirements, and develop comprehensive implementation strategies."
 name: "Plan Mode - Strategic Planning & Architecture"
-tools:
-  - search/codebase
-  - vscode/extensions
-  - web/fetch
-  - web/githubRepo
-  - read/problems
-  - azure-mcp/search
-  - search/searchResults
-  - search/usages
-  - vscode/vscodeAPI
+permission:
+  read: allow
+  search: allow
+  edit: allow
+  skill: allow
+  question: allow
+  webfetch: allow
+  websearch: allow
+model: openrouter/kimi-k2-thinking
 ---
 
 # Plan Mode - Strategic Planning & Architecture Assistant

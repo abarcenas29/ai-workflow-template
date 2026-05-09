@@ -319,4 +319,60 @@ Create a clear architectural guide for implementing new features:
   - Performance considerations
   - Testing blind spots
 
-Include information about when this blueprint was generated and recommendations for keeping it updated as the architecture evolves."
+Include information about when this blueprint was generated and recommendations for keeping it updated as the architecture evolves.
+
+### ${INCLUDES_DECISION_RECORDS ? "18" : INCLUDES_CODE_EXAMPLES ? "17" : "16"}. Populate Agent Knowledge Base
+
+Write the discovered architecture details into the persistent knowledge system so all orchestrator agents (researcher, architect, implementer, coder, tracker) inherit this context without rediscovery:
+
+1. **Update `learned-knowledge.instructions.md`**:
+   - Append session entry with:
+     - **Pipeline:** `architecture-blueprint-generator`
+     - **New knowledge** section: detected tech stack, architectural pattern, layer structure, dependency rules, key abstractions
+   - Organize findings under the relevant sections (Conventions & Patterns, Architecture Decisions, Gotchas)
+
+2. **Create/update `docs/.architecture-context.md`**:
+   A concise, agent-readable reference (~50-150 lines) with:
+
+   ```markdown
+   # Architecture Context (Auto-Detected)
+
+   **Generated:** {date}
+   **Source:** architecture-blueprint-generator skill
+
+   ## Tech Stack
+   | Layer | Technology | Version |
+   |---|---|---|
+   | Frontend | {detected} | {version} |
+   | Backend | {detected} | {version} |
+   | Database | {detected} | {version} |
+   | Infrastructure | {detected} | {version} |
+
+   ## Architectural Pattern
+   {detected pattern} — {brief description, e.g., "Clean Architecture with CQRS"}
+
+   ## Layer Structure
+   | Layer | Directory | Purpose | Depends On |
+   |---|---|---|---|
+   | {name} | {path} | {responsibility} | {layer names} |
+
+   ## Key Abstractions
+   | Interface/Class | Location | Purpose | Implementations |
+   |---|---|---|---|
+   | `{name}` | `{path}` | {what it does} | {concrete classes} |
+
+   ## Dependency Rules
+   - {direction rule}: e.g., "Presentation → Application → Domain ← Infrastructure"
+   - {enforcement}: e.g., "Enforced via ArchUnit tests in tests/Architecture"
+
+   ## Notable Deviations / Gotchas
+   - {issue or quirk found}: {brief description}
+
+   ## Extension Points
+   - {how to add new feature type}: {pattern to follow}
+   ```
+
+3. **After writing both files**, summarize in your output:
+   - `docs/.architecture-context.md` created/updated
+   - `learned-knowledge.instructions.md` appended
+   - Key findings that were persisted (3-5 bullet points)"
