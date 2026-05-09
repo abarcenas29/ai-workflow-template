@@ -13,7 +13,7 @@ This project includes AI-assisted development configuration distributed through 
 
 1. **Understand before acting** — Read relevant instructions from `.agents/instructions/` before working with specific technologies
 2. **Plan before implementing** — Use `.agents/agents/plan.agent.md` or `.agents/agents/implementation-plan.agent.md` patterns for structured work
-3. **Track progress** — Update `.copilot-tracking/changes/*.md` after each task (see `.agents/instructions/task-implementation.instructions.md`)
+3. **Track progress** — Update `memory-bank/activeContext.md` and `memory-bank/progress.md` after each task (see `.agents/instructions/task-implementation.instructions.md`)
 4. **Maintain context** — Keep memory bank files updated (see `.agents/instructions/memory-bank.instructions.md`)
 
 ## Instructions Reference
