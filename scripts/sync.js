@@ -76,7 +76,7 @@ function syncFile(sourceFile, targetFile) {
   copyFileSync(sourceFile, targetFile)
 }
 
-const rootFiles = ['AGENTS.md', 'opencode.mcp.example.json']
+const rootFiles = ['AGENTS.md', 'opencode.mcp.example.json', 'skills-lock.json']
 
 if (!existsSync(sourceAgentsDir)) {
   console.warn('[ai-workflow-template] No .agents directory found to sync.')
@@ -122,6 +122,48 @@ for (const sourceFile of sourceFiles) {
 
   skipped += 1
   console.warn(`[ai-workflow-template] Skipped locally modified file: ${relativePath}`)
+}
+
+/* ──  Sync .opencode/ directory ────────────────────────────── */
+
+const sourceOpenCodeDir = resolve(packageRoot, '.opencode')
+const openCodeExcluded = new Set(['node_modules', 'package.json', 'package-lock.json', 'bun.lock', '.gitignore'])
+
+if (existsSync(sourceOpenCodeDir)) {
+  const openCodeFiles = collectFiles(sourceOpenCodeDir)
+
+  for (const sourceFile of openCodeFiles) {
+    const relativePath = relative(sourceOpenCodeDir, sourceFile)
+    if (openCodeExcluded.has(relativePath) || openCodeExcluded.has(relativePath.split('/')[0])) {
+      continue
+    }
+
+    const targetFile = resolve(consumerRoot, '.opencode', relativePath)
+    const sourceHash = hashFile(sourceFile)
+    const existingHash = existsSync(targetFile) ? hashFile(targetFile) : null
+    const trackedKey = `__opencode__/${relativePath}`
+    const recordedHash = manifest.files[trackedKey] ?? null
+
+    if (!existsSync(targetFile)) {
+      syncFile(sourceFile, targetFile)
+      manifest.files[trackedKey] = sourceHash
+      copied += 1
+      added += 1
+      continue
+    }
+
+    const isUntouched = recordedHash !== null && existingHash === recordedHash
+
+    if (forceOverwrite || isUntouched) {
+      syncFile(sourceFile, targetFile)
+      manifest.files[trackedKey] = sourceHash
+      copied += 1
+      continue
+    }
+
+    skipped += 1
+    console.warn(`[ai-workflow-template] Skipped locally modified opencode file: ${relativePath}`)
+  }
 }
 
 for (const rootFile of rootFiles) {

@@ -1,6 +1,6 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "description": "A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.",
   "main": "index.js",
   "scripts": {
@@ -29,8 +29,11 @@
     ".agents/",
     ".github/workflows/",
     "scripts/",
+    ".opencode/agents/",
+    ".opencode/commands/",
     "AGENTS.md",
-    "opencode.mcp.example.json"
+    "opencode.mcp.example.json",
+    "skills-lock.json"
   ],
   "devDependencies": {
     "@playwright/test": "^1.59.1",
