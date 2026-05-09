@@ -157,9 +157,92 @@ for (const rootFile of rootFiles) {
   console.warn(`[ai-workflow-template] Skipped locally modified root file: ${rootFile}`)
 }
 
+/* ──  Scaffold memory-bank/ directory ──────────────────────────── */
+
+const memoryBankStubs = {
+  'projectbrief.md': `# projectbrief
+
+> Foundation document — defines core requirements and goals.
+
+- **Purpose**: {{describe project purpose}}
+- **Goals**: {{list project goals}}
+- **Scope**: {{define scope}}
+`,
+  'productContext.md': `# productContext
+
+> Why this project exists and what problems it solves.
+
+- **Problem**: {{describe the problem}}
+- **Solution**: {{describe the solution}}
+- **User Experience**: {{describe UX goals}}
+`,
+  'activeContext.md': `# activeContext
+
+> Current work focus, recent changes, next steps.
+
+- **Current Focus**: {{current task or goal}}
+- **Recent Changes**: {{list of recent changes}}
+- **Next Steps**: {{next actions}}
+`,
+  'systemPatterns.md': `# systemPatterns
+
+> Architecture, key decisions, design patterns.
+
+- **Architecture**: {{describe architecture}}
+- **Key Decisions**: {{list key technical decisions}}
+- **Patterns**: {{list design patterns in use}}
+`,
+  'techContext.md': `# techContext
+
+> Technologies, setup, constraints, dependencies.
+
+- **Stack**: {{list technologies}}
+- **Setup**: {{describe dev setup}}
+- **Constraints**: {{list technical constraints}}
+`,
+  'progress.md': `# progress
+
+> What works, what's left, current status.
+
+- **Working**: {{what's implemented and working}}
+- **To Build**: {{what remains}}
+- **Status**: {{overall project status}}
+- **Known Issues**: {{list known issues}}
+`,
+}
+
+const memoryBankDir = resolve(consumerRoot, 'memory-bank')
+let scaffolded = 0
+
+for (const [fileName, fileContent] of Object.entries(memoryBankStubs)) {
+  const targetFile = resolve(memoryBankDir, fileName)
+  const trackedKey = `__memory-bank__/${fileName}`
+
+  if (existsSync(targetFile)) {
+    continue
+  }
+
+  ensureParentDirectory(targetFile)
+  writeFileSync(targetFile, fileContent, 'utf8')
+  manifest.files[trackedKey] = hashFile(targetFile)
+  scaffolded += 1
+}
+
+/* ──  Auto-copy opencode.mcp.json from example ────────────────── */
+
+const exampleMcpFile = resolve(packageRoot, 'opencode.mcp.example.json')
+const targetMcpFile = resolve(consumerRoot, 'opencode.mcp.json')
+const mcpTrackedKey = '__root__/opencode.mcp.json'
+
+if (existsSync(exampleMcpFile) && !existsSync(targetMcpFile)) {
+  copyFileSync(exampleMcpFile, targetMcpFile)
+  manifest.files[mcpTrackedKey] = hashFile(targetMcpFile)
+  scaffolded += 1
+}
+
 if (!dryRun) {
   writeManifest(manifest)
 }
 
 const modeLabel = forceOverwrite ? 'force' : dryRun ? 'dry-run' : 'safe'
-console.log(`[ai-workflow-template] Synced ${copied} files (${added} new), skipped ${skipped} modified files. Mode: ${modeLabel}.`)
+console.log(`[ai-workflow-template] Synced ${copied} files (${added} new), scaffolded ${scaffolded} files, skipped ${skipped} modified files. Mode: ${modeLabel}.`)
