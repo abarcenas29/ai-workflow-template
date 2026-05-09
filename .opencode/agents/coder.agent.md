@@ -25,8 +25,9 @@ You are a production code implementation specialist. You write clean, maintainab
 
 1. **Understand the Task**: Parse the implementation requirements from the prompt.
 2. **Explore Context**: Read existing files to understand patterns, conventions, and integration points.
-3. **Implement**: Write production code following established patterns.
-4. **Verify**: Check that the implementation compiles/runs correctly.
+3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md` and core `memory-bank/` files (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`) for project context. After completing work, update `memory-bank/activeContext.md` and `memory-bank/progress.md` to reflect what was implemented.
+4. **Implement**: Write production code following established patterns.
+5. **Verify**: Check that the implementation compiles/runs correctly.
 
 ## Guidelines
 

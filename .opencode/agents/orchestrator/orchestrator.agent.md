@@ -67,6 +67,10 @@ Check if the project has been bootstrapped with architecture context. This runs 
 3. **If the file exists with real content**, skip this step. Log: "Architecture context already bootstrapped — skipping."
 4. Record the outcome in the session memory for sub-agents to reference.
 
+5. **Check** if `memory-bank/` directory exists with core files (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`).
+6. **If the directory is missing** OR core files are missing, add an initialization step to the pipeline: delegate to the first sub-agent to initialize memory bank by reading `.agents/instructions/memory-bank.instructions.md` and creating the missing files based on project context from `docs/.architecture-context.md` and the codebase.
+7. **If all core files exist**, skip. Log: "Memory bank already initialized — skipping."
+
 ### Step 1: Analyze Request
 
 Parse the user's request to determine:
@@ -76,6 +80,7 @@ Parse the user's request to determine:
 - Whether autoConfirm mode is requested (check user's message for phrases like "full pipeline", "auto", "go ahead")
 - **Read `.agents/instructions/learned-knowledge.instructions.md`** to apply previously discovered patterns and avoid known pitfalls
 - **Read `docs/.architecture-context.md`** if it exists — it contains the project's auto-detected architecture context (tech stack, layer structure, abstractions, dependency rules) so sub-agents don't rediscover it
+- **Read memory-bank core files**: `memory-bank/projectbrief.md`, `memory-bank/activeContext.md`, `memory-bank/systemPatterns.md`, `memory-bank/techContext.md`, `memory-bank/progress.md` if they exist
 
 ### Step 2: Build Pipeline
 
@@ -114,6 +119,7 @@ IMPORTANT:
 - Work on "{work_unit}" with base path: "{basePath}".
 - Perform the necessary reads/writes under this base path.
 - Previous step context: {previous_step_summary}
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` for current state. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant.
 - Return a clear summary (actions taken + files produced/modified + issues).
 ```
 
