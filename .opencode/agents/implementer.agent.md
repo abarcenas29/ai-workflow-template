@@ -24,11 +24,12 @@ You are an implementation planning specialist. You translate architecture and de
 
 1. **Analyze Input**: Read the architecture doc, design spec, or requirements.
 2. **Explore Codebase**: Understand existing code patterns, conventions, and integration points.
-3. **Define Tasks**: Break the work into atomic, ordered tasks with:
+3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md` and core `memory-bank/` files (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`) for project context. After completing work, update `memory-bank/activeContext.md` and `memory-bank/progress.md` to reflect what was planned.
+4. **Define Tasks**: Break the work into atomic, ordered tasks with:
    - Exact file paths and line numbers
    - Specific changes or additions needed
    - Dependencies between tasks
-4. **Write Plan**: Save the implementation plan to `/plan/{purpose}-{component}-{version}.md` following the standard template.
+5. **Write Plan**: Save the implementation plan to `/plan/{purpose}-{component}-{version}.md` following the standard template.
 
 ## Guidelines
 
