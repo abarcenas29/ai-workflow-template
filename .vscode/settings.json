@@ -1,0 +1,18 @@
+{
+  "playwright.reuseBrowser": true,
+  "playwright.showTrace": true,
+  "playwright.env": {
+    "HEADLESS": "false",
+    "SLOW_MO": "0"
+  },
+  "playwright.headed": true,
+  
+  "files.associations": {
+    "*.spec.ts": "typescript",
+    "playwright.config.ts": "typescript"
+  },
+  
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Playwright Test - Current File",
+      "type": "node",
+      "request": "launch",
+      "env": {
+        "PWDEBUG": "console",
+        "HEADLESS": "false"
+      },
+      "program": "${workspaceFolder}/node_modules/.bin/playwright",
+      "args": ["test", "${file}", "--workers=1"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "presentation": {
+        "group": "playwright",
+        "order": 1
+      }
+    },
+    {
+      "name": "Playwright Test - Debug Mode",
+      "type": "node",
+      "request": "launch",
+      "env": {
+        "PWDEBUG": "1",
+        "HEADLESS": "false"
+      },
+      "program": "${workspaceFolder}/node_modules/.bin/playwright",
+      "args": ["test", "${file}", "--debug"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "presentation": {
+        "group": "playwright",
+        "order": 2
+      }
+    },
+    {
+      "name": "Playwright Test - All Tests",
+      "type": "node",
+      "request": "launch",
+      "env": {
+        "PWDEBUG": "console",
+        "HEADLESS": "false"
+      },
+      "program": "${workspaceFolder}/node_modules/.bin/playwright",
+      "args": ["test", "--workers=1"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "presentation": {
+        "group": "playwright",
+        "order": 3
+      }
+    }
+  ]
+}
