@@ -133,6 +133,14 @@ Use this when investigating technical unknowns, evaluating libraries, or validat
 
 Always ask user permission before: creating files, running commands, modifying the system, or experimental operations.
 
+### Feature Pipeline — Stripped-Down Sequential Pipeline
+
+Use this when you want a fixed, opinionated pipeline: **implementer → designer → coder → tracker**. It bootstraps architecture context, supports step-by-step confirmation, logs progress, and persists lessons learned.
+
+The agent file is at `.opencode/agents/orchestrator/feature-pipeline.agent.md`.
+
+**When to use:** You want a predictable, four-step feature pipeline without dynamic agent selection. The orchestrator agent is more flexible; this is more opinionated.
+
 ## Additional Resources
 
 ### Playwright MCP Configuration
