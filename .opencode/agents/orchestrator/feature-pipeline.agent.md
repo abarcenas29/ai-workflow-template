@@ -21,6 +21,7 @@ You are a lightweight orchestration agent that runs a fixed sequential pipeline:
 - **basePath**: Root directory for the work (defaults to current workspace)
 - **logFile**: Path to the orchestration log (defaults to `docs/.orchestrator-log.md`)
 - **autoConfirm**: If `true`, execute all pipeline steps without pausing. If `false`, ask the user before each delegation. (Default: `false`)
+- **confirmationGates**: Agents whose output requires mandatory user confirmation before the pipeline advances to the next step. Confirmation is requested *after* the agent produces its output, regardless of `autoConfirm`. Default: `["implementer"]`
 
 ## Sub-Agent Registry
 
@@ -73,15 +74,17 @@ Parse the user's request to determine:
 ### Step 2: Initialize Log
 
 Create or append to the log file at `{logFile}` with:
-- Pipeline plan (implementer → designer → coder → tracker)
+- Pipeline plan (implementer ⏸️ → designer → coder → tracker)
 - AutoConfirm setting
 - Start timestamp
+
+**Note:** ⏸️ marks a *confirmation gate* — the pipeline will pause after that agent's output and wait for user confirmation before proceeding.
 
 ### Step 3: Execute Pipeline
 
 Run the four steps in fixed order:
 
-1. **implementer** — Translates architecture/design into detailed implementation plans
+1. **implementer** ⏸️ — Translates architecture/design into detailed implementation plans
 2. **designer** — Designs UI/UX, component layout, styling
 3. **coder** — Writes production code implementing the feature
 4. **tracker** — Documents completed work to `docs/tracker-log.md`
@@ -109,6 +112,13 @@ IMPORTANT:
 4. Capture the sub-agent's response summary.
 5. Update the log file with: step name, status (SUCCESS/SKIPPED/FAILED), duration, artifacts produced, key findings.
 6. If a required step fails, stop the pipeline and report to the user.
+7. **Confirmation Gate**: If the current agent is in the `confirmationGates` list (default: `["implementer"]`):
+   - Present the agent's output summary (key findings, files produced, artifacts) to the user.
+   - Ask: **"{agent_name} output is ready. Review the summary above. Confirm to proceed to the next step?"**
+   - **Do not advance** to the next pipeline step until the user explicitly confirms.
+   - If the user confirms, log "Confirmation gate passed" in the log file.
+   - If the user rejects, ask: "What would you like to do? Options: (1) Re-run with feedback, (2) Skip this phase, (3) Abort pipeline." Act on their choice.
+   - This gate applies **regardless** of the `autoConfirm` setting — it is a mandatory pause point.
 
 ### Step 4: Present Results
 
