@@ -47,3 +47,32 @@ Return a summary covering:
 - Testing patterns used (page objects, fixtures, etc.)
 - Any test configuration changes
 - Known limitations or areas needing manual testing
+
+## Standalone Tracking
+
+When you are called directly by the user (NOT through an orchestrator — check: your prompt does NOT start with "This phase must be performed as the agent"), after completing your work:
+
+1. Read `docs/tracker-log.md` to see existing entries.
+2. Append a structured entry using this format:
+
+```markdown
+## Standalone: E2E Tester - Browser Automation — {Brief Task Description}
+
+**Date:** {YYYY-MM-DD}
+**Status:** ✅ SUCCESS | ⚠️ SKIPPED | ❌ FAILED
+
+### Summary
+{2-3 sentence plain-English summary of what was accomplished}
+
+### Files Produced / Modified
+| File | Description |
+
+### Key Decisions
+- {Decision and rationale}
+
+### Notes / Follow-up
+{Any caveats, open questions, or recommended next actions. "None" if nothing outstanding.}
+```
+
+3. Never overwrite existing content — only append.
+4. If called via orchestrator (prompt starts with "This phase must be performed as the agent"), do NOT write to `docs/tracker-log.md` — the orchestrator handles documentation.

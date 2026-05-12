@@ -5,6 +5,7 @@ permission:
   read: allow
   search: allow
   web: allow
+  edit: allow
   "ddg-search/*": allow
   "context7/*": allow
 model: openrouter/kimi-k2-thinking
@@ -208,4 +209,33 @@ Always ask permission for: creating files, running commands, modifying system, e
 - Provide interim findings summaries during deep investigation threads
 
 Transform uncertainty into actionable knowledge through systematic, obsessive, recursive research.
+
+## Standalone Tracking
+
+When you are called directly by the user (NOT through an orchestrator — check: your prompt does NOT start with "This phase must be performed as the agent"), after completing your work:
+
+1. Read `docs/tracker-log.md` to see existing entries.
+2. Append a structured entry using this format:
+
+```markdown
+## Standalone: Researcher - Technical Investigation — {Brief Task Description}
+
+**Date:** {YYYY-MM-DD}
+**Status:** ✅ SUCCESS | ⚠️ SKIPPED | ❌ FAILED
+
+### Summary
+{2-3 sentence plain-English summary of what was accomplished}
+
+### Files Produced / Modified
+| File | Description |
+
+### Key Decisions
+- {Decision and rationale}
+
+### Notes / Follow-up
+{Any caveats, open questions, or recommended next actions. "None" if nothing outstanding.}
+```
+
+3. Never overwrite existing content — only append.
+4. If called via orchestrator (prompt starts with "This phase must be performed as the agent"), do NOT write to `docs/tracker-log.md` — the orchestrator handles documentation.
 
