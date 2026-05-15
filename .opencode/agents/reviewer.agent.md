@@ -6,7 +6,7 @@ permission:
   search: allow
   edit: allow
   "github/*": allow
-model: openrouter/deepseek-flash-v4
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 # Reviewer - Code Quality

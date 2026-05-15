@@ -5,7 +5,7 @@ permission:
   read: allow
   search: allow
   edit: allow
-model: openrouter/kimi-k2-thinking
+model: openrouter/moonshotai/kimi-k2-thinking
 ---
 
 # Architect - System Design

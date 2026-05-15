@@ -7,7 +7,7 @@ permission:
   edit: allow
   execute: allow
   "github/*": allow
-model: openrouter/deepseek-flash-v4
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 # Deployer - Release Engineering
