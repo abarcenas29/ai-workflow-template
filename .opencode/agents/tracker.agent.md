@@ -7,7 +7,7 @@ permission:
   glob: allow
   edit: allow
   write: allow
-model: openrouter/deepseek-flash-v4
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 # Tracker - Documentation Recorder

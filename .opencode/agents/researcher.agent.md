@@ -8,7 +8,7 @@ permission:
   edit: allow
   "ddg-search/*": allow
   "context7/*": allow
-model: openrouter/kimi-k2-thinking
+model: openrouter/moonshotai/kimi-k2-thinking
 ---
 
 # Technical spike research mode
