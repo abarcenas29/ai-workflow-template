@@ -8,7 +8,7 @@ permission:
   execute: allow
   agent: allow
   todo: allow
-model: openrouter/moonshotai/kimi-k2-thinking
+model: deepseek/deepseek-v4-pro
 ---
 
 # Feature Pipeline

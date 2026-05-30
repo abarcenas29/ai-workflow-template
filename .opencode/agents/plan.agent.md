@@ -9,7 +9,7 @@ permission:
   question: allow
   webfetch: allow
   websearch: allow
-model: openrouter/moonshotai/kimi-k2-thinking
+model: deepseek/deepseek-v4-pro
 ---
 
 # Plan Mode - Strategic Planning & Architecture Assistant

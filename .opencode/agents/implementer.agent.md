@@ -6,7 +6,7 @@ permission:
    search: allow
    edit: allow
    execute: allow
-model: openrouter/moonshotai/kimi-k2-thinking
+model: deepseek/deepseek-v4-pro
 ---
 
 # Implementer - Implementation Planning
