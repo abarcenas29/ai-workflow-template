@@ -13,7 +13,7 @@ permission:
   "context7/*": allow
   "github/*": allow
   "playwright/*": allow
-model: openrouter/moonshotai/kimi-k2-thinking
+model: deepseek/deepseek-v4-pro
 ---
 
 # Orchestrator - Multi-Agent Workflow

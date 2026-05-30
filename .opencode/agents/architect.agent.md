@@ -5,7 +5,7 @@ permission:
   read: allow
   search: allow
   edit: allow
-model: openrouter/moonshotai/kimi-k2-thinking
+model: deepseek/deepseek-v4-pro
 ---
 
 # Architect - System Design

@@ -6,7 +6,7 @@ permission:
   search: allow
   edit: allow
   execute: allow
-model: openrouter/deepseek/deepseek-v4-flash
+model: deepseek/deepseek-v4-flash
 ---
 
 # Unit Tester - Test Coverage

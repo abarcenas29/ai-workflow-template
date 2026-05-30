@@ -7,7 +7,7 @@ permission:
   edit: allow
   execute: allow
   "playwright/*": allow
-model: openrouter/deepseek/deepseek-v4-flash
+model: deepseek/deepseek-v4-flash
 ---
 
 # E2E Tester - Browser Automation
