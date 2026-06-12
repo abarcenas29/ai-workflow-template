@@ -6,6 +6,11 @@
       "command": ["npx", "-y", "chrome-devtools-mcp@latest"],
       "enabled": true
     },
+    "angular-cli": {
+      "type": "local",
+      "command": ["npx", "-y", "@angular/cli", "mcp"],
+      "enabled": true
+    },
     "ddg-search": {
        "type": "local",
        "command": ["npx", "-y", "ddg-mcp-search"],
