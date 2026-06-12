@@ -158,6 +158,7 @@ Some agents require MCP servers configured in `opencode.mcp.json` (copy from `op
 - 📋 `create-implementation-plan` - Structured task planning
 - ✍️ `create-readme` - Automated README generation
 - 🎯 `context-map` - File relevance mapping
+- 🧠 `graphify` - Codebase knowledge graph generation
 
 ### Development Tools
 - 🎭 `playwright-explore-website` / `playwright-generate-test` - Browser automation
@@ -176,6 +177,31 @@ Some agents require MCP servers configured in `opencode.mcp.json` (copy from `op
 - 🛡️ `agent-governance` - AI safety controls
 - 🔒 `security-owasp` - OWASP security guidelines
 - 🤝 `conventional-commit` / `git-commit` - Git best practices
+
+---
+
+### 🧠 Knowledge Graph (graphify)
+
+Turns any folder of code, docs, papers, images, or videos into a **queryable knowledge graph** with community detection, interactive HTML visualization, and GraphRAG-ready JSON.
+
+```bash
+# Build a knowledge graph for the current directory
+/graphify
+
+# Build for a specific path
+/graphify <path>
+
+# Query an existing graph
+/graphify query "How does authentication work?"
+```
+
+#### Prerequisites
+
+- **Python 3.10+** — required runtime
+- **`graphifyy` Python package** — `pip install graphifyy` or `uv tool install graphifyy`
+- **Optional: Gemini API key** (`GEMINI_API_KEY` or `GOOGLE_API_KEY`) — enables faster semantic extraction; without it, graphify falls back to Claude subagents
+
+> 📖 [GitHub: safishamsi/graphify](https://github.com/safishamsi/graphify) — full docs, examples, and source
 
 ---
 
