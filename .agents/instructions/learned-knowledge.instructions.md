@@ -1,46 +1,22 @@
----
-applyTo: "**"
-description: "Persistent project knowledge accumulated across sessions. This file grows over time as agents discover patterns, conventions, gotchas, and preferences during work. It enables self-improvement — each session learns from the last."
----
+# Learned Knowledge
 
-# Learned Project Knowledge
+> Accumulated patterns, conventions, gotchas, and agent tuning notes from TDD and other pipeline sessions.
 
-This file is the project's cumulative memory. It is read at the start of every session and updated at the end of every orchestrated pipeline.
+## Session: 2026-06-13
 
-## How to Use
+**Pipeline:** TDD Infrastructure Bootstrap
+**Coverage:** N/A (infrastructure setup)
+**TDD Iterations:** 0
 
-- **Read this file** at the beginning of every task to apply previously discovered patterns and conventions.
-- **Append new entries** when you discover something that would help future sessions (patterns, gotchas, preferences).
-- **Never overwrite** — only append. This is a living log.
+**New knowledge:**
+- Project is a template distribution package (npm), not a deployable application
+- Source code is in `scripts/` (ES modules), not a traditional `src/` directory
+- E2E tests use Playwright with `tests/` directory, `.spec.ts` extension
+- Unit tests use Vitest with `scripts/` directory, `.test.{js,ts}` extension
+- Playwright config uses `chromium` as default, `fullyParallel: true`
+- Coverage threshold is 90% across all metrics (statements, branches, functions, lines)
 
----
-
-## Project Overview
-
-<!-- High-level project description filled in over time -->
-
-## Conventions & Patterns
-
-<!-- Coding conventions, architectural patterns, naming conventions discovered in this project -->
-
-## Gotchas & Deviations
-
-<!-- Unexpected behaviors, tricky configs, known pitfalls -->
-
-## Preferences
-
-<!-- User preferences about tooling, style, approach, etc. -->
-
-## Architecture Decisions
-
-<!-- Key technical decisions and their rationale -->
-
-## Agent Tuning Notes
-
-<!-- Per-agent prompt improvements discovered during sessions -->
-
----
-
-## Session Log
-
-<!-- New entries are appended here by the orchestrator after each pipeline -->
+**Agent tuning notes:**
+- unit-tester: Must be told to look in `scripts/` for source and test files, not `src/`
+- coder: Must be told the project uses ES module syntax (import/export, not require/module.exports)
+- implementer: Plans should target `scripts/` for production code and tests

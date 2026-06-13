@@ -1,6 +1,6 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "1.23.0",
+  "version": "1.25.0",
   "description": "A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,9 @@
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report",
+    "test:unit": "vitest run",
+    "test:unit:coverage": "vitest run --coverage",
+    "test:unit:watch": "vitest",
     "prepare": "husky",
     "sync": "node ./scripts/sync.js",
     "postinstall": "node ./scripts/sync.js"
@@ -37,7 +40,9 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "@vitest/coverage-v8": "^4.1.8",
     "dotenv": "^17.4.2",
-    "husky": "^9.0.0"
+    "husky": "^9.0.0",
+    "vitest": "^4.1.8"
   }
 }

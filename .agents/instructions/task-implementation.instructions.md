@@ -22,12 +22,16 @@ All planning, implementation, and execution work must be recorded in Markdown fi
 
 **MUST complete before starting implementation:**
 
+0. **Verify graphify graph:** Check `graphify-out/graph.json` exists. If not, run `graphify .` to generate it. The graph provides code-level relationship data (dependencies, callers, patterns) that the memory bank's markdown docs alone cannot capture. Skip this step only if the task exclusively modifies markdown/docs files.
 1. Read `memory-bank/activeContext.md` to understand current focus and recent changes
 2. Read `memory-bank/progress.md` to understand project-wide status
 3. Read `memory-bank/tasks/_index.md` to find the task assigned to you
 4. Read the full task file in `memory-bank/tasks/` — understand the request, thought process, implementation plan, and all subtasks
-5. Identify referenced files mentioned in the task and examine them for context
-6. Understand current project structure and conventions
+5. **Graphify context for referenced files:** For each referenced file mentioned in the task:
+   - Run `graphify explain "<file-or-component>"` to get all connected nodes and their relationships
+   - Run `graphify path "<task-relevant-component>" "<referenced-file>"` to trace dependency chains
+   - Fall back to the Read tool only when graphify lacks detail or the file is not in the graph
+6. Understand current project structure and conventions via the graph's community structure (`graphify-out/GRAPH_REPORT.md` `## Communities`) and the memory bank's `systemPatterns.md`
 
 ## 2. Systematic Implementation Process
 
@@ -36,7 +40,7 @@ All planning, implementation, and execution work must be recorded in Markdown fi
 1. **Process subtasks in order** — Follow the task file's subtask sequence exactly, one step at a time
 2. **Before implementing any subtask:**
    - Fully understand all implementation requirements from the task file
-   - Gather any additional required context
+   - Gather any additional required context — prefer `graphify query "<subtask topic>"` over grep/glob for discovering related files, callers, and patterns
 3. **Implement the subtask completely with working code:**
    - Follow existing code patterns and conventions
    - Create working functionality that meets all requirements
@@ -74,6 +78,7 @@ All planning, implementation, and execution work must be recorded in Markdown fi
 2. Update `memory-bank/activeContext.md` — summarize what was implemented and set next steps
 3. Update `memory-bank/tasks/_index.md` — mark the task file as Completed
 4. Mark the task's overall status to Completed in its own file
+5. Run `graphify update .` to sync the knowledge graph with newly implemented code (AST-only, zero API cost)
 
 ## 5. Problem Resolution
 
@@ -88,16 +93,18 @@ All planning, implementation, and execution work must be recorded in Markdown fi
 ## Implementation Workflow
 
 ```
+0. Verify graphify-out/graph.json exists (run `graphify .` if not)
 1. Read activeContext.md, progress.md, tasks/_index.md, and the assigned task file
 2. For each unchecked subtask:
-   a. Fully understand requirements
+   a. Fully understand requirements — query graphify for context
    b. Implement with working code following workspace patterns
    c. Validate implementation meets requirements
    d. Mark subtask complete in task file
    e. Add progress log entry to task file with date and details
    f. Update activeContext.md and _index.md
 3. Repeat until all subtasks complete
-4. Update progress.md, activeContext.md, _index.md with final status
+4. Run `graphify update .` to sync graph
+5. Update progress.md, activeContext.md, _index.md with final status
 ```
 
 ## Success Criteria

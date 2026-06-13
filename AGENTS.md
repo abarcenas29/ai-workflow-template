@@ -141,6 +141,45 @@ The agent file is at `.opencode/agents/orchestrator/feature-pipeline.agent.md`.
 
 **When to use:** You want a predictable, four-step feature pipeline without dynamic agent selection. The orchestrator agent is more flexible; this is more opinionated.
 
+### TDD Orchestrator — Test-Driven Development Pipeline
+
+Use this when you want strict Test-Driven Development: **tests first, code second**. The pipeline enforces the RED → GREEN → REFACTOR/VERIFY cycle:
+
+```
+implementer (PLAN) → unit-tester∥ (RED) → coder∥ (GREEN) → unit-tester (VERIFY ≥90%) → reviewer → tracker
+```
+
+| Step | Phase | Agent | Role |
+|------|-------|-------|------|
+| 1 | PLAN | implementer | Creates plan with parallel test/code batch tables |
+| 2 | RED | unit-tester∥ | Writes failing tests before any implementation exists |
+| 3 | GREEN | coder∥ | Writes minimal code to pass tests — no extra features |
+| 4 | VERIFY | unit-tester | Runs all tests, checks coverage ≥ 90% |
+| 5 | REVIEW | reviewer | Audits tests + code for quality, security, patterns |
+| 6 | DOCUMENT | tracker | Records results to `docs/tracker-log.md` |
+
+The agent file is at `.opencode/agents/orchestrator/tdd-orchestrator.agent.md`.
+
+**When to use:** Any feature, bug fix, or refactor where tests should be written first. The orchestrator automatically selects this pipeline when testable code changes are requested.
+
+**Coverage gate:** If coverage < 90%, the pipeline loops back to RED phase (up to 3 iterations).
+
+### Memory Bank
+
+The memory bank at `memory-bank/` preserves project context across AI sessions. Core files:
+
+| File | Purpose |
+|------|---------|
+| `projectbrief.md` | Core requirements, goals, scope |
+| `productContext.md` | Problem solved, UX goals |
+| `systemPatterns.md` | Architecture, design patterns |
+| `techContext.md` | Technologies, setup, constraints |
+| `activeContext.md` | Current focus, recent changes, next steps |
+| `progress.md` | What works, what's left, known issues |
+| `tasks/` | Per-task tracking with `_index.md` |
+
+**Always read `activeContext.md` and `progress.md` at the start of every task.** Update them after completing work. See `.agents/instructions/memory-bank.instructions.md` for full details.
+
 ## Additional Resources
 
 ### Playwright MCP Configuration
@@ -152,7 +191,9 @@ For details on how Playwright MCP integrates with the headed mode debugging conf
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
-When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+When the user types `/graphify`, invoke these skills in order before doing anything else:
+1. `skill: "graphify-framework-aware"` — detects project frameworks and configures `.graphifyignore` to exclude boilerplate
+2. `skill: "graphify"` — runs the knowledge graph pipeline
 
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.

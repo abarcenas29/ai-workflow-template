@@ -59,6 +59,7 @@
     "ddg-search_*": "allow",
     "github_*": "allow",
     "mcp-everything_*": "allow",
+    "angular-cli_*": "allow",
     "playwright_*": "allow"
   }
 }

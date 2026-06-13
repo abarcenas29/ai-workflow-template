@@ -5,6 +5,9 @@ description: 'Comprehensive project architecture blueprint generator that analyz
 
 # Comprehensive Project Architecture Blueprint Generator
 
+> **Pre-discovery:** Load the `context-map` skill first to build a scoped file-level map via graphify. The context map feeds into the full blueprint below.
+> **Graphify:** All codebase discovery uses `graphify query`, `graphify path`, and `graphify explain` against `graphify-out/graph.json`. Grep/glob/read are fallbacks only when graphify returns no results.
+
 ## Configuration Variables
 ${PROJECT_TYPE="Auto-detect|.NET|Java|React|Angular|Python|Node.js|Flutter|Other"} <!-- Primary technology -->
 ${ARCHITECTURE_PATTERN="Auto-detect|Clean Architecture|Microservices|Layered|MVVM|MVC|Hexagonal|Event-Driven|Serverless|Monolithic|Other"} <!-- Primary architectural pattern -->
@@ -19,18 +22,45 @@ ${FOCUS_ON_EXTENSIBILITY=true|false} <!-- Emphasize extension points and pattern
 
 "Create a comprehensive 'Project_Architecture_Blueprint.md' document that thoroughly analyzes the architectural patterns in the codebase to serve as a definitive reference for maintaining architectural consistency. Use the following approach:
 
+### 0. Graphify-First Discovery
+
+Before any grep, glob, or manual file reads, leverage the project's knowledge graph for token-efficient discovery:
+
+**0a. Bootstrap the graph if needed:**
+If `graphify-out/graph.json` does not exist, generate it first:
+```
+graphify .
+```
+This builds the knowledge graph with AST-extracted relationships and community structure. All subsequent discovery steps query the graph.
+
+**0b. Architecture detection via graph queries (primary):**
+- `graphify query "architecture pattern layers dependencies"` — discover architectural structure
+- `graphify query "technology stack frameworks packages imports"` — detect tech stack
+- `graphify query "key interfaces abstractions design patterns"` — identify core abstractions
+- `graphify query "cross-cutting concerns authentication logging configuration"` — find cross-cutting concern implementations
+
+**0c. Relationship mapping via graph (primary):**
+- `graphify path "<ComponentA>" "<ComponentB>"` — trace dependency chains between subsystems
+- `graphify explain "<component>"` — deep-dive on a single node's connections and patterns
+- `graphify query "circular dependency"` — detect layer violations and dependency cycles
+
+**0d. Broad architecture scan:**
+Read `graphify-out/GRAPH_REPORT.md` `## Communities` and `## God Nodes` sections for community structure and hub nodes. Use `graphify-out/wiki/index.md` for agent-navigable wiki if it exists.
+
+**0e. Fallback to grep/glob/read:**
+Only when graphify queries return no relevant results (rare for well-structured codebases), fall back to grep/glob/file-reads. Graphify subgraph results are typically 200-800 tokens vs. 3000+ tokens for raw grep output.
+
 ### 1. Architecture Detection and Analysis
-- ${PROJECT_TYPE == "Auto-detect" ? "Analyze the project structure to identify all technology stacks and frameworks in use by examining:
-  - Project and configuration files
-  - Package dependencies and import statements
-  - Framework-specific patterns and conventions
-  - Build and deployment configurations" : "Focus on ${PROJECT_TYPE} specific patterns and practices"}
-  
-- ${ARCHITECTURE_PATTERN == "Auto-detect" ? "Determine the architectural pattern(s) by analyzing:
-  - Folder organization and namespacing
-  - Dependency flow and component boundaries
-  - Interface segregation and abstraction patterns
-  - Communication mechanisms between components" : "Document how the ${ARCHITECTURE_PATTERN} architecture is implemented"}
+- ${PROJECT_TYPE == "Auto-detect" ? "Use graphify queries to identify all technology stacks and frameworks in use:
+  - `graphify query \"technology stack frameworks dependencies imports\"` for tech stack
+  - `graphify query \"build configuration deployment infrastructure\"` for build/deploy config
+  - Read `graphify-out/GRAPH_REPORT.md` `## Communities` for community-level technology groupings" : "Focus on ${PROJECT_TYPE} specific patterns and practices"}
+
+- ${ARCHITECTURE_PATTERN == "Auto-detect" ? "Determine the architectural pattern(s) by querying the graph structure:
+  - `graphify query \"layer dependency direction boundaries\"` reveals dependency flow
+  - `graphify query \"interfaces abstractions contract segregation\"` reveals interface patterns
+  - `graphify path` between key subsystems reveals communication mechanisms
+  - `graphify explain \"<layer-name>\"` deep-dives into each architectural layer" : "Document how the ${ARCHITECTURE_PATTERN} architecture is implemented"}
 
 ### 2. Architectural Overview
 - Provide a clear, concise explanation of the overall architectural approach
@@ -39,17 +69,29 @@ ${FOCUS_ON_EXTENSIBILITY=true|false} <!-- Emphasize extension points and pattern
 - Note any hybrid architectural patterns or adaptations of standard patterns
 
 ### 3. Architecture Visualization
+
+Extract component relationships from the graph before building diagrams:
+- `graphify query "component subsystem module relationships dependencies"` — discover subsystems
+- `graphify path "<SubsystemA>" "<SubsystemB>"` — verify dependency directions between specific subsystems
+- `graphify explain "<subsystem>"` — deep-dive into a subsystem's internal structure and connections
+- Use `graphify-out/GRAPH_REPORT.md` `## Surprising Connections` for non-obvious cross-boundary links
+
 ${DIAGRAM_TYPE != "None" ? `Create ${DIAGRAM_TYPE} diagrams at multiple levels of abstraction:
-- High-level architectural overview showing major subsystems
-- Component interaction diagrams showing relationships and dependencies
-- Data flow diagrams showing how information moves through the system
+- High-level architectural overview showing major subsystems (from graph community structure)
+- Component interaction diagrams showing relationships and dependencies (from graph edges)
+- Data flow diagrams showing how information moves through the system (from `graphify path` traces)
 - Ensure diagrams accurately reflect the actual implementation, not theoretical patterns` : "Describe the component relationships based on actual code dependencies, providing clear textual explanations of:
-- Subsystem organization and boundaries
-- Dependency directions and component interactions
-- Data flow and process sequences"}
+- Subsystem organization and boundaries (from graph communities)
+- Dependency directions and component interactions (from graph edges)
+- Data flow and process sequences (from `graphify path` traces)"}
 
 ### 4. Core Architectural Components
-For each architectural component discovered in the codebase:
+Discover components via the graph first, then deep-dive:
+- Identify major components from `graphify-out/GRAPH_REPORT.md` `## God Nodes` (hub nodes with highest degree)
+- Use `graphify explain "<component>"` to get all connected nodes and relationships for each god node
+- Use `graphify path "<component>" "<other>"` to trace specific interaction patterns between components
+
+For each architectural component discovered:
 
 - **Purpose and Responsibility**:
   - Primary function within the architecture
@@ -320,6 +362,9 @@ Create a clear architectural guide for implementing new features:
   - Testing blind spots
 
 Include information about when this blueprint was generated and recommendations for keeping it updated as the architecture evolves.
+
+### Post-Generation: Keep Graph Current
+After the blueprint is generated, run `graphify update .` to incrementally re-extract any changed files. This keeps the graph aligned with newly documented architecture understanding, so future queries (`graphify query`, `graphify path`, `graphify explain`) return up-to-date results without rebuilding the entire graph.
 
 ### ${INCLUDES_DECISION_RECORDS ? "18" : INCLUDES_CODE_EXAMPLES ? "17" : "16"}. Populate Agent Knowledge Base
 

@@ -70,6 +70,20 @@ flowchart TD
    - Includes task index file (`_index.md`) listing all tasks with their statuses
    - Preserves complete thought process and history for each task
 
+### Graph-Enhanced Context (graphify)
+
+When `graphify-out/graph.json` exists, it serves as a complementary machine-readable index of all file relationships, dependencies, and architectural patterns. The memory bank's markdown files capture human-written project context; graphify captures automatically extracted code-level connections.
+
+**Bootstrap:** If `graphify-out/graph.json` does not exist, run `graphify .` to generate the knowledge graph before reading any memory bank files. This ensures code-level relationship data is available alongside the markdown context.
+
+**When to query the graph instead of reading files:**
+- Architecture and dependency questions → `graphify query` (subgraph results, ~200-800 tokens)
+- Component interaction tracing → `graphify path "<A>" "<B>"`
+- Focused concept deep-dives → `graphify explain "<concept>"`
+- Community/pattern overview → `graphify-out/GRAPH_REPORT.md`
+
+**Keeping the graph current:** After any code modification, run `graphify update .` (AST-only, zero API cost) to sync the graph.
+
 ### Additional Context
 
 Create additional files/folders within memory-bank/ when they help organize:
@@ -86,8 +100,12 @@ Create additional files/folders within memory-bank/ when they help organize:
 
 ```mermaid
 flowchart TD
-    Start[Start] --> ReadFiles[Read Memory Bank]
-    ReadFiles --> CheckFiles{Files Complete?}
+    Start[Start] --> CheckGraph{graphify-out/graph.json exists?}
+    CheckGraph -->|No| Bootstrap[Run graphify .]
+    Bootstrap --> ReadFiles[Read Memory Bank]
+    CheckGraph -->|Yes| ReadFiles
+    ReadFiles --> QueryGraph[Query graphify for architecture context]
+    QueryGraph --> CheckFiles{Files Complete?}
 
     CheckFiles -->|No| Plan[Create Plan]
     Plan --> Document[Document in Chat]
@@ -139,6 +157,41 @@ For every task:
 
 The Markdown record is the source of truth for auditing, traceability, and recovery after session resets.
 
+## Graphify-Enhanced Context Retrieval
+
+When `graphify-out/graph.json` exists, prefer graphify over grep/glob for codebase questions:
+
+| Question Type | Graphify Command | Replaces |
+|---|---|---|
+| How does X work? | `graphify explain "X"` | Grep for definitions, reading multiple files |
+| What calls Y? | `graphify query "calls Y depends-on Y invokes Y"` | Recursive grep for callers across files |
+| How does A connect to B? | `graphify path "A" "B"` | Manual dependency tracing across files |
+| Architecture overview | `graphify query "architecture layers patterns dependencies"` | GRAPH_REPORT.md / file-by-file analysis |
+| Community structure | `graphify-out/GRAPH_REPORT.md` `## Communities` | Manual folder hierarchy analysis |
+| Key abstractions | `graphify query "interface abstract class base pattern"` | Grep for interface/abstract class definitions |
+
+**Token efficiency:** graphify queries return focused subgraphs (~200-800 tokens) vs. raw grep results (often 3000+ tokens for large codebases). Always query the graph first; fall back to grep only when graphify lacks sufficient data or `graphify-out/graph.json` is missing.
+
+**Expanding queries:** When a graphify query returns 0 hits, expand the question against the graph's vocabulary before falling back to grep. Run:
+```
+$(cat graphify-out/.graphify_python) -c "
+import json, re
+from pathlib import Path
+data = json.loads(Path('graphify-out/graph.json').read_text())
+vocab = set()
+for n in data['nodes']:
+    for c in re.findall(r'[^\W\d_]+', n.get('label','') or '', re.UNICODE):
+        parts = re.findall(r'[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+', c) or [c]
+        for p in parts:
+            t = p.lower()
+            if 3 <= len(t) <= 30:
+                vocab.add(t)
+Path('graphify-out/.vocab.txt').write_text('\n'.join(sorted(vocab)))
+print(f'vocab: {len(vocab)} tokens')
+"
+```
+Then select up to 12 tokens from the vocabulary list that semantically match the query intent, and re-run with the expanded query.
+
 ## Documentation Updates
 
 Memory Bank updates occur when:
@@ -147,6 +200,7 @@ Memory Bank updates occur when:
 2. After implementing significant changes
 3. When user requests with **update memory bank** (MUST review ALL files)
 4. When context needs clarification
+5. After code changes that introduce new relationships — run `graphify update .` to sync the graph
 
 ```mermaid
 flowchart TD
