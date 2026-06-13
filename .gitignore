@@ -4,3 +4,4 @@ opencode.mcp.json
 .agents-sync-manifest.json
 node_modules/
 graphify-out/
+coverage/
