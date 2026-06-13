@@ -12,12 +12,17 @@ This isn't a one-off template to clone—it's a **live npm package** that distri
 
 - ⚙️ **27+ Specialized AI Skills** - Reusable, task-based workflows (`.agents/skills/`)
 - 🧠 **Smart Agent Frameworks** - Plan Mode, Implementation Plans, Research Spikes (`.agents/agents/`)
+- 🔄 **Multi-Agent Orchestrator** — Dynamic pipeline builder with 10+ specialized sub-agents
+- 🧪 **TDD Orchestrator** — Strict RED→GREEN→REFACTOR/VERIFY test-driven pipeline (90% coverage gate)
 - 📝 **Framework Instructions** - Technology-specific guidance (`.agents/instructions/`)
 - 💬 **Prompt Templates** - Ready-to-use prompt blueprints (`.agents/prompts/`)
+- 🧠 **Memory Bank** — Persistent project context across AI sessions
 - 🏃‍♂️ **Caveman Mode** - Ultra-compressed communication for token efficiency
-- 🧪 **Playwright Testing** - Automated testing with MCP integration
+- 🎭 **Playwright Testing** - Automated E2E testing with MCP integration
+- ⚡ **Vitest Unit Testing** — Fast unit tests with v8 coverage (≥90% threshold)
 - 📦 **Version Auto-Bumping** - Husky-managed semantic versioning
 - 🚀 **Auto-Publishing** - npm publish on merge to `main`
+- 🗺️ **graphify Knowledge Graph** — Queryable code-level relationship mapping
 
 ---
 
@@ -205,6 +210,59 @@ Turns any folder of code, docs, papers, images, or videos into a **queryable kno
 
 ---
 
+### 🧪 TDD Orchestrator — Test-Driven Development Pipeline
+
+The project enforces a strict **Test-Driven Development** methodology through a specialized orchestrator that runs the **RED → GREEN → REFACTOR/VERIFY** cycle:
+
+```
+implementer (PLAN) → unit-tester∥ (RED) → coder∥ (GREEN) → unit-tester (VERIFY) → reviewer → tracker
+```
+
+| Step | Agent | Phase | Description |
+|------|-------|-------|-------------|
+| 1 | Implementer | PLAN | Creates implementation plan with parallel test/code batch tables |
+| 2 | Unit Tester | RED | Writes FAILING tests first — defines expected behavior before any code exists |
+| 3 | Coder | GREEN | Writes MINIMAL production code to pass all tests — no extra features |
+| 4 | Unit Tester | VERIFY | Runs full suite, enforces ≥90% coverage threshold |
+| 5 | Reviewer | REFACTOR | Audits tests + implementation for quality, security, patterns |
+| 6 | Tracker | DOCUMENT | Records pipeline results to `docs/tracker-log.md` |
+
+**Key TDD rules enforced:**
+- Tests are ALWAYS written first (RED phase) — no implementation until tests exist
+- Coverage gate: if <90%, loop back to RED phase (up to 3 iterations)
+- Every test suite tracked in `memory-bank/tasks/`
+- Lessons learned persisted to `.agents/instructions/learned-knowledge.instructions.md`
+
+**How to invoke:**
+
+```bash
+@orchestrator Add user authentication with login/logout endpoints
+```
+
+The TDD orchestrator uses `subagent_type "tdd-orchestrator"` and auto-selects the strict TDD pipeline when testable code changes are requested.
+
+### 🧠 Memory Bank — Persistent Project Context
+
+The memory bank preserves project knowledge across AI sessions, preventing context loss after resets:
+
+```
+projectbrief.md → productContext.md / systemPatterns.md / techContext.md → activeContext.md → progress.md / tasks/
+```
+
+| File | Purpose |
+|------|---------|
+| `memory-bank/projectbrief.md` | Core requirements, goals, and scope |
+| `memory-bank/productContext.md` | Problem solved, UX goals |
+| `memory-bank/systemPatterns.md` | Architecture, design patterns, component relationships |
+| `memory-bank/techContext.md` | Technologies, dev setup, constraints |
+| `memory-bank/activeContext.md` | Current focus, recent changes, next steps |
+| `memory-bank/progress.md` | What works, what's left, known issues |
+| `memory-bank/tasks/` | Per-task tracking with `_index.md` |
+
+**Task commands:** `add task`, `update task [ID]`, `show tasks [filter]`
+
+---
+
 ## 📦 Versioning
 
 Husky automatically bumps versions on every commit:
@@ -245,9 +303,28 @@ npm run sync -- --dry-run
 # Test package creation
 npm pack --json
 
-# Run Playwright tests
+# Run Playwright E2E tests
 npm test
+
+# Run unit tests (Vitest)
+npm run test:unit
+
+# Run unit tests with coverage (90% threshold)
+npm run test:unit:coverage
+
+# Watch mode for unit tests
+npm run test:unit:watch
 ```
+
+### Testing
+
+| Type | Framework | Command | Coverage |
+|------|-----------|---------|----------|
+| E2E | Playwright | `npm test` | — |
+| Unit | Vitest | `npm run test:unit` | `npm run test:unit:coverage` (≥90%) |
+
+- **E2E tests** live in `tests/*.spec.ts` — browser automation via Playwright
+- **Unit tests** live in `scripts/*.test.{js,ts}` — component tests via Vitest with v8 coverage
 
 ---
 
