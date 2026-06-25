@@ -154,7 +154,6 @@ Add tests for the authentication module with focus on edge cases
 
 - Project must have a build/test system configured
 - Testing framework should be installed (or installable)
-- VS Code with GitHub Copilot extension
 
 ## Troubleshooting
 

@@ -17,9 +17,19 @@
 - Created `.agents/instructions/learned-knowledge.instructions.md`
 - Populated all 6 memory bank core files with real project context
 
+## Recent Changes (continued)
+
+- Rewrote `.agents/instructions/agent.instructions.md` (1068→609 lines) — replaced all GitHub Copilot references with opencode equivalents:
+  - Simplified frontmatter to `description`, `name`, `tools` only
+  - Removed Copilot-only sections: Handoffs, MCP Server Config, Agent Processing/Behavior, Version Compatibility
+  - Updated tool configuration with opencode tool set (`Bash`, `Read`, `Write`, `Edit`, `Grep`, `Glob`, `Task`, `TodoWrite`, `Skill`, `WebFetch`, `WebSearch`)
+  - Updated sub-agent orchestration to use `Task` tool and `.agents/agents/` paths
+  - Replaced `${variableName}` syntax with plain-language descriptions
+
 ## Next Actions
 
 1. Create a minimal unit test to verify Vitest setup works end-to-end
 2. Run `npm run test:unit` to confirm the test framework is functional
 3. TDD orchestrator is now ready for its first real feature/task
 4. Consider creating a sample unit test in `scripts/` to validate the pipeline
+5. Review remaining instruction files for any lingering Copilot references
