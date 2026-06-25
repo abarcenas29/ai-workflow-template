@@ -64,7 +64,7 @@ GitHub docs live on **docs.github.com** and **cli.github.com**.
 
 | Library ID             | Use for                                       |
 | ---------------------- | --------------------------------------------- |
-| `/websites/github_en`  | Actions, API, repos, security, admin, Copilot |
+| `/websites/github_en`  | Actions, API, repos, security, admin |
 | `/websites/cli_github` | GitHub CLI (`gh`) commands and flags          |
 
 ### Agent Framework — Use Learn MCP + Context7

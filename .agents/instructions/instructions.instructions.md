@@ -1,18 +1,18 @@
 ---
-description: "Guidelines for creating high-quality custom instruction files for GitHub Copilot"
+description: "Guidelines for creating high-quality custom instruction files for opencode"
 applyTo: "**/*.instructions.md"
 ---
 
 # Custom Instructions File Guidelines
 
-Instructions for creating effective and maintainable custom instruction files that guide GitHub Copilot in generating domain-specific code and following project conventions.
+Instructions for creating effective and maintainable custom instruction files that guide opencode in generating domain-specific code and following project conventions.
 
 ## Project Context
 
-- Target audience: Developers and GitHub Copilot working with domain-specific code
+- Target audience: Developers and AI assistants working with domain-specific code
 - File format: Markdown with YAML frontmatter
 - File naming convention: lowercase with hyphens (e.g., `react-best-practices.instructions.md`)
-- Location: `.github/instructions/` directory
+- Location: `.agents/instructions/` directory
 - Purpose: Provide context-aware guidance for code generation, review, and documentation
 
 ## Required Frontmatter
@@ -189,7 +189,7 @@ function getUser(id: any): any {
 
 Before finalizing instruction files:
 
-1. **Test with Copilot**: Try the instructions with actual prompts in VS Code
+1. **Test with opencode**: Try the instructions with actual tasks
 2. **Verify Examples**: Ensure code examples are correct and run without errors
 3. **Check Glob Patterns**: Confirm `applyTo` patterns match intended files
 
@@ -260,5 +260,4 @@ Description and example
 
 ## Additional Resources
 
-- [Custom Instructions Documentation](https://code.visualstudio.com/docs/copilot/customization/custom-instructions)
-- [Awesome Copilot Instructions](https://github.com/github/awesome-copilot/tree/main/instructions)
+- [opencode Documentation](https://opencode.ai)

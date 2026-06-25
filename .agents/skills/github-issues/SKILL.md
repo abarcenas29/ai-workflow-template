@@ -87,7 +87,7 @@ State values: `open`, `closed`
 ```json
 {
   "owner": "github",
-  "repo": "awesome-copilot",
+  "repo": "example-project",
   "title": "[Bug] Login page crashes when using SSO",
   "body": "## Description\nThe login page crashes when users attempt to authenticate using SSO.\n\n## Steps to Reproduce\n1. Navigate to login page\n2. Click 'Sign in with SSO'\n3. Page crashes\n\n## Expected Behavior\nSSO authentication should complete and redirect to dashboard.\n\n## Actual Behavior\nPage becomes unresponsive and displays error.\n\n## Environment\n- Browser: [To be filled]\n- OS: [To be filled]\n\n## Additional Context\nReported by user.",
   "labels": ["bug"]
@@ -103,7 +103,7 @@ State values: `open`, `closed`
 ```json
 {
   "owner": "github",
-  "repo": "awesome-copilot",
+  "repo": "example-project",
   "title": "[Feature] Add dark mode support",
   "body": "## Summary\nAdd dark mode theme option for improved user experience and accessibility.\n\n## Motivation\n- Reduces eye strain in low-light environments\n- Increasingly expected by users\n- Improves accessibility\n\n## Proposed Solution\nImplement theme toggle with system preference detection.\n\n## Acceptance Criteria\n- [ ] Toggle switch in settings\n- [ ] Persists user preference\n- [ ] Respects system preference by default\n- [ ] All UI components support both themes\n\n## Alternatives Considered\nNone specified.\n\n## Additional Context\nHigh priority request.",
   "labels": ["enhancement", "high-priority"]

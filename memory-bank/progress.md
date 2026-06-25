@@ -20,6 +20,19 @@
 - **Unit tests**: Vitest framework installed but no test files exist yet
 - **Coverage baseline**: No coverage data until first test run
 - **Feature pipeline**: Haven't been exercised since bootstrap
+- **Remaining instruction files**: Some may still contain Copilot references needing porting to opencode
+
+## Recently Completed
+
+### 2026-06-25: Rewrote agent.instructions.md for opencode
+
+Rewrote `.agents/instructions/agent.instructions.md` (1068→609 lines):
+- Simplified frontmatter — removed `model`, `target`, `infer`, `metadata`, `mcp-servers`, `handoffs`
+- Removed ~300 lines of Copilot-only content (Handoffs, MCP Server Config, Processing/Behavior, Version Compatibility)
+- Replaced tool aliases with opencode's case-sensitive tool names
+- Updated all paths from `.github/agents/` to `.agents/agents/`
+- Kept generic sections: orchestration, prompt structure, variables, checklist, patterns, testing
+- This was the third and largest instruction file ported (after `prompt.instructions.md` and `instructions.instructions.md`)
 
 ## Current Status
 
