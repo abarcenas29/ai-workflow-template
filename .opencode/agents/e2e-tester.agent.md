@@ -7,6 +7,7 @@ permission:
   edit: allow
   execute: allow
   "playwright/*": allow
+  "memory-bank/*": allow
 model: deepseek/deepseek-v4-flash
 ---
 

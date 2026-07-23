@@ -8,6 +8,7 @@ permission:
   execute: allow
   agent: allow
   todo: allow
+  "memory-bank/*": allow
 model: deepseek/deepseek-v4-pro
 ---
 
@@ -69,7 +70,7 @@ Parse the user's request to determine:
 - Whether autoConfirm mode is requested (check user's message for phrases like "full pipeline", "auto", "go ahead")
 - **Read `.agents/instructions/learned-knowledge.instructions.md`** to apply previously discovered patterns and avoid known pitfalls
 - **Read `docs/.architecture-context.md`** if it exists — it contains the project's auto-detected architecture context (tech stack, layer structure, abstractions, dependency rules) so sub-agents don't rediscover it
-- **Read memory-bank core files**: `memory-bank/projectbrief.md`, `memory-bank/activeContext.md`, `memory-bank/systemPatterns.md`, `memory-bank/techContext.md`, `memory-bank/progress.md` if they exist
+- **Search memory-bank**: use `memory_bank_memory_search` for semantic context and `memory_bank_memory_get` to read core files (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`)
 
 ### Step 2: Initialize Log
 
@@ -107,7 +108,7 @@ IMPORTANT:
 - Previous step context: {previous_step_summary}
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Learned knowledge: read .agents/instructions/learned-knowledge.instructions.md for patterns and conventions.
-- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` for current state. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant.
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
 - Return a clear summary (actions taken + files produced/modified + issues).
 ```
 
@@ -140,7 +141,7 @@ When the pipeline reaches the "coder" step and the latest implementer plan has p
       - Work on "Implement task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
       - Perform the necessary reads/writes under this base path.
       - Previous step context: {previous_step_summary}
-      - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` for current state. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant.
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
       - Return a clear summary (actions taken + files produced/modified + issues).
       ```
    d. **Wait for all tasks in this batch to complete** (fan-in). Capture each response summary.

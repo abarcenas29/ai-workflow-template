@@ -8,6 +8,7 @@ permission:
   edit: allow
   "ddg-search/*": allow
   "context7/*": allow
+  "memory-bank/*": allow
 model: deepseek/deepseek-v4-pro
 ---
 
