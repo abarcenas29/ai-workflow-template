@@ -4,5 +4,12 @@ opencode.mcp.json
 .agents-sync-manifest.json
 node_modules/
 graphify-out/
-memory-bank/.index/
 coverage/
+
+# Memory vector index (generated, rebuildable)
+memory-bank/.index/
+
+# Local embedding model cache
+models/
+.cache/
+*.onnx

@@ -1,3 +1,11 @@
+---
+id: "playwright-mcp-configuration"
+title: "Playwright MCP Configuration"
+updated: "2026-05-12"
+tags: [configuration]
+doc_type: "configuration"
+---
+
 # Playwright MCP Configuration
 
 ## Overview

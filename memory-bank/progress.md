@@ -1,3 +1,12 @@
+---
+id: "progress"
+title: "Progress"
+updated: "2026-06-25"
+tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, tdd, feature-pipeline]
+entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm]
+category: "progress"
+---
+
 # Progress
 
 ## What Works
