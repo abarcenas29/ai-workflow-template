@@ -8,6 +8,7 @@ permission:
   execute: allow
   agent: allow
   todo: allow
+  "memory-bank/*": allow
 model: deepseek/deepseek-v4-pro
 ---
 
@@ -93,7 +94,7 @@ Parse the user's request to determine:
 - Whether the user specified `minCoverage` or `maxTDDIterations` overrides (e.g. "minCoverage=85", "maxIterations=5")
 - **Read `.agents/instructions/learned-knowledge.instructions.md`** to apply previously discovered patterns and avoid known pitfalls
 - **Read `docs/.architecture-context.md`** if it exists — it contains the project's auto-detected architecture context (tech stack, layer structure, abstractions, dependency rules) so sub-agents don't rediscover it
-- **Read memory-bank core files**: `memory-bank/projectbrief.md`, `memory-bank/activeContext.md`, `memory-bank/systemPatterns.md`, `memory-bank/techContext.md`, `memory-bank/progress.md` if they exist
+- **Search memory-bank**: use `memory_bank_memory_search` for semantic context and `memory_bank_memory_get` to read core files (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`)
 
 ### Step 2: Build Pipeline
 
@@ -136,8 +137,8 @@ IMPORTANT:
 - The batches within each table must respect dependency order (Batch A has no deps, Batch B depends on Batch A completing, etc.).
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Learned knowledge: read .agents/instructions/learned-knowledge.instructions.md for patterns and conventions.
-- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` for current state.
-- After completing the plan, update `memory-bank/activeContext.md` and `memory-bank/progress.md`.
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads.
+- After completing the plan, update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then run `memory_bank_memory_update`.
 - Return a clear summary including: plan file path, number of test tasks, number of implementation tasks, batch breakdown per table.
 ```
 
@@ -173,6 +174,7 @@ IMPORTANT:
      2. Update `memory-bank/tasks/_index.md` — add the new test task entry.
      3. Update `memory-bank/activeContext.md` — append test coverage baseline for this component.
      4. Update `memory-bank/progress.md` — document which test suites were created and their status.
+     5. Run `memory_bank_memory_update` to sync the index.
    - Return a clear summary: test files created, number of test cases per file, coverage areas covered, memory-bank files updated.
    ```
    d. **Wait for all test tasks in this batch to complete** (fan-in). Capture each response summary.
@@ -214,7 +216,8 @@ IMPORTANT:
    - Update memory-bank files:
      1. Update `memory-bank/activeContext.md` — append what was implemented and which tests it satisfies.
      2. Update `memory-bank/progress.md` — document implementation status and test alignment.
-     3. Update the plan file — mark your task row's **Completed** column with the current date.
+     3. Run `memory_bank_memory_update` to sync the index.
+     4. Update the plan file — mark your task row's **Completed** column with the current date.
    - Return a clear summary: files created/modified, which test files were satisfied, build verification results, memory-bank files updated.
    ```
    d. **Wait for all implementation tasks in this batch to complete** (fan-in). Capture each response summary.
@@ -253,6 +256,7 @@ IMPORTANT:
   1. Update `memory-bank/activeContext.md` — append test run results and coverage report.
   2. Update `memory-bank/progress.md` — document verification status.
   3. Update `memory-bank/tasks/_index.md` — update test task statuses based on pass/fail results.
+  4. Run `memory_bank_memory_update` to sync the index.
 - Return a clear summary including: pass/fail counts, coverage percentage, threshold met (yes/no), failing test details if any, coverage gaps if any.
 ```
 

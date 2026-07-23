@@ -4,4 +4,5 @@ opencode.mcp.json
 .agents-sync-manifest.json
 node_modules/
 graphify-out/
+memory-bank/.index/
 coverage/

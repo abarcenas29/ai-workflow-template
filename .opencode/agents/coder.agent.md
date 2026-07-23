@@ -6,6 +6,7 @@ permission:
   search: "allow"
   edit: "allow"
   execute: "allow"
+  "memory-bank/*": allow
 model: deepseek/deepseek-v4-flash
 ---
 
@@ -28,13 +29,14 @@ You are a production code implementation specialist. You write clean, maintainab
    - Read the full phase section for context — understand what sibling tasks exist and how yours fits
    - Check the Parallel Execution Summary to see which batch you belong to and whether sibling tasks are running concurrently
 2. **Explore Context**: Read existing files to understand patterns, conventions, and integration points.
-3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md` and core `memory-bank/` files (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`) for project context.
+3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md`. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads.
 4. **Implement**: Write production code following established patterns.
 5. **Verify**: Check that the implementation compiles/runs correctly.
 6. **Document**: Record what was accomplished in all three locations:
    - **Plan file**: Open `/plan/{purpose}-{component}-{version}.md` and mark your task row's **Completed** column with the current date. If the task is the last incomplete in its phase, update the phase status as well.
    - **memory-bank/activeContext.md**: Append a summary of what was implemented, files changed, and current focus.
    - **memory-bank/progress.md**: Update the project status — document what now works and any known issues.
+   - Run `memory_bank_memory_update` to sync the index.
 
 ## Guidelines
 

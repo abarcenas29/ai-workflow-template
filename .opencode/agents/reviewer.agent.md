@@ -6,6 +6,7 @@ permission:
   search: allow
   edit: allow
   "github/*": allow
+  "memory-bank/*": allow
 model: deepseek/deepseek-v4-flash
 ---
 
