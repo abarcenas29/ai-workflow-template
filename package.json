@@ -1,7 +1,7 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "1.25.0",
-  "description": "A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.",
+  "version": "1.26.0",
+  "description": "A comprehensive template repository for AI-assisted development workflows using OpenCode. Provides structured agent pipelines, TDD orchestrator, memory bank with vector search, skills, prompts, and coding standards distributed as an npm package.",
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
@@ -14,7 +14,11 @@
     "test:unit:watch": "vitest",
     "prepare": "husky",
     "sync": "node ./scripts/sync.js",
-    "postinstall": "node ./scripts/sync.js"
+    "postinstall": "node ./scripts/sync.js && node ./scripts/normalize-memory.js",
+    "memory:search": "node ./scripts/memory-cli.js search",
+    "memory:rebuild": "node ./scripts/memory-cli.js rebuild",
+    "memory:update": "node ./scripts/memory-cli.js update",
+    "memory:normalize": "node ./scripts/normalize-memory.js"
   },
   "repository": {
     "type": "git",
@@ -34,9 +38,12 @@
     "scripts/",
     ".opencode/agents/",
     ".opencode/commands/",
+    ".husky/",
+    "memory-bank/.vocabulary.json",
     "AGENTS.md",
     "opencode.mcp.example.json",
-    "skills-lock.json"
+    "skills-lock.json",
+    ".husky/post-merge"
   ],
   "devDependencies": {
     "@playwright/test": "^1.59.1",
@@ -44,5 +51,13 @@
     "dotenv": "^17.4.2",
     "husky": "^9.0.0",
     "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.0",
+    "sqlite-vec": "^0.1.9",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "optionalDependencies": {
+    "@xenova/transformers": "^2.17.0"
   }
 }

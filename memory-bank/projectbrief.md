@@ -1,3 +1,12 @@
+---
+id: "projectbrief"
+title: "Project Brief"
+updated: "2026-06-25"
+tags: [configuration, tdd]
+entities: [vitest, playwright, graphify, memory-bank, opencode, npm]
+category: "brief"
+---
+
 # Project Brief
 
 ## Purpose

@@ -1,0 +1,52 @@
+{
+  "categories": {
+    "brief": "Project scope, goals (projectbrief.md)",
+    "product": "Product context, UX goals (productContext.md)",
+    "architecture": "System patterns, design decisions, component relationships",
+    "tech": "Technology stack, dev setup, constraints",
+    "context": "Current focus, recent changes, next steps (activeContext.md)",
+    "progress": "What works, what's left, known issues (progress.md)",
+    "task": "Individual task tracking (tasks/TASK*.md)",
+    "decision": "ADR-style architecture/technical decisions"
+  },
+
+  "tags": {
+    "agent_roles": [
+      "designer", "architect", "researcher", "coder", "implementer",
+      "tester", "reviewer", "tracker", "deployer", "orchestrator"
+    ],
+    "workflow": [
+      "bootstrap", "setup", "configuration", "migration", "refactor",
+      "tdd", "feature-pipeline", "onboarding", "normalization",
+      "research", "spike", "implementation"
+    ],
+    "memory_ops": [
+      "decision", "discovery", "status-update", "task-plan", "retrospective"
+    ]
+  },
+
+  "entity_patterns": {
+    "vitest":            ["vitest", "vitest\\.config", "@vitest\\/coverage"],
+    "playwright":        ["playwright", "@playwright", "browser.*test"],
+    "graphify":          ["graphify", "knowledge graph", "graph\\.json"],
+    "memory-bank":       ["memory-bank", "memory bank", "activeContext", "systemPatterns"],
+    "husky":             ["husky", "pre-commit", "git hook"],
+    "tdd-orchestrator":  ["tdd orchestrator", "RED.*GREEN.*REFACTOR"],
+    "mcp-server":        ["mcp", "modelcontextprotocol", "stdio", "mcp server"],
+    "sqlite-vec":        ["sqlite-vec", "sqlite.vec", "better-sqlite3"],
+    "transformers.js":   ["@xenova\\/transformers", "transformers\\.js", "all-MiniLM"],
+    "opencode":          ["opencode", "OpenCode", "open code"],
+    "npm":               ["npm", "npm package", "npm install"]
+  },
+
+  "file_category_map": {
+    "projectbrief":     "brief",
+    "productContext":   "product",
+    "systemPatterns":   "architecture",
+    "techContext":      "tech",
+    "activeContext":    "context",
+    "progress":         "progress"
+  },
+
+  "doc_types": ["spike", "architecture", "configuration", "orchestrator-log", "tracker-log", "decision"]
+}

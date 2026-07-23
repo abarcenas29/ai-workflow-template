@@ -53,6 +53,11 @@
       "type": "remote",
       "url": "https://your-mcp-server.com/mcp",
       "enabled": false
+    },
+    "memory-bank": {
+      "type": "local",
+      "command": ["node", "scripts/mcp-memory-server.js"],
+      "enabled": true
     }
   },
   "permission": {
@@ -60,6 +65,7 @@
     "github_*": "allow",
     "mcp-everything_*": "allow",
     "angular-cli_*": "allow",
-    "playwright_*": "allow"
+    "playwright_*": "allow",
+    "memory-bank_*": "allow"
   }
 }
