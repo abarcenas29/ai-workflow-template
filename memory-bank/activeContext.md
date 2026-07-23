@@ -1,3 +1,12 @@
+---
+id: "activeContext"
+title: "Active Context"
+updated: "2026-06-25"
+tags: [architect, orchestrator, bootstrap, setup, configuration, tdd, implementation]
+entities: [vitest, graphify, memory-bank, tdd-orchestrator, mcp-server, opencode, npm]
+category: "context"
+---
+
 # Active Context
 
 ## Current Focus

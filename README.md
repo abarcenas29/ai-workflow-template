@@ -1,6 +1,6 @@
 # 🤖 AI Workflow Template
 
-**Publishable AI workflow starter pack for GitHub Copilot** - Auto-syncing, version-managed, npm-distributed agent configuration suite.
+**Publishable AI workflow starter pack for OpenCode** — Auto-syncing, version-managed, npm-distributed agent configuration suite with vector search memory.
 
 ---
 
@@ -16,7 +16,8 @@ This isn't a one-off template to clone—it's a **live npm package** that distri
 - 🧪 **TDD Orchestrator** — Strict RED→GREEN→REFACTOR/VERIFY test-driven pipeline (90% coverage gate)
 - 📝 **Framework Instructions** - Technology-specific guidance (`.agents/instructions/`)
 - 💬 **Prompt Templates** - Ready-to-use prompt blueprints (`.agents/prompts/`)
-- 🧠 **Memory Bank** — Persistent project context across AI sessions
+- 🧠 **Memory Bank** — Persistent project context across AI sessions with semantic search
+- 🔍 **Vector Memory Search** — sqlite-vec powered semantic search (token-efficient, zero deps)
 - 🏃‍♂️ **Caveman Mode** - Ultra-compressed communication for token efficiency
 - 🎭 **Playwright Testing** - Automated E2E testing with MCP integration
 - ⚡ **Vitest Unit Testing** — Fast unit tests with v8 coverage (≥90% threshold)
@@ -241,9 +242,38 @@ implementer (PLAN) → unit-tester∥ (RED) → coder∥ (GREEN) → unit-tester
 
 The TDD orchestrator uses `subagent_type "tdd-orchestrator"` and auto-selects the strict TDD pipeline when testable code changes are requested.
 
-### 🧠 Memory Bank — Persistent Project Context
+### 🧠 Memory Bank — Persistent Project Context with Vector Search
 
-The memory bank preserves project knowledge across AI sessions, preventing context loss after resets:
+The memory bank preserves project knowledge across AI sessions, preventing context loss after resets. **New: semantic vector search** lets agents query project memory without loading all files into context — saving thousands of tokens per session.
+
+#### Architecture
+
+```
+Markdown files (git-committed)          Vector Index (.gitignore'd)
+══════════════════════════════          ════════════════════════════
+memory-bank/                            memory-bank/.index/
+├── activeContext.md                    └── memory.db  ← sqlite-vec + better-sqlite3
+├── progress.md                              │
+├── systemPatterns.md                         │  rebuilt from .md files
+├── ...                                       ▼  on demand
+                                        memory_search("tdd orchestrator")
+                                        → top 5 relevant chunks (~500 tokens)
+```
+
+**Source of truth:** Markdown files (git-versioned, human-readable).  
+**Search index:** `sqlite-vec` vector database (disposable, rebuildable, never committed).
+
+#### MCP Tools (OpenCode)
+
+| Tool | Purpose |
+|---|---|
+| `memory_search` | Semantic search across memory-bank + docs (query + topK) |
+| `memory_update` | Incremental sync — only changed files (~2 seconds) |
+| `memory_rebuild` | Full rebuild from markdown files (rare — clone/corruption) |
+| `memory_get` | Read a specific memory file by name |
+| `memory_stats` | Index statistics (vector count, DB size) |
+
+#### File Structure
 
 ```
 projectbrief.md → productContext.md / systemPatterns.md / techContext.md → activeContext.md → progress.md / tasks/
@@ -259,7 +289,34 @@ projectbrief.md → productContext.md / systemPatterns.md / techContext.md → a
 | `memory-bank/progress.md` | What works, what's left, known issues |
 | `memory-bank/tasks/` | Per-task tracking with `_index.md` |
 
+#### Document Schema
+
+All memory-bank files use YAML frontmatter for search indexing:
+
+```yaml
+---
+id: activeContext
+title: "Active Context"
+updated: 2026-07-23
+tags: [orchestrator, bootstrap, tdd]
+entities: [vitest, graphify, memory-bank]
+category: context
+---
+```
+
+See `memory-bank/.vocabulary.json` for the controlled vocabulary (user-extensible).
+
+**Auto-normalization:** `npm install` runs `normalize-memory.js` to add frontmatter to existing files.  
+**Pre-commit validation:** Husky hook rejects commits with invalid frontmatter.
+
 **Task commands:** `add task`, `update task [ID]`, `show tasks [filter]`
+
+#### Token Efficiency
+
+| Approach | Tokens per session |
+|---|---|
+| Read all memory files | ~5,000–15,000+ |
+| Semantic search | ~500–2,000 (top 3–5 chunks) |
 
 ---
 
@@ -314,6 +371,20 @@ npm run test:unit:coverage
 
 # Watch mode for unit tests
 npm run test:unit:watch
+
+# ─── Memory Bank (Vector Search) ───
+
+# Build the vector search index (one-time, ~8 min for 5K files)
+npm run memory:rebuild
+
+# Incremental update (seconds — only changed files)
+npm run memory:update
+
+# Search project memory
+npm run memory:search "tdd orchestrator status"
+
+# Normalize document frontmatter (runs automatically on install)
+npm run memory:normalize
 ```
 
 ### Testing

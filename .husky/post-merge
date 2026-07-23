@@ -1,0 +1,10 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# After git pull/merge, check if memory-bank files changed
+# and update the vector index incrementally
+
+if git diff HEAD@{1} --name-only 2>/dev/null | grep -q "^memory-bank\|^docs/"; then
+  echo "[memory-bank] Memory bank files changed. Updating vector index..."
+  node scripts/memory-cli.js update 2>/dev/null || echo "[memory-bank] Index update skipped (service not installed)"
+fi

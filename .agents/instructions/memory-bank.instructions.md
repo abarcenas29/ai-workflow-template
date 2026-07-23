@@ -6,7 +6,7 @@ Coding standards, domain knowledge, and preferences that AI should follow.
 
 # Memory Bank
 
-You are an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
+You are an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I use the vector search index (`memory_search`) to retrieve relevant context efficiently, and fall back to reading specific files (`memory_get`) when I need complete, un-summarized content.
 
 ## Memory Bank Structure
 
@@ -94,6 +94,42 @@ Create additional files/folders within memory-bank/ when they help organize:
 - Testing strategies
 - Deployment procedures
 
+### Vector Search Index (sqlite-vec)
+
+The memory bank includes a **semantic vector search index** powered by `sqlite-vec` + `better-sqlite3`. This allows token-efficient retrieval without loading all files into context.
+
+**Index location:** `memory-bank/.index/memory.db` (git-ignored, rebuildable)
+
+**MCP tools** (configured in `opencode.json`):
+- `memory_search` — Semantic search across all memory-bank and docs files
+- `memory_update` — **Daily use** — incremental sync (only changed files, ~2 seconds)
+- `memory_rebuild` — Full rebuild (corrupted index, model change, or fresh clone)
+- `memory_get` — Read a specific memory file by name
+- `memory_stats` — Check index status
+
+**When to use semantic search instead of reading all files:**
+- Session start → `memory_update` then `memory_search({ query: "current focus recent changes next steps" })` (~500 tokens vs ~5K+)
+- Before decisions → `memory_search({ query: "<topic>", topK: 5 })` for related context
+- Architecture questions → `memory_search({ query: "<pattern>", sourceFile: "systemPatterns" })"
+
+**When to still use full file reads:**
+- Need complete, un-summarized file content → `memory_get({ file: "<id>" })`
+- Index is empty or stale → `memory_rebuild()` then re-search
+
+**Sync triggers:**
+- After writing documentation → `memory_update` (incremental, fast)
+- Session start → `memory_update` first, then `memory_search`
+- After `git pull` → `memory_update` (or post-merge hook if configured)
+- Full `memory_rebuild` only for: fresh clone, corrupted index, embedding model change, or if incremental update missed changes
+
+### Document Schema (Frontmatter)
+
+All `memory-bank/**/*.md` files must have YAML frontmatter for search indexing. See `.agents/instructions/memory-schema.instructions.md` for the full schema and `memory-bank/.vocabulary.json` for the controlled vocabulary.
+
+**Required fields:** `id`, `title`, `updated`, `tags`, `entities`, `category`
+
+**Pre-commit validation:** The husky hook validates frontmatter before commits. Running `npm run memory:normalize` auto-fixes missing frontmatter.
+
 ## Core Workflows
 
 ### Plan Mode
@@ -102,9 +138,20 @@ Create additional files/folders within memory-bank/ when they help organize:
 flowchart TD
     Start[Start] --> CheckGraph{graphify-out/graph.json exists?}
     CheckGraph -->|No| Bootstrap[Run graphify .]
-    Bootstrap --> ReadFiles[Read Memory Bank]
-    CheckGraph -->|Yes| ReadFiles
-    ReadFiles --> QueryGraph[Query graphify for architecture context]
+    Bootstrap --> CheckIndex{memory index exists?}
+    CheckGraph -->|Yes| CheckIndex
+
+    CheckIndex -->|No| Rebuild[memory_rebuild]
+    CheckIndex -->|Yes| UpdateIndex[memory_update]
+    
+    Rebuild --> Search
+    UpdateIndex --> Search
+    Search --> GetContext{context sufficient?}
+    
+    GetContext -->|No| GetFile[memory_get: specific file]
+    GetFile --> GetContext
+    
+    GetContext -->|Yes| QueryGraph[Query graphify for architecture context]
     QueryGraph --> CheckFiles{Files Complete?}
 
     CheckFiles -->|No| Plan[Create Plan]
@@ -119,11 +166,15 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start[Start] --> Context[Check Memory Bank]
-    Context --> Update[Update Documentation]
-    Update --> Rules[Update instructions if needed]
-    Rules --> Execute[Execute Task]
-    Execute --> Document[Document Changes]
+    Start[Start] --> Context[memory_search: current task context]
+    Context --> Verify[Verify Understanding]
+    Verify --> ReadFiles{need full files?}
+    ReadFiles -->|Yes| GetFull[memory_get: specific files]
+    ReadFiles -->|No| Execute[Execute Task]
+    GetFull --> Execute
+    Execute --> Update[Update Documentation]
+    Update --> UpdateIndex[memory_update]
+    UpdateIndex --> Done[Done]
 ```
 
 ### Task Management
@@ -138,7 +189,8 @@ flowchart TD
     Execute[Execute Task] --> Update[Add Progress Log Entry]
     Update --> StatusChange[Update Task Status]
     StatusChange --> IndexUpdate[Update _index.md]
-    IndexUpdate --> Complete{Completed?}
+    IndexUpdate --> UpdateIndex[memory_update]
+    UpdateIndex --> Complete{Completed?}
     Complete -->|Yes| Archive[Mark as Completed]
     Complete -->|No| Execute
 ```
@@ -198,7 +250,7 @@ Memory Bank updates occur when:
 
 1. Discovering new project patterns
 2. After implementing significant changes
-3. When user requests with **update memory bank** (MUST review ALL files)
+3. When user requests with **update memory bank** (validate via `memory_get` for specific files)
 4. When context needs clarification
 5. After code changes that introduce new relationships — run `graphify update .` to sync the graph
 
@@ -207,18 +259,20 @@ flowchart TD
     Start[Update Process]
 
     subgraph Process
-        P1[Review ALL Files]
-        P2[Document Current State]
-        P3[Clarify Next Steps]
-        P4[Update instructions]
+        P1[memory_search: all sections]
+        P2[memory_get: files needing updates]
+        P3[Document Current State]
+        P4[Clarify Next Steps]
+        P5[Update instructions]
+        P6[memory_update]
 
-        P1 --> P2 --> P3 --> P4
+        P1 --> P2 --> P3 --> P4 --> P5 --> P6
     end
 
     Start --> Process
 ```
 
-Note: When triggered by **update memory bank**, I MUST review every memory bank file, even if some don't require updates. Focus particularly on activeContext.md, progress.md, and the tasks/ folder (including \_index.md) as they track current state.
+Note: When triggered by **update memory bank**, first search for changes since last update via `memory_search`, then read specific files via `memory_get`. Focus particularly on activeContext.md, progress.md, and the tasks/ folder (including \_index.md) as they track current state. After making changes, run `memory_rebuild` to sync the index.
 
 ## Project Intelligence (instructions)
 

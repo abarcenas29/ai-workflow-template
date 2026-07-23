@@ -1,3 +1,12 @@
+---
+id: "_index"
+title: "Tasks Index"
+updated: "2026-06-25"
+tags: []
+entities: []
+category: "context"
+---
+
 # Tasks Index
 
 ## In Progress

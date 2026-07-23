@@ -1,3 +1,11 @@
+---
+id: "tracker-log"
+title: "Tracker Log"
+updated: "2026-07-23"
+tags: [architect, researcher, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, configuration, refactor, tdd, research, spike, implementation, decision, discovery]
+doc_type: "tracker-log"
+---
+
 # Tracker Log
 
 Chronological record of work completed by the multi-agent pipeline. Each entry is appended by the tracker agent after a pipeline step finishes.
@@ -159,3 +167,27 @@ Rewrote `.agents/skills/prompt-builder/SKILL.md` replacing all GitHub Copilot re
 ### Notes / Follow-up
 
 None.
+
+---
+
+## Standalone: Researcher - Technical Investigation — Vector Database for AI Workflow Memory
+
+**Date:** 2026-07-23
+**Status:** ✅ SUCCESS
+
+### Summary
+Exhaustive research spike evaluating self-hosted vector database options for scaling AI agent memory without consuming excessive tokens. Analyzed sqlite-vec, LanceDB, ChromaDB, Milvus Lite, and PostgreSQL + pgvector against the constraints of a git-committed, Node.js developer template. Discovered that industry leaders (Claude Code, OpenClaw, Manus) have converged on a "Markdown as source of truth, vector DB as disposable index" architecture that elegantly solves the git merge conflict problem. Recommended sqlite-vec + better-sqlite3 as the embedded vector index layer, with markdown files remaining the canonical, git-versioned source of truth.
+
+### Files Produced / Modified
+| File | Description |
+|---|---|
+| `docs/spike-vector-db-memory.md` | Comprehensive spike document: 6 vector DBs evaluated, git merge analysis, architecture recommendation with code examples |
+
+### Key Decisions
+- **Architecture**: Markdown files (`memory-bank/*.md`) remain source of truth (git-committed). Vector index (`memory-bank/.index/memory.db`) is git-ignored and rebuildable — same pattern as Claude Code and OpenClaw (145k+ stars)
+- **Vector DB**: `sqlite-vec` (7.9k stars, Mozilla-backed) over LanceDB (heavier), ChromaDB (Python dependency), Milvus Lite (Python-only), pgvector (server overhead)
+- **Embedding model**: `@xenova/transformers` with `all-MiniLM-L6-v2` (384-dim) — runs entirely in Node.js with zero external dependencies
+- **Rejected**: Committing binary `.db` to git (merge conflicts unresolvable), gitsqlite (author warns about merge risks), cloud vector DBs (violates self-hosted constraint)
+
+### Notes / Follow-up
+Next step: prototype implementation. Create `scripts/memory-index.js` with rebuild and search functions. Add `@xenova/transformers` and `sqlite-vec` as optional dependencies. Update `memory-bank.instructions.md` to document the two-tier architecture. For team-scale (5+ concurrent contributors), evaluate PostgreSQL + pgvector as an upgrade path.

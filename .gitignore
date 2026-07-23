@@ -5,3 +5,11 @@ opencode.mcp.json
 node_modules/
 graphify-out/
 coverage/
+
+# Memory vector index (generated, rebuildable)
+memory-bank/.index/
+
+# Local embedding model cache
+models/
+.cache/
+*.onnx
