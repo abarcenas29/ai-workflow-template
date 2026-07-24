@@ -1,11 +1,12 @@
 ---
 id: "projectbrief"
 title: "Project Brief"
-updated: "2026-06-25"
+updated: "2026-07-23"
 tags: [configuration, tdd]
 entities: [vitest, playwright, graphify, memory-bank, opencode, npm]
 category: "brief"
 ---
+
 
 # Project Brief
 

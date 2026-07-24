@@ -1,8 +1,11 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "1.29.0",
+  "version": "1.32.0",
   "description": "A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.",
   "main": "index.js",
+  "bin": {
+    "ai-workflow-setup": "./bin/setup.js"
+  },
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
@@ -14,7 +17,7 @@
     "test:unit:watch": "vitest",
     "prepare": "husky",
     "sync": "node ./scripts/sync.js",
-    "postinstall": "node ./scripts/sync.js && node ./scripts/normalize-memory.js",
+    "postinstall": "node ./scripts/sync.js && node ./scripts/normalize-memory.js && echo '' && echo '⚠️  IMPORTANT: Run npx ai-workflow-setup to configure git hooks' && echo '   (npm postinstall scripts will be blocked by npm v12+)'",
     "memory:search": "node ./scripts/memory-cli.js search",
     "memory:rebuild": "node ./scripts/memory-cli.js rebuild",
     "memory:update": "node ./scripts/memory-cli.js update",
@@ -33,9 +36,11 @@
   },
   "homepage": "https://github.com/abarcenas29/ai-workflow-template#readme",
   "files": [
+    "bin/",
     ".agents/",
     ".github/workflows/",
     "scripts/",
+    "scripts/setup/",
     ".opencode/agents/",
     ".opencode/commands/",
     ".husky/",

@@ -35,7 +35,53 @@ Install directly into the project that needs AI workflow configuration:
 npm install @abarcenas/ai-workflow-template
 ```
 
-The package runs `postinstall` automatically to sync configurations.
+The package runs `postinstall` automatically to sync files. For full setup including git hooks, run the one-step setup command below.
+
+---
+
+## 🪝 Git Hook Setup
+
+After installing the package, configure husky git hooks with one command:
+
+```bash
+# One-step setup (fetches from npm registry automatically):
+npx @abarcenas/ai-workflow-template
+
+# Or if the package is already installed:
+npx ai-workflow-setup
+```
+
+### What It Does
+
+The setup command automatically:
+
+| Phase | Action |
+|-------|--------|
+| 🔍 **Discover** | Detects git repo, existing hooks, CI mode |
+| 🪝 **Hooks** | Installs `pre-commit` (version bump + validation) and `post-merge` (memory index update) |
+| 📦 **Prepare** | Merges `"husky"` into your `package.json` prepare script |
+| ⚙️ **Husky Init** | Initializes husky and sets `core.hooksPath` |
+| 🔄 **Sync** | Copies agent configurations, skills, and memory bank scaffolding |
+
+### Options
+
+```bash
+npx ai-workflow-setup --dry-run     # Preview without changes
+npx ai-workflow-setup --force       # Overwrite existing hooks
+npx ai-workflow-setup --skip-hooks  # Skip hook installation
+npx ai-workflow-setup --skip-sync   # Skip file sync
+npx ai-workflow-setup --help        # Show all options
+```
+
+### Hook Merging
+
+If you already have existing husky hooks, the setup command intelligently merges:
+- **Your hooks are never overwritten** — new content is appended after a separator
+- **Managed hooks are detected** via marker comments and updated idempotently
+- **Complex hooks** trigger a warning with manual merge instructions
+- **CI environments** auto-skip hook configuration
+
+> **ℹ️ npm v12 note:** Future npm versions block automatic `postinstall` scripts. The explicit `npx setup` command is the recommended, future-proof approach.
 
 ---
 
@@ -416,6 +462,7 @@ npm run memory:normalize
 - 📖 `AGENTS.md` is the main instruction file agents should read
 - 🎯 Package assumes public npm registry
 - 🎭 Playwright MCP integration documented in `docs/` folder
+- 🪝 Run `npx ai-workflow-setup` after install to configure git hooks (npm v12+ compatible)
 
 ---
 

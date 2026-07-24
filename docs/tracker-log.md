@@ -6,6 +6,7 @@ tags: [architect, researcher, coder, implementer, tester, reviewer, tracker, orc
 doc_type: "tracker-log"
 ---
 
+
 # Tracker Log
 
 Chronological record of work completed by the multi-agent pipeline. Each entry is appended by the tracker agent after a pipeline step finishes.
@@ -191,3 +192,56 @@ Exhaustive research spike evaluating self-hosted vector database options for sca
 
 ### Notes / Follow-up
 Next step: prototype implementation. Create `scripts/memory-index.js` with rebuild and search functions. Add `@xenova/transformers` and `sqlite-vec` as optional dependencies. Update `memory-bank.instructions.md` to document the two-tier architecture. For team-scale (5+ concurrent contributors), evaluate PostgreSQL + pgvector as an upgrade path.
+
+---
+
+## Feature Pipeline: Setup Command — `npx ai-workflow-setup`
+
+**Date:** 2026-07-24
+**Status:** ✅ SUCCESS (88/88 tests passing)
+**Pipeline:** Feature Pipeline — implementer → researcher → architect → implementer → coder (5 batches) → unit-tester
+
+### Summary
+
+Implemented the complete `npx @abarcenas/ai-workflow-template setup` command (aliased as `npx ai-workflow-setup`) that replaces the deprecated `postinstall` auto-sync pattern. The command performs 5 sequential, idempotent phases: discover consumer project state, install/merge git hooks via husky, configure prepare script, initialize husky programmatically, and sync configuration files. Built with zero new dependencies (Node.js built-ins + existing `husky` only), ES modules throughout, 14 new files, 3 modified files, and 88 passing unit tests.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `bin/setup.js` | CLI entry point (shebang + delegation to orchestrator) |
+| `scripts/setup/constants.js` | Static data: hook definitions, env vars, CLI flags, exit codes, unicode symbols |
+| `scripts/setup/utils.js` | 20 shared helpers: path resolution, fs wrappers, JSON, CI detection, CLI parsing |
+| `scripts/setup/ui.js` | 16 output functions: banner, step output, summary table, help text, ANSI colors with TTY guard |
+| `scripts/setup/discover.js` | Phase 1: 8-step consumer project state detection → Context object |
+| `scripts/setup/hooks.js` | Phase 2: 6-case hook merge algorithm (install/overwrite/skip/merge/wrap/dry-run) |
+| `scripts/setup/prepare.js` | Phase 3: 6-case prepare script handling (add/skip/merge/warn/dry-run) |
+| `scripts/setup/husky-init.js` | Phase 4: programmatic `husky()` initialization with 6 return paths |
+| `scripts/setup/sync-phase.js` | Phase 5: child process spawn for sync.js + normalize-memory.js |
+| `scripts/setup/index.js` | Orchestrator: 5-phase pipeline, arg parsing, error aggregation, exit codes |
+| `scripts/setup/discover.test.js` | 21 tests — consumer project state detection |
+| `scripts/setup/hooks.test.js` | 16 tests — hook merge algorithm (all 6 cases + edge cases) |
+| `scripts/setup/prepare.test.js` | 27 tests — prepare script classification and merging |
+| `scripts/setup/index.test.js` | 24 tests — orchestrator arg parsing, phase ordering, error handling |
+| `package.json` | Added `bin.ai-workflow-setup`, `files: ["bin/", "scripts/setup/"]`, deprecation notice |
+| `.husky/pre-commit` | Added `# Managed by @abarcenas/ai-workflow-template setup` marker as first line |
+| `.husky/post-merge` | Added `# Managed by @abarcenas/ai-workflow-template setup` marker as first line |
+
+### Key Decisions
+
+- **Explicit command over lifecycle scripts**: Follows npm ecosystem consensus (husky v9, lint-staged) — `npx <package> setup` replaces auto-sync
+- **Zero new dependencies**: CLI arg parsing, output formatting, and all logic use Node.js built-ins only — no commander, yargs, or inquirer
+- **Hook marker idempotency**: First-line comment `# Managed by @abarcenas/ai-workflow-template setup` on both hook files enables safe re-runs and content-based detection
+- **Child process for sync.js**: Spawned via `child_process.spawn` to avoid `process.exit()` in sync.js killing the parent setup process
+- **Graceful degradation**: Non-fatal phase errors (hooks, prepare, husky-init, sync) produce warnings but don't block later phases
+- **Context enrichment pattern**: Each phase receives and enriches the shared Context object — orchestrator aggregates results for summary
+- **Husky programmatic API over manual shim generation**: Uses `husky()` call rather than duplicating version-specific shim logic
+- **Real temp directories over mocking for tests**: Catches path resolution and permission issues that mocks would miss
+
+### Notes / Follow-up
+
+- **Minor gap**: The `"setup"` script alias (`"setup": "node ./bin/setup.js"`) was not added to `package.json` scripts — command works via `npx ai-workflow-setup` but not via `npm run setup`
+- 88/88 tests pass across 4 test files in 183ms
+- 5 manual integration test scenarios defined in implementation plan
+- Postinstall retained with deprecation notice for backward compatibility (npm v12 blocks it by default)
+- Future: add `--uninstall` flag, hook manifest tracking, husky v10 compatibility

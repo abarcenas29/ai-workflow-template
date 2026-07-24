@@ -1,10 +1,11 @@
 ---
 id: "playwright-mcp-configuration"
 title: "Playwright MCP Configuration"
-updated: "2026-05-12"
+updated: "2026-07-23"
 tags: [configuration]
 doc_type: "configuration"
 ---
+
 
 # Playwright MCP Configuration
 
