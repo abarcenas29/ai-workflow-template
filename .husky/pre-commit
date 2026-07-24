@@ -1,2 +1,4 @@
+# Managed by @abarcenas/ai-workflow-template setup
+
 node scripts/bump-version.js
 node scripts/validate-memory-schema.js

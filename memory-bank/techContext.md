@@ -1,11 +1,12 @@
 ---
 id: "techContext"
 title: "Tech Context"
-updated: "2026-06-25"
+updated: "2026-07-23"
 tags: [orchestrator, setup, configuration]
 entities: [vitest, playwright, graphify, husky, opencode, npm]
 category: "tech"
 ---
+
 
 # Tech Context
 

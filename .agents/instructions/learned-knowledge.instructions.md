@@ -20,3 +20,26 @@
 - unit-tester: Must be told to look in `scripts/` for source and test files, not `src/`
 - coder: Must be told the project uses ES module syntax (import/export, not require/module.exports)
 - implementer: Plans should target `scripts/` for production code and tests
+
+## Session: 2026-07-24
+
+**Pipeline:** researcher → architect → implementer → coder (6 parallel batches) → unit-tester → tracker
+**Coverage:** 88/88 tests passing across 4 test files (discover 21, hooks 16, prepare 27, index 24)
+**TDD Iterations:** 0 (feature pipeline, not TDD)
+
+**New knowledge:**
+- **npm v12 blocks postinstall scripts from dependencies** — this is a critical ecosystem shift that affects ALL npm library distribution. Postinstall auto-sync is no longer viable; explicit setup commands are required
+- **npx-based setup command pattern** (following Playwright, Prisma, Cypress convention) is the future-proof distribution mechanism for CLI tools that need to configure consumer projects
+- **Husky v9 programmatic API** is dead simple: `import husky from 'husky'; husky(consumerRoot)` — no need to shell out or manually manage shim files
+- **`child_process.spawn` for scripts with `process.exit()`** — importing sync.js (which calls `process.exit()`) directly into the setup process would kill the parent. Spawn as a child process to isolate exit behavior
+- **Marker comment idempotency** — a first-line comment (`# Managed by @abarcenas/ai-workflow-template setup`) on hook files enables content-based detection for safe re-runs. This pattern should be used for any managed file that needs idempotent installation
+- **6-batch parallel execution worked well**: Batch A (3 foundation: constants, utils, ui) → Batch B (5 core: discover, hooks, prepare, husky-init, sync-phase) → Batch C (2 orchestrator: index.js, bin/setup.js) → Batches D+E (3 config: pre-commit marker, post-merge marker, package.json) → Batch F (4 tests). Clear interface definitions were essential for parallelism
+- **Duplicate-marker trap** — constants.js `TEMPLATE_HOOKS.content` must stay in sync with actual `.husky/` hook files. During T12 (post-merge marker), a mismatch was discovered between the template content in constants.js (which already had the marker via `buildHookContent()`) and the actual disk file. Solution: update constants.js template content whenever hook files are modified
+
+**Agent tuning notes:**
+- **researcher**: Should explicitly investigate npm ecosystem changes (version-specific behavior, deprecations) — the npm v12 postinstall discovery was the single most important finding that drove the architecture
+- **architect**: Modular design with clear interface contracts (Context object shape, return types) paid off — all 5 Batch B modules could be implemented in parallel without coordination issues
+- **implementer**: The parallel batch plan with explicit dependency edges (Batch A → B → C, D+E → F) was critical for the 6 sub-agent coder execution. Without this structure, 6 concurrent coders would have had race conditions on shared files
+- **coder (parallel batches)**: Batch ordering discipline worked — foundation first, then core, then orchestrator. The truly independent batches (D: markers, F: tests) could run alongside later batches. Key lesson: define interfaces (Context shape, return types) before splitting work across parallel coders
+- **unit-tester**: Using real temp directories (`mkdtempSync`) over mocking filesystem operations catches path resolution and permission issues that mocks would miss. Mock only environment-dependent utilities (CI detection, Node version), not filesystem
+- **tracker**: Should capture ecosystem discoveries alongside implementation details — the npm v12 finding and marker idempotency pattern are valuable knowledge for future pipeline sessions

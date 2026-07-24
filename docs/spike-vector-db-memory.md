@@ -6,6 +6,7 @@ tags: [architect, researcher, research, spike, implementation, decision, discove
 doc_type: "spike"
 ---
 
+
 # Spike: Vector Database for AI Workflow Memory
 
 **Status:** ✅ Complete

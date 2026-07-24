@@ -1,0 +1,840 @@
+---
+id: design-setup-command-v1
+title: "Setup Command Architecture Design — npx @abarcenas/ai-workflow-template setup"
+updated: "2026-07-24"
+tags: [architect, design, setup, husky, hooks, npm-v12, distribution]
+entities: [husky, sync.js, normalize-memory.js, setup-cli, bin]
+category: design
+status: In progress
+---
+
+# Setup Command Architecture Design
+
+**Goal:** Design a long-term, npm-v12-safe `npx @abarcenas/ai-workflow-template setup` command that replaces the deprecated `postinstall` auto-sync pattern.
+
+**Version:** 1.0.0
+**Date Created:** 2026-07-24
+**Status:** In progress
+
+---
+
+## 1. Introduction
+
+### 1.1 Problem Statement
+
+The current distribution mechanism relies on npm's `postinstall` lifecycle script (`scripts/sync.js` + `scripts/normalize-memory.js`). As of npm v12, automatic `postinstall` scripts are **blocked by default** for security reasons (CVE-2025-XXXX, supply-chain attack vector). Consumers must opt-in via `--ignore-scripts` override or an npm config flag — both are friction points that hurt adoption.
+
+The npm ecosystem consensus (validated by husky v9, lint-staged, and others) is to move to an **explicit, user-invoked setup command** — `npx <package> setup`.
+
+### 1.2 Solution Summary
+
+Provide `npx @abarcenas/ai-workflow-template setup` (aliased as `npx ai-workflow-setup`) that performs **all** onboarding steps in a single, idempotent, well-documented command:
+
+1. Discover consumer project state
+2. Install/merge git hooks via husky
+3. Configure the `prepare` script in consumer's `package.json`
+4. Initialize husky (generate `_/` shims, set `core.hooksPath`)
+5. Sync `.agents/`, `.opencode/`, root files via existing sync logic
+6. Scaffold `memory-bank/` if missing
+
+### 1.3 Non-Goals (Out of Scope)
+
+- **Interactive TUI** — output is plain text with ANSI color codes only
+- **Uninstall command** — adding `setup --uninstall` is a future concern
+- **Hook content migration** between husky major versions — assume v9+
+- **Windows-specific path handling** — basic POSIX, CI is Linux/macOS
+
+---
+
+## 2. Requirements & Constraints
+
+### REQ-01: Explicit invocation
+The consumer MUST explicitly run `npx @abarcenas/ai-workflow-template setup` (or `npx ai-workflow-setup`). No automatic execution.
+
+### REQ-02: npm v12 safe
+Must NOT rely on lifecycle scripts (`postinstall`, `preinstall`). Must function when npm v12 blocks them by default.
+
+### REQ-03: Idempotent
+Running `setup` multiple times must be safe — no duplicate entries, no corrupted hook files. Every module must detect its own previously-applied state.
+
+### REQ-04: Graceful degradation
+Every failure mode must produce a clear, actionable error message. A failure in one phase (e.g., hook merging) must not prevent later phases from running where safe.
+
+### REQ-05: Hook merging
+Consumer's existing hooks (pre-commit, post-merge, etc.) must be preserved — our commands are **appended**, never replaced. If the existing hook format is incompatible, create a wrapper script.
+
+### REQ-06: Prepare script merging
+If the consumer has an existing `"prepare"` script, it must be preserved by appending `&& husky`. If the script is complex, warn and provide manual steps.
+
+### REQ-07: CI/CD awareness
+In CI environments: skip git hook installation entirely. Only perform file sync and memory-bank scaffold.
+
+### REQ-08: UX feedback
+Every operation must produce visible output: what was done, what was skipped, what was warned. A clear summary at the end.
+
+### CON-01: ESM only
+All new code is ES modules (`"type": "module"` in package.json). No CommonJS.
+
+### CON-02: Zero additional dependencies
+No new npm packages. Use only Node.js built-ins (fs, path, child_process, crypto) and the existing `husky` dependency.
+
+### CON-03: Must integrate with existing sync.js manifest system
+Hook files installed should be tracked via the `.agents-sync-manifest.json` to support future updates.
+
+### SEC-01: No arbitrary script execution
+Hook files installed are plain shell scripts. Never evaluate or `require()` consumer code.
+
+### SEC-02: Validate git repository before modifying
+If `setup` runs outside a git repository, warn and skip hook installation.
+
+---
+
+## 3. Component Architecture
+
+### 3.1 Module Map
+
+```
+bin/
+  setup.js                          # Shebang + delegates to scripts/setup/index.js
+                                    # (npm "bin" entry: "ai-workflow-setup")
+
+scripts/
+  setup/
+    ├── index.js                    # Orchestrator — runs phases in sequence
+    ├── discover.js                 # Detect consumer project state → Context object
+    ├── hooks.js                    # Install/merge hook files into consumer's .husky/
+    ├── prepare.js                  # Modify consumer's package.json "prepare" script
+    ├── husky-init.js               # Programmatically run husky() to generate _/ shims
+    ├── sync-phase.js               # Delegates to existing scripts/sync.js logic
+    ├── ui.js                       # Progress, success/warning/error, summary
+    ├── constants.js                # Paths, hook definitions, env var names
+    └── utils.js                    # Shared helpers (fs wrappers, INIT_CWD, etc.)
+  sync.js                           # (existing — invoked by sync-phase.js)
+  normalize-memory.js               # (existing — invoked by sync-phase.js)
+```
+
+### 3.2 Component Responsibilities
+
+| Module | Responsibility | Input | Output |
+|--------|---------------|-------|--------|
+| `index.js` | Phase orchestration, error boundary, arg parsing | `process.argv`, `process.env` | Exit code, summary |
+| `discover.js` | Detect consumer state | Consumer root path | `Context` object |
+| `hooks.js` | Read template hooks, merge with consumer hooks, write | `Context`, `--force` | `HookResult[]` |
+| `prepare.js` | Read/modify consumer's package.json | `Context` | `PrepareResult` |
+| `husky-init.js` | Run `husky()` to generate shims | `Context` | `HuskyInitResult` |
+| `sync-phase.js` | Invoke `sync.js` and `normalize-memory.js` as child processes | `Context`, `--force`, `--dry-run` | `SyncResult` |
+| `ui.js` | Format output | Any result objects | stdout/stderr |
+| `constants.js` | Define static data | — | Constants |
+| `utils.js` | Shared helpers | — | Utility fns |
+
+### 3.3 The Context Object
+
+Passed through all phases. Each phase enriches it:
+
+```js
+{
+  // === Discovery (populated by discover.js) ===
+  consumerRoot: "/path/to/consumer/project",  // from INIT_CWD or cwd()
+  packageRoot: "/path/to/node_modules/@abarcenas/ai-workflow-template",
+  isGitRepo: true,
+  hasPackageJson: true,
+  consumerPackageJson: { /* parsed */ },
+  existingHooks: {
+    "pre-commit": { exists: true, isShell: true, size: 234 },
+    "post-merge": { exists: false }
+  },
+  existingPrepareScript: "husky",
+  isCI: false,
+  nodeVersion: "22.11.0",
+  npmVersion: "12.0.0",
+  flags: { force: false, dryRun: false, yes: false, skipHooks: false, skipPrepare: false },
+
+  // === Results (populated by each phase) ===
+  hooksResult: { installed: ["pre-commit", "post-merge"], merged: ["pre-commit"], skipped: [], errors: [] },
+  prepareResult: { action: "already-set", originalScript: "husky", newScript: null },
+  huskyInitResult: { shimsGenerated: true, hooksPathSet: true },
+  syncResult: { filesSynced: 12, filesScaffolded: 6, filesSkipped: 2 },
+
+  // === Global state ===
+  errors: [],   // collected across phases
+  warnings: [], // collected across phases
+}
+```
+
+---
+
+## 4. Phase-by-Phase Design
+
+### 4.1 Phase 0: Argument Parsing + Entry (`bin/setup.js` + `scripts/setup/index.js`)
+
+```
+bin/setup.js (shebang: #!/usr/bin/env node)
+  → import { main } from '../scripts/setup/index.js'
+  → main(process.argv.slice(2))
+```
+
+**Flags:**
+
+| Flag | Effect |
+|------|--------|
+| `--force` | Overwrite consumer hooks, re-run husky init, overwrite prepare script |
+| `--dry-run` | Report what would happen; make zero changes |
+| `--yes` / `-y` | Skip all confirmation prompts (non-interactive/CI mode) |
+| `--skip-hooks` | Skip hook installation phase |
+| `--skip-prepare` | Skip prepare script modification |
+| `--skip-sync` | Skip file sync phase |
+| `--help` / `-h` | Print usage |
+| `--version` / `-v` | Print version from `package.json` |
+
+**Exit codes:**
+- `0` — All phases successful (or no-op)
+- `1` — One or more phases had non-fatal warnings (successful but with caveats)
+- `2` — Fatal error in a required phase
+
+### 4.2 Phase 1: Discovery (`discover.js`)
+
+**Detection checks (in order):**
+
+```
+1. Resolve consumerRoot
+   → process.env.INIT_CWD  (set by npm during `npx`)
+   → process.cwd()         (fallback when running via node directly)
+   → Warn if neither is useful
+
+2. Detect git repository
+   → Check for .git/ directory at consumerRoot
+   → Run `git rev-parse --git-dir` (2>/dev/null)
+   → If NOT a git repo: set context.isGitRepo = false
+     → Hook phases will be skipped
+     → Warn: "Not a git repository — hook installation skipped.
+              Run `git init` first, then re-run setup."
+
+3. Detect package.json
+   → Read + parse consumerRoot/package.json
+   → If missing: warn, create empty stub result
+
+4. Detect existing hooks
+   → For each hook: consumerRoot/.husky/<name>
+   → Record: exists, isFile, size, firstLine (for format detection)
+
+5. Detect existing prepare script
+   → Read consumerPackageJson.scripts.prepare
+   → Classify: 'none' | 'husky' | 'husky-containing' | 'other'
+
+6. Detect CI environment
+   → Check env vars: CI, GITHUB_ACTIONS, GITLAB_CI, CIRCLECI, TRAVIS, JENKINS_URL,
+     BITBUCKET_BUILD_NUMBER, APPVEYOR, CODEBUILD_BUILD_ID, AZURE_HTTP_USER_AGENT
+   → Also check: NODE_ENV === 'production', npm_config_ignore_scripts
+   → In CI: set context.isCI = true
+
+7. Detect Node.js version
+   → process.version → parse major
+   → If < 18: warn (unsupported)
+
+8. Detect husky installation
+   → Check if husky is resolvable from consumerRoot
+   → Try: resolve(consumerRoot, 'node_modules/husky')
+   → If not found: will need `npm install` first
+```
+
+### 4.3 Phase 2: Hook Installation (`hooks.js`)
+
+**Template hook definitions (in `constants.js`):**
+
+```js
+export const TEMPLATE_HOOKS = {
+  "pre-commit": {
+    source: resolve(packageRoot, '.husky/pre-commit'),
+    content: `node scripts/bump-version.js\nnode scripts/validate-memory-schema.js\n`,
+    description: "Auto-bump version + validate memory-bank schema before commits",
+  },
+  "post-merge": {
+    source: resolve(packageRoot, '.husky/post-merge'),
+    content: `#!/bin/sh\n# After git pull/merge, update memory bank vector index\nif git diff HEAD@{1} --name-only 2>/dev/null | grep -q "^memory-bank\\|^docs/"; then\n  echo "[memory-bank] Memory bank files changed. Updating vector index..."\n  node scripts/memory-cli.js update 2>/dev/null || echo "[memory-bank] Index update skipped (service not installed)"\nfi\n`,
+    description: "Auto-update memory bank vector index after pull/merge",
+  },
+}
+```
+
+**Merge algorithm (per hook):**
+
+```
+For each hook in TEMPLATE_HOOKS:
+
+  CASE A: Consumer does NOT have this hook
+    → Copy template hook to consumerRoot/.husky/<name>
+    → Set executable (chmod 755)
+    → Result: "installed"
+
+  CASE B: Consumer HAS this hook AND (force flag is set)
+    → Rename existing: .husky/<name> → .husky/<name>.bak
+    → Copy template hook
+    → Result: "overwritten (backup created)"
+
+  CASE C: Consumer HAS this hook AND it appears to be our hook
+    → Check if content matches (hash or contains our marker comment)
+    → Need a marker: first line comment "# Managed by @abarcenas/ai-workflow-template setup"
+    → If match: skip (or update if version changed)
+    → Result: "skipped (already installed)"
+
+  CASE D: Consumer HAS this hook AND it's a shell script AND we're NOT our hook
+    → Read existing content
+    → Append a marker separator (`\n# --- @abarcenas/ai-workflow-template ---\n`)
+    → Append our hook content
+    → Write merged file
+    → Result: "merged"
+
+  CASE E: Consumer HAS this hook AND it's a BINARY / non-shell executable
+    → Cannot safely merge
+    → Create wrapper: .husky/<name>.wrapper (shell script that runs consumer's first, then ours)
+    → Rename consumer's original: .husky/<name> → .husky/<name>.real
+    → Write wrapper as .husky/<name>
+    → Result: "wrapped (original preserved as .<name>.real)"
+
+  CASE F: dry-run mode
+    → Report what WOULD happen, make no changes
+    → Result: "would-install" | "would-merge" | "would-wrap" | "would-skip"
+```
+
+**Hooks are NOT copied into `.husky/_/`** — those shims are generated by husky during Phase 4.
+
+### 4.4 Phase 3: Prepare Script Handling (`prepare.js`)
+
+**Algorithm:**
+
+```
+1. Read consumerPackageJson from context
+2. Extract scripts.prepare value (or undefined)
+
+3. Classify:
+   VALUE                   | CLASSIFICATION     | ACTION
+   undefined / null        | 'none'             | SET to "husky"
+   "husky"                 | 'exact-match'      | SKIP
+   "husky && ..."          | 'starts-with'      | SKIP (already has husky first)
+   "... && husky"          | 'ends-with'        | SKIP (already has husky last)
+   "... && husky && ..."   | 'contains'         | SKIP
+   anything else           | 'other'            | MERGE: append "&& husky"
+
+4. For 'other' classification:
+   → SIMPLE (single command, no `&&` chains >3):
+     → Set to: "original && husky"
+   → COMPLEX (multi-line, `&&` chains >3, or `npm run` prefix):
+     → WARN: "Your prepare script is complex. Add '&& husky' manually:
+             \"scripts\": { \"prepare\": \"<your-script> && husky\" }"
+     → Do NOT auto-modify
+     → Result: "warned (manual merge required)"
+
+5. Write back to consumerRoot/package.json
+   → Use JSON.parse/stringify with 2-space indent + trailing newline
+   → Preserve all other fields exactly
+
+6. In dry-run mode: report what WOULD be written
+```
+
+**Edge case: consumer has no `scripts` block at all:**
+→ Create `"scripts": { "prepare": "husky" }` block
+
+### 4.5 Phase 4: Husky Initialization (`husky-init.js`)
+
+This phase generates the `.husky/_/` shim directory and sets `core.hooksPath` via husky's programmatic API.
+
+**Algorithm:**
+
+```
+1. Verify husky is available:
+   → Try: resolve(consumerRoot, 'node_modules/husky')
+   → If NOT found:
+     → In CI: SKIP (acceptable)
+     → Not CI: ERROR "husky is not installed. Run: npm install husky --save-dev"
+     → This is a BLOCKING error unless --skip-hooks is set
+
+2. Invoke husky():
+   → import { default as husky } from 'husky';
+   → husky(consumerRoot);
+   → This does:
+     a. Runs `git config core.hooksPath .husky/_` in consumer's repo
+     b. Generates .husky/_/ shim files (h, husky.sh, pre-commit, post-merge, etc.)
+     c. Generates .husky/_/.gitignore with content: `*`
+
+3. Verify post-condition:
+   → Check .husky/_/ directory exists
+   → Check .husky/_/.gitignore exists with content `*`
+   → Check .husky/_/h exists (the dispatcher script)
+
+4. Handle failure modes:
+   → Not a git repo: Skip husky init (git config will fail)
+   → Permission denied (.git/config): Warn, suggest manual fix
+   → husky() throws: Catch, log error, continue with warning
+
+5. In dry-run mode:
+   → Report "Would initialize husky (generate .husky/_/ shims)"
+```
+
+**Design Decision:** We use husky's own programmatic API rather than manually generating `_/` shims. Rationale:
+- Husky owns the shim format; we should not duplicate their logic
+- If husky v10 changes shim structure, our code doesn't break
+- The `husky()` call is idempotent — safe to run multiple times
+
+**Alternative considered (ALT-01):** Manually copy `_/` shims from template's `.husky/_/`.
+**Rejected because:** The shim content is version-specific and must match the consumer's husky package version, not the template's.
+
+### 4.6 Phase 5: File Sync (`sync-phase.js`)
+
+Reuses existing `scripts/sync.js` and `scripts/normalize-memory.js` logic.
+
+**Integration approach:**
+
+```
+Option A (PREFERRED): Spawn child process
+  → `node scripts/sync.js --force` (if force)
+  → `node scripts/sync.js --dry-run` (if dry-run)
+  → Capture stdout, parse summary line
+  → Pros: Reuses exact same logic, no code duplication
+  → Cons: Slightly less efficient (child process overhead)
+
+Option B: Import and call directly ← REJECTED
+  → sync.js and normalize-memory.js use INIT_CWD, which during npx setup
+    is the consumer's root — this works correctly.
+  → But: both scripts call process.exit() on certain paths
+    (sync.js line 83, normalize-memory.js line 300)
+  → If we import them, `process.exit()` kills OUR process too.
+  → Must spawn child process OR refactor them to not call exit()
+```
+
+**Decision:** Use Option A (spawn child process) initially. If performance becomes a concern (unlikely — sync is ~100ms), refactor `sync.js` and `normalize-memory.js` to export functions instead of calling `process.exit()`.
+
+**Alternative (ALT-02):** Refactor sync.js to export a `run()` function that returns a result object instead of calling `process.exit()`.
+**Deferred:** Can be done later with test coverage to ensure no regression.
+
+**Sync phase steps:**
+
+```
+1. Run sync.js as child process
+   → Pass --force or --dry-run as appropriate
+   → Capture exit code and stdout
+
+2. Run normalize-memory.js as child process
+   → Pass --force or --dry-run as appropriate
+   → Capture exit code and stdout
+
+3. Collect results
+```
+
+### 4.7 Phase 6: Summary (`ui.js` → called by `index.js`)
+
+Prints a summary table:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ @abarcenas/ai-workflow-template setup v1.29.0           │
+├─────────────────────────────────────────────────────────┤
+│ ✓ Discovery        │ Git repo, Node v22.11.0            │
+│ ✓ Hooks            │ pre-commit: installed              │
+│                    │ post-merge: merged                  │
+│ ✓ Prepare script   │ Already set to "husky"             │
+│ ✓ Husky init       │ Shims generated, hooksPath set     │
+│ ✓ File sync        │ 12 files synced, 6 scaffolded      │
+│ ⚠ Memory normalize │ Already normalized (skipped)       │
+├─────────────────────────────────────────────────────────┤
+│ Setup complete. Hooks are active on your next commit.   │
+│                                                         │
+│ To verify: git log --oneline -1 (should trigger hooks)  │
+│ To update:  npx @abarcenas/ai-workflow-template setup   │
+│ To remove:  (see docs for uninstall instructions)       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Color scheme:**
+- `✓` — Green (success)
+- `⚠` — Yellow (warning)
+- `✗` — Red (error)
+- Info lines — White/Default
+- Section headers — Bold/Cyan
+
+**Output levels:**
+- `--quiet` / `-q`: Only errors
+- default: All success + warning + error
+- `--verbose` / `-V`: All success + warning + error + debug info
+
+---
+
+## 5. Edge Case Catalog
+
+| # | Scenario | Detection | Behavior |
+|---|----------|-----------|----------|
+| EC-01 | Not a git repo | `discover.js` checks `.git/` | Skip hooks + husky-init. Warn. Continue with sync only. |
+| EC-02 | Consumer has NO package.json | `discover.js` read attempt fails | Warn. Skip prepare phase. Continue with hooks + sync. |
+| EC-03 | Consumer's pre-commit is a Python script | `hooks.js` checks first line for `#!/` + non-sh shebang | Create wrapper shell script. Don't modify original. |
+| EC-04 | Consumer's pre-commit is a compiled binary | `hooks.js` stat check + file magic | Create wrapper. Warn. |
+| EC-05 | Consumer has `"prepare": "my-script && husky"` | `prepare.js` detects "husky" substring | Skip. Already configured. |
+| EC-06 | Consumer has multi-line prepare script | `prepare.js` detects newline in string | Warn. Provide manual instructions. |
+| EC-07 | npm v12 blocks postinstall | User explicitly runs `npx setup` | No change needed — setup is explicit. |
+| EC-08 | Running in GitHub Actions | `discover.js` checks `GITHUB_ACTIONS=true` | Skip hooks. Only sync + scaffold memory-bank. |
+| EC-09 | Consumer has husky v8 (not v9) | `husky-init.js` checks husky version | Warn: "Husky v9+ required. You have v8. Upgrade: npm install husky@9" |
+| EC-10 | Consumer's .husky/ is a file, not directory | `hooks.js` stat check | Error: ".husky/ exists as a file, not a directory. Remove it first." |
+| EC-11 | Permission denied writing .husky/ | `hooks.js` write fails | Error: "Permission denied. Check file ownership." |
+| EC-12 | git config fails (permission) | `husky-init.js` exec fails | Warn. Provide manual command. |
+| EC-13 | package.json is malformed JSON | `discover.js` / `prepare.js` parse fails | Error: "package.json is not valid JSON." |
+| EC-14 | Consumer project is the template itself | `discover.js` checks if consumerRoot === packageRoot | Warn: "Running setup on the template itself. Some steps will be skipped." |
+| EC-15 | Dry-run in CI | Multiple flags combine | Report what WOULD happen (hooks skipped, sync would run). |
+| EC-16 | Consumer has `node_modules/.bin/husky` but husky is not in dependencies | `husky-init.js` resolves husky | It still works — husky is available. No warn needed. |
+| EC-17 | Consumer has `.husky/_/` from a previous husky version | `husky-init.js` — husky() handles this | Husky re-generates shims. Existing `_/` is overwritten. |
+| EC-18 | Consumer hook file is empty | `hooks.js` size === 0 | Treat as "not our hook" → append. |
+| EC-19 | Consumer has `"prepare": "husky || true"` | `prepare.js` detects "husky" substring | Skip (already contains husky). Considered "configured." |
+| EC-20 | INIT_CWD is undefined (not run via npx) | `discover.js` fallback to cwd() | Warn: "Running outside npx context. Using current directory." |
+
+---
+
+## 6. UX Copy
+
+### 6.1 Banner
+
+```
+@abarcenas/ai-workflow-template v1.29.0 — setup
+
+This command installs AI workflow tooling into your project:
+  • Git hooks (pre-commit, post-merge) via husky
+  • .agents/ and .opencode/ configuration files
+  • Memory bank scaffolding
+  • Prepare script configuration
+
+Documentation: https://github.com/abarcenas29/ai-workflow-template#readme
+```
+
+### 6.2 Help Text
+
+```
+Usage: npx @abarcenas/ai-workflow-template setup [options]
+
+Options:
+  --force         Overwrite existing hooks and prepare script
+  --dry-run       Report what would happen without making changes
+  --yes, -y       Skip all confirmation prompts (non-interactive mode)
+  --skip-hooks    Skip git hook installation
+  --skip-prepare  Skip prepare script modification
+  --skip-sync     Skip file sync and memory bank scaffold
+  --quiet, -q     Only show errors
+  --verbose, -V   Show all output including debug information
+  --help, -h      Show this help message
+  --version, -v   Show version number
+
+Examples:
+  npx @abarcenas/ai-workflow-template setup           # Standard setup
+  npx @abarcenas/ai-workflow-template setup --force    # Overwrite existing config
+  npx @abarcenas/ai-workflow-template setup --dry-run  # Preview changes
+  npx @abarcenas/ai-workflow-template setup --yes      # Non-interactive (CI/CD)
+```
+
+### 6.3 Warning Messages
+
+```
+⚠  Not a git repository — git hooks will NOT be installed.
+   Run `git init` first, then re-run setup.
+
+⚠  Your prepare script is complex and could not be automatically merged.
+   Add '&& husky' to your prepare script manually:
+   "scripts": { "prepare": "<your-script> && husky" }
+
+⚠  Husky v9+ is required. Your version may be incompatible.
+   Upgrade: npm install husky@9 --save-dev
+
+⚠  Running setup on the template project itself.
+   Some steps will be skipped as they are not applicable.
+
+⚠  Running outside npx context. Using the current directory as the target.
+   For best results, run via: npx @abarcenas/ai-workflow-template setup
+
+⚠  Already normalized. Use --force to re-run normalization.
+```
+
+### 6.4 Error Messages
+
+```
+✗  .husky/ exists as a file, not a directory.
+   Remove it first: rm .husky
+
+✗  package.json is not valid JSON.
+   Fix the syntax error and re-run setup.
+
+✗  Permission denied writing to .husky/pre-commit.
+   Check file ownership and permissions.
+
+✗  Husky is not installed in this project.
+   Run: npm install husky --save-dev
+   Then re-run: npx @abarcenas/ai-workflow-template setup
+```
+
+### 6.5 Success Messages
+
+```
+✓  pre-commit hook installed
+
+✓  pre-commit hook merged (your existing hook is preserved)
+
+✓  prepare script already set to "husky"
+
+✓  Husky initialized — git hooks are active
+
+✓  12 files synced (3 new), 6 memory-bank files scaffolded
+```
+
+### 6.6 Promotion (shown at end, only once per session)
+
+```
+💡 Enjoying ai-workflow-template? Star us on GitHub:
+   https://github.com/abarcenas29/ai-workflow-template
+
+   Run `npx @abarcenas/ai-workflow-template setup` anytime to update.
+```
+
+---
+
+## 7. File Structure Plan
+
+### 7.1 New Files to Create
+
+| File | Purpose |
+|------|---------|
+| `bin/setup.js` | CLI entry point (shebang, delegates to `scripts/setup/index.js`) |
+| `scripts/setup/index.js` | Orchestrator: parse args, run phases, print summary |
+| `scripts/setup/discover.js` | Discovery: detect consumer project state → Context |
+| `scripts/setup/hooks.js` | Hook installation & merging |
+| `scripts/setup/prepare.js` | Package.json prepare script handling |
+| `scripts/setup/husky-init.js` | Programmatic husky initialization |
+| `scripts/setup/sync-phase.js` | Spawn child processes for sync.js + normalize-memory.js |
+| `scripts/setup/ui.js` | Output formatting (success/warning/error, summary table) |
+| `scripts/setup/constants.js` | Hook definitions, env var lists, package name, etc. |
+| `scripts/setup/utils.js` | Shared helpers |
+| `scripts/setup/index.test.js` | Unit tests for the orchestrator |
+| `scripts/setup/hooks.test.js` | Unit tests for hook merging logic |
+| `scripts/setup/prepare.test.js` | Unit tests for prepare script merging |
+| `scripts/setup/discover.test.js` | Unit tests for discovery |
+
+### 7.2 Files to Modify
+
+| File | Change |
+|------|--------|
+| `package.json` | Add `"bin"` field, add `bin/` and `scripts/setup/` to `"files"`, add `setup` script alias |
+| `scripts/sync.js` | Add marker comment to output for parse-ability by sync-phase.js (optional) |
+| `.husky/pre-commit` | Add marker comment `# Managed by @abarcenas/ai-workflow-template` as first line |
+| `.husky/post-merge` | Add marker comment `# Managed by @abarcenas/ai-workflow-template` as first line |
+
+### 7.3 package.json Changes (Precise)
+
+```jsonc
+{
+  // ADD:
+  "bin": {
+    "ai-workflow-setup": "./bin/setup.js"
+  },
+
+  // MODIFY "scripts" block:
+  "scripts": {
+    // ... existing scripts ...
+    "setup": "node ./bin/setup.js",   // ADD: for local use
+    "postinstall": "echo '[ai-workflow-template] postinstall is deprecated. Run: npx @abarcenas/ai-workflow-template setup' && node ./scripts/sync.js && node ./scripts/normalize-memory.js"
+    // NOTE: postinstall kept for backward compat; shows deprecation notice
+  },
+
+  // MODIFY "files" block — ADD:
+  "files": [
+    // ... existing entries ...
+    "bin/",
+    "scripts/setup/"
+  ]
+}
+```
+
+---
+
+## 8. Integration Points
+
+### 8.1 Existing sync.js Integration
+
+**How:** `sync-phase.js` spawns `node <packageRoot>/scripts/sync.js` as a child process with `INIT_CWD` set to consumer root.
+
+**Why child process, not import:** `sync.js` calls `process.exit()` on early-exit paths (line 83). Importing it directly would kill the setup process. Refactoring sync.js to export a function is a future task.
+
+**Passed flags:** `--force` if setup was called with `--force`, `--dry-run` if `--dry-run`.
+
+### 8.2 Existing normalize-memory.js Integration
+
+Same pattern as sync.js — spawned as child process.
+
+### 8.3 Sync Manifest Integration
+
+Hook files installed by `hooks.js` are not currently tracked in `.agents-sync-manifest.json`. Two options:
+
+**Option A (Recommended):** Add hook entries to the manifest under a `__hooks__/` namespace (similar to `__opencode__/` and `__root__/` prefixes used in sync.js).
+
+**Option B:** Keep hooks outside manifest tracking — they are managed by the setup command, not sync.js.
+
+**Decision:** Option B for v1. Rationale: hooks are versioned-git-tracked content. The manifest tracks files that should be updated on new template versions. Hook content changes rarely and merging requires user intent (don't auto-overwrite). Future versions can add tracking.
+
+### 8.4 Hook Marker Comments
+
+To support idempotency detection (EC-03 case C), each template hook file shall have this as its **first line**:
+
+```sh
+# Managed by @abarcenas/ai-workflow-template setup
+```
+
+The `hooks.js` module checks for this line to determine if the consumer's existing hook is "ours" (→ skip or update) or "theirs" (→ merge).
+
+---
+
+## 9. Error Handling Strategy
+
+### 9.1 Phase Error Policy
+
+| Phase | On Error | Blocking? |
+|-------|----------|-----------|
+| Discovery | Hard error if no consumerRoot resolvable | YES — cannot continue |
+| Discovery | Warnings for missing git, package.json | NO — continue |
+| Hooks | Write failure, permission denied | NO — warn, continue |
+| Prepare | Malformed JSON | NO — warn, continue |
+| Husky Init | husky not installed | NO — warn, continue (CI skips) |
+| Husky Init | git config failure | NO — warn, provide manual command |
+| Sync | Child process failure | NO — warn, continue |
+| Normalize | Child process failure | NO — warn, continue |
+
+### 9.2 Error Object Format
+
+Each phase returns a result with potential errors:
+
+```js
+{
+  phase: "hooks",
+  status: "warning",   // "success" | "warning" | "error"
+  details: { ... },
+  errors: [
+    { code: "HOOK_PERMISSION_DENIED", message: "...", path: "..." }
+  ],
+  warnings: [
+    { code: "HOOK_MERGE_COMPLEX", message: "...", path: "..." }
+  ]
+}
+```
+
+### 9.3 Global Error Aggregation
+
+`index.js` collects all phase results. At summary time:
+- If any phase has `status: "error"`: exit code 2, print all errors
+- If any phase has `status: "warning"`: exit code 1, print all warnings
+- If all phases `status: "success"`: exit code 0
+
+---
+
+## 10. Testing Strategy
+
+### 10.1 Unit Tests (Vitest)
+
+| Module | Test Focus |
+|--------|-----------|
+| `discover.js` | Mock fs, env vars — verify detection of git, package.json, CI, hooks |
+| `hooks.js` | Temp directory fixtures — test all merge cases (A-F) |
+| `prepare.js` | String manipulation — test all classification/merge cases |
+| `husky-init.js` | Mock husky import, verify function call |
+| `utils.js` | Pure function tests |
+| `index.js` | Arg parsing, phase ordering, exit codes |
+
+### 10.2 Test Fixtures
+
+Create a `test-fixtures/` directory with:
+- `consumer-no-git/` — No `.git/`, has `package.json`
+- `consumer-with-hooks/` — Has `.husky/pre-commit` with custom content
+- `consumer-with-prepare/` — Has `"prepare": "npm run build"`
+- `consumer-ci/` — Simulated CI environment
+- `consumer-clean/` — Bare project, nothing configured
+
+### 10.3 Integration Test (Manual)
+
+```
+1. mkdir /tmp/test-consumer && cd /tmp/test-consumer
+2. git init
+3. npm init -y
+4. npm install husky --save-dev
+5. npx /path/to/ai-workflow-template setup --dry-run
+6. npx /path/to/ai-workflow-template setup
+7. Verify: .husky/ contains hooks, package.json has prepare, .agents/ synced
+8. Run again — should be idempotent
+9. npx /path/to/ai-workflow-template setup --force
+10. Verify hooks overwritten
+```
+
+---
+
+## 11. Risks & Assumptions
+
+### RISK-01: Husky v10 breaking changes
+**Risk:** Husky releases v10 with a different API, breaking our `husky()` call.
+**Mitigation:** Pin to `husky@^9.0.0` in template's devDependencies. The consumer installs their own husky version. Add version detection in `husky-init.js`.
+
+### RISK-02: Consumer uses a different hook manager (lefthook, yorkie, simple-git-hooks)
+**Risk:** Multiple hook managers conflict with husky's `core.hooksPath`.
+**Mitigation:** Detect other hook managers in discovery phase. Warn the consumer. Do NOT install hooks if another manager is detected. Provide manual instructions.
+
+### RISK-03: INIT_CWD behavior changes in future npm versions
+**Risk:** npm removes `INIT_CWD` or changes its semantics.
+**Mitigation:** Fallback to `process.cwd()` with a warning. Document explicitly.
+
+### RISK-04: Prepare script merge breaks consumer's build
+**Risk:** Appending `&& husky` to a complex prepare script causes failures.
+**Mitigation:** Conservative merge — only auto-merge simple scripts. Complex scripts get a warning + manual instructions.
+
+### ASSUMPTION-01: Consumer project uses npm (not yarn, pnpm, bun)
+If the consumer uses an alternative package manager, `npx` still works (it ships with npm). The `prepare` script field is universal. Husky works across all package managers. No special handling needed.
+
+### ASSUMPTION-02: Consumer project has Node.js >= 18
+Older Node versions are EOL. We don't test or support them.
+
+### ASSUMPTION-03: Consumer's hooks are either shell scripts or binaries
+We assume a binary-only world for "can't merge" case. Python/Ruby/Node hooks are treated as "non-shell."
+
+---
+
+## 12. Open Questions
+
+| ID | Question | Status |
+|----|----------|--------|
+| Q-01 | Should `npx @abarcenas/ai-workflow-template setup` also run `npm install` if husky is missing? | **DECISION: No.** Installing packages is too invasive. Tell the user what to run. |
+| Q-02 | Should we add an `--uninstall` flag to remove hooks? | **Deferred to v2.** Focus on install for v1. |
+| Q-03 | Should `postinstall` be removed entirely or kept with deprecation warning? | **DECISION: Kept with deprecation warning.** Provides a migration path for existing consumers who update the template package. The deprecation notice also serves as documentation. |
+| Q-04 | What should the bin name be? `ai-workflow-setup` or `ai-workflow-template-setup`? | **DECISION: `ai-workflow-setup`.** Shorter, easier to type. The `@abarcenas/ai-workflow-template` npm package can also be invoked via the full name. |
+| Q-05 | Should `--force` overwrite prepare script entirely or just re-append? | **DECISION: It re-sets `"prepare": "husky"` entirely.** The user explicitly opted into force mode. If they had something custom, the old value is logged. |
+
+---
+
+## 13. Alternatives Considered
+
+| ID | Alternative | Rejected Because |
+|----|-------------|-----------------|
+| ALT-01 | Manually generate `.husky/_/` shims instead of calling `husky()` | Shims are version-specific. We'd need to maintain compatibility with every husky release. |
+| ALT-02 | Refactor sync.js to export a function instead of spawning child process | Adds test burden for sync.js refactor. Spawning is simpler and achieves the same result. Defer to later. |
+| ALT-03 | Create a separate npm package for the setup CLI | Adds maintenance overhead. The setup command is tightly coupled to the template's hooks and structure. Co-locating keeps versioning in sync. |
+| ALT-04 | Use `commander` or `yargs` for CLI arg parsing | Zero-dependency policy. Our flag set is small enough for manual parsing. |
+| ALT-05 | Interactive prompts (e.g., `inquirer`) for hook merging decisions | UX complexity, CI-incompatible. `--yes` flag handles non-interactive. Explicit flags for overrides. |
+| ALT-06 | Put setup script in `scripts/setup-cli.js` (flat, not directory) | ~300-400 lines in one file is too much. Modular directory structure enables independent testing of each phase. |
+
+---
+
+## 14. Implementation Sequence (Recommended)
+
+1. **Phase 0-1**: `bin/setup.js`, `constants.js`, `utils.js`, `ui.js`, `discover.js` — get the CLI entry point + discovery working
+2. **Phase 4**: `husky-init.js` — verify `husky()` works from within an npx context
+3. **Phase 2**: `hooks.js` — hook merging logic with test fixtures
+4. **Phase 3**: `prepare.js` — prepare script handling
+5. **Phase 5**: `sync-phase.js` — child process integration
+6. **Phase 6**: `index.js` — wire everything together, add summary
+7. **Tests**: Unit tests for each module
+8. **Docs**: Update README.md, techContext.md with setup instructions
+
+---
+
+## 15. Related Specifications
+
+- [Context from research spike: npm v12 postinstall breaking changes, husky v9 programmatic API]
+- `scripts/sync.js` — existing file sync logic (reused)
+- `scripts/normalize-memory.js` — existing memory normalization logic (reused)
+- `.husky/pre-commit`, `.husky/post-merge` — template hook definitions
+- `package.json` — bin entry, files array, scripts
