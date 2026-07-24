@@ -12,9 +12,12 @@
 // installed husky version is used.
 // ═════════════════════════════════════════════════════════════════════════════
 
+import { execSync } from 'child_process'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { createRequire } from 'module'
+
+import { info, warn, verbose } from './ui.js'
 
 // ── Main export ──────────────────────────────────────────────────────────────
 
@@ -34,14 +37,15 @@ import { createRequire } from 'module'
  * @param {boolean}  context.hasGit       - Whether the project has a `.git/` directory.
  * @param {boolean}  context.dryRun       - When `true` only report, do nothing.
  * @param {boolean}  context.isCI         - When `true` skip husky init entirely.
+ * @param {boolean}  context.verbose      - When `true` emit verbose progress messages.
  * @returns {Promise<{action: string, message: string}>}
  */
 export async function initHusky(context) {
-  const { consumerRoot, hasGit, dryRun, isCI } = context
+  const { consumerRoot, hasGit, dryRun, isCI, verbose: verboseFlag } = context
 
   // ── Dry-run mode ─────────────────────────────────────────────────────
   if (dryRun) {
-    console.log(
+    info(
       '[setup] Would initialize husky (generate .husky/_/ shims, set core.hooksPath)',
     )
     return { action: 'dry-run', message: 'Would initialize husky' }
@@ -49,7 +53,7 @@ export async function initHusky(context) {
 
   // ── CI environment ───────────────────────────────────────────────────
   if (isCI) {
-    console.log('[setup] CI environment detected — skipping husky init')
+    warn('[setup] CI environment detected — skipping husky init')
     return {
       action: 'skipped',
       message: 'Skipping husky init in CI environment',
@@ -67,27 +71,48 @@ export async function initHusky(context) {
 
   // ── Resolve husky from the consumer's node_modules ──────────────────
   let husky
+  verbose(verboseFlag, 'Resolving husky from consumer node_modules\u2026')
   try {
     const consumerRequire = createRequire(join(consumerRoot, 'package.json'))
     const huskyPath = consumerRequire.resolve('husky')
+    verbose(verboseFlag, `Found husky at ${huskyPath}`)
     const mod = await import(huskyPath)
     husky = mod.default
   } catch {
     // createRequire.resolve or import() failed — husky is not installed
+    verbose(verboseFlag, 'husky not found \u2014 skipping init')
     return {
       action: 'skipped',
       message: 'husky is not installed. Run: npm install husky --save-dev',
     }
   }
 
+  // ── Clear stale hooksPath ──────────────────────────────────────────
+  // Husky v9's programmatic API is a no-op when core.hooksPath already
+  // exists (even if pointing to a wrong value). Unset it so husky()
+  // actually generates the .husky/_/ shim files from scratch.
+  verbose(verboseFlag, 'Clearing stale core.hooksPath\u2026')
+  try {
+    execSync('git config --local --unset core.hooksPath', {
+      cwd: consumerRoot,
+      stdio: 'pipe',
+    })
+  } catch {
+    // Silently continue if the key didn't exist or is not unset-able.
+    // husky() will handle hooksPath setup internally.
+  }
+
   // ── Invoke husky() ──────────────────────────────────────────────────
+  verbose(verboseFlag, 'Calling husky()\u2026')
   try {
     husky(consumerRoot)
   } catch (err) {
+    verbose(verboseFlag, `husky() failed: ${err.message}`)
     return { action: 'failed', message: err.message }
   }
 
   // ── Verify post-condition ───────────────────────────────────────────
+  verbose(verboseFlag, 'Verifying .husky/_/h exists\u2026')
   const hPath = join(consumerRoot, '.husky', '_', 'h')
   if (!existsSync(hPath)) {
     return {

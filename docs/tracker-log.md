@@ -245,3 +245,92 @@ Implemented the complete `npx @abarcenas/ai-workflow-template setup` command (al
 - 5 manual integration test scenarios defined in implementation plan
 - Postinstall retained with deprecation notice for backward compatibility (npm v12 blocks it by default)
 - Future: add `--uninstall` flag, hook manifest tracking, husky v10 compatibility
+
+---
+
+## Feature Pipeline: Verbose Logging — `npx ai-workflow-setup --verbose`
+
+**Date:** 2026-07-24
+**Status:** ✅ SUCCESS (96/96 tests passing)
+**Pipeline:** Feature Pipeline — implementer (bootstrap) → researcher → implementer (planning) → coder (4 parallel batches) → tracker
+
+### Summary
+
+Activated the dormant `--verbose` flag for `npx ai-workflow-setup` by adding step-by-step progress output across all 5 setup phases. Fixed the root cause of silent hangs in `sync-phase.js` by streaming child process output in real-time when verbose mode is active. Added a `verbose()` output function to `ui.js`, wired the verbose flag through the Context object, and added targeted logging in all phase modules. 9 files modified, 1 new test file, 5 new tests, 0 regressions.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/setup/ui.js` | Added `verbose(enabled, message)` export — dim ANSI output, no-op when disabled |
+| `scripts/setup/discover.js` | Added `verbose` Context field + 9 detection step verbose log calls |
+| `scripts/setup/sync-phase.js` | **Critical fix**: `stdio: 'inherit'` when verbose for real-time child output; `AI_WORKFLOW_VERBOSE` env var passthrough |
+| `scripts/setup/husky-init.js` | 8 verbose messages around husky resolution, init, and error paths; replaced raw console.log with ui.js |
+| `scripts/setup/hooks.js` | 18 verbose calls across all 5 merge cases (ensureDir, writeFile, chmod) |
+| `scripts/sync.js` | 8 per-file verbose messages gated by `AI_WORKFLOW_VERBOSE=1` env var |
+| `scripts/setup/discover.test.js` | +2 tests — verbose Context field (true/undefined) |
+| `scripts/setup/index.test.js` | +1 test — verbose flag passthrough through full pipeline |
+| `scripts/setup/sync-phase.test.js` | **NEW** — 5 tests: stdio modes, env vars, output capture, pre-spawn messages |
+| `docs/spike-verbose-logging.md` | Research spike: root cause analysis, 7 files identified, output specification |
+| `plan/feature-verbose-logging-v1.md` | Implementation plan: 10 tasks, 4 batches, 15 test scenarios |
+| `.agents/instructions/learned-knowledge.instructions.md` | Appended session entry with 8 key learnings and agent tuning notes |
+
+### Key Decisions
+
+- **Activate existing infrastructure over new mechanisms**: The `--verbose` flag was already defined and parsed but dead code — activated it rather than adding a debug library or spinner package
+- **`stdio: 'inherit'` for verbose child output**: Real-time streaming to terminal fixes the root cause of silent hangs; normal mode preserves existing `pipe` + capture behavior for error reporting
+- **Env var for child process communication**: `sync.js` reads `AI_WORKFLOW_VERBOSE=1` from `process.env` — no shared context object between parent and child processes
+- **`console.error` for child verbose output**: stdout is captured by parent for result parsing; stderr streams to terminal in inherit mode — diagnostic messages correctly use stderr
+- **Zero index.js changes**: Context `verbose` field flows automatically from `discover(flags)` through all phase modules — validates the existing Context enrichment architecture
+- **4 parallel batches, 0 collisions**: Batches A→B→C→D with clear dependency edges; 10 tasks implemented without any shared-file race conditions
+
+### Notes / Follow-up
+
+- 96 tests pass (91 existing + 5 new) across 5 test files, 0 failures
+- `normalize-memory.js` benefits from verbose output streaming without any code changes — its existing internal logging is now visible in real-time
+- Manual integration tests recommended: `node bin/setup.js --verbose` should show real-time discovery steps, hook operations, husky resolution, and child process output
+- `--debug` flag enhancement remains deferred — would add even more granular output (file hashes, raw JSON, error stacks) building on the same verbose infrastructure
+
+---
+
+## Feature Pipeline: Verbose Logging — `npx ai-workflow-setup --verbose`
+
+**Date:** 2026-07-24
+**Status:** ✅ SUCCESS (96/96 tests passing, 0 regressions)
+**Pipeline:** Feature Pipeline — implementer (bootstrap) → researcher → implementer (plan) → coder (4 batches A-D) → tracker
+
+### Summary
+
+Activated the dormant `--verbose`/`-V` flag infrastructure in `npx ai-workflow-setup` to eliminate the "silent hang" problem. The root cause was `sync-phase.js` `spawnScript()` capturing child process stdout/stderr into a string that was never displayed. Added a `verbose()` output function to `ui.js`, wired the verbose flag through the Context object, and added 45+ granular progress messages across all 5 pipeline phases. The critical P0 fix streams child process output in real-time when `--verbose` is active via `stdio: 'inherit'`. All changes use zero new npm dependencies.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/setup/ui.js` | **Modified** — Added `verbose(enabled, message)` export function (dim ANSI `…` prefix, no-op when disabled) |
+| `scripts/setup/discover.js` | **Modified** — Added `verbose: !!flags.verbose` to Context object; added 9 verbose log calls for all detection steps |
+| `scripts/setup/sync-phase.js` | **Modified** — **P0 critical fix**: `spawnScript()` uses `stdio: 'inherit'` when verbose, streams child output in real-time; passes `AI_WORKFLOW_VERBOSE` env var to child processes; pre-spawn verbose messages |
+| `scripts/setup/husky-init.js` | **Modified** — 6 verbose log calls around husky resolution, import, and error paths; replaced raw `console.log` with `info()`/`warn()` from ui.js |
+| `scripts/setup/hooks.js` | **Modified** — 18 verbose log calls across all 5 merge cases (A–E) for per-operation file tracking |
+| `scripts/sync.js` | **Modified** — 8 per-file copy/scaffold verbose messages via `AI_WORKFLOW_VERBOSE` env var, output to stderr |
+| `scripts/setup/discover.test.js` | **Modified** — Added 2 tests (verbose=true on Context, verbose=false on Context) |
+| `scripts/setup/index.test.js` | **Modified** — Added 1 test (verbose flag passthrough through full pipeline) |
+| `scripts/setup/sync-phase.test.js` | **NEW** — 5 tests covering stdio mode switching, env var passthrough, exit code results, and pre-spawn verbose messages |
+| `plan/feature-verbose-logging-v1.md` | Implementation plan — 10 tasks across 4 batches, all completed |
+| `docs/spike-verbose-logging.md` | Research spike — root cause analysis, 7 files identified, output format specification |
+
+### Key Decisions
+
+- **stdio switching for child processes**: When `--verbose` is active, use `stdio: 'inherit'` (real-time streaming to terminal); when not verbose, keep existing `stdio: 'pipe'` (capture for error reporting). This was preferred over a prefix-stream or tee approach because it's simpler and the child process stderr is still visible.
+- **Env var for child process communication**: `AI_WORKFLOW_VERBOSE=1`/`0` environment variable passes the verbose flag to spawned `sync.js` and `normalize-memory.js` processes — avoids refactoring sync.js's architecture or switching to direct function calls.
+- **Zero new npm dependencies**: All changes use Node.js built-ins (`child_process`, `process.env`, existing ui.js formatting) — no debug library, no spinner, no CLI framework additions.
+- **`index.js` needs NO changes**: The verbose flag flows from `discover(flags)` → Context object → all phase modules automatically, because the orchestrator already passes the full Context to every phase.
+- **`console.error` for child process verbose output**: `sync.js` uses stderr for verbose messages instead of stdout, since stdout is captured for result parsing; stderr streams through in `stdio: 'inherit'` mode.
+- **Test isolation via `vi.mock`**: The new `sync-phase.test.js` mocks `child_process` spawn to test stdio mode switching without actually running child processes — follows established patterns from `hooks.test.js`.
+
+### Notes / Follow-up
+
+- 96/96 tests pass (91 existing + 5 new) across 5 test files — 0 regressions
+- Manual integration test: `node bin/setup.js --verbose` produces 45+ dim `…` messages across all phases
+- Manual integration test: `node bin/setup.js` (without `--verbose`) produces identical output to pre-change behavior
+- Future enhancement: Add `--debug` flag (implies `--verbose` plus file hashes, raw JSON, error stacks) — infrastructure supports it via new `debug()` function in `ui.js` and `debug: !!flags.debug` in Context

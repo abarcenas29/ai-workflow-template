@@ -139,6 +139,24 @@ function write(...lines) {
   }
 }
 
+/**
+ * Prints a dimmed verbose/debug message to stdout when verbose mode is
+ * enabled.
+ *
+ * When `enabled` is falsy the function is a no-op, making it safe to call
+ * unconditionally in hot paths without an extra `if` guard.
+ *
+ * @param {*} enabled  - Truthy to print, falsy to skip.
+ * @param {string} message - Debug message to display.
+ * @example
+ *   verbose(true, 'Resolving consumer root from INIT_CWD\u2026')
+ *   //   \u2026 Resolving consumer root from INIT_CWD\u2026
+ */
+export function verbose(enabled, message) {
+  if (!enabled) return
+  write(`  ${DIM}\u2026 ${message}${RST}`)
+}
+
 // ── Public output API ───────────────────────────────────────────────────────
 
 /**

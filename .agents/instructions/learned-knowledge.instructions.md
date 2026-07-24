@@ -43,3 +43,26 @@
 - **coder (parallel batches)**: Batch ordering discipline worked — foundation first, then core, then orchestrator. The truly independent batches (D: markers, F: tests) could run alongside later batches. Key lesson: define interfaces (Context shape, return types) before splitting work across parallel coders
 - **unit-tester**: Using real temp directories (`mkdtempSync`) over mocking filesystem operations catches path resolution and permission issues that mocks would miss. Mock only environment-dependent utilities (CI detection, Node version), not filesystem
 - **tracker**: Should capture ecosystem discoveries alongside implementation details — the npm v12 finding and marker idempotency pattern are valuable knowledge for future pipeline sessions
+
+## Session: 2026-07-24 — Verbose Logging for ai-workflow-setup
+
+**Pipeline:** implementer (bootstrap) → researcher → implementer (planning) → coder (4 parallel batches) → tracker
+**Coverage:** 96/96 tests passing across 5 test files (discover 23, hooks 16, prepare 27, index 25, sync-phase 5)
+**TDD Iterations:** 0 (feature pipeline, not TDD)
+
+**New knowledge:**
+- **Dead code infrastructure is a valuable find** — the `--verbose` flag already existed in `constants.js` and was correctly parsed by `parseCliArgs()`, but was never checked anywhere. Always check for existing-but-unused infrastructure before building new mechanisms
+- **`spawnScript()` in `sync-phase.js` was the root cause of silent hangs** — child process stdout/stderr was captured into a string but that string was never displayed or logged. The fix: use `stdio: 'inherit'` when verbose, `'pipe'` for normal mode
+- **Child process communication requires env vars** — parent and child processes share no context object. `sync.js` reads `AI_WORKFLOW_VERBOSE` from `process.env` set by `sync-phase.js` before spawning
+- **`console.error` (stderr) is correct for verbose output in child processes** — stdout is captured by the parent for result parsing, but stderr streams to terminal in `stdio: 'inherit'` mode. Diagnostic messages go to stderr
+- **`index.js` needed ZERO changes** — the Context `verbose` field flows from `discover(flags)` through all phase modules automatically via the existing orchestration pattern. This validates the Context enrichment architecture
+- **Parallel batching with 4 batches and 10 tasks worked cleanly**: Batch A (T1–T2 foundation) → Batch B (T3–T6 core fixes) → Batch C (T7 single) → Batch D (T8–T10 tests). 0 collisions, clean interface boundaries. The explicit dependency graph (Batch A → B → C, B → D) prevented race conditions
+- **`normalize-memory.js` already has good internal logging** — when verbose mode streams child stdout in real-time, this existing logging becomes visible to the user for free, with no code changes needed
+- **Dim ANSI style (` … prefix`) for verbose output** — visually distinguishes verbose progress from normal output. Uses existing color infrastructure with TTY guard
+
+**Agent tuning notes:**
+- **researcher**: Should examine existing flag/configuration infrastructure for dead code — the `--verbose` flag was fully defined and parsed but never checked. This was the single most impactful finding because it revealed both the root cause (spawnScript capture) and the solution path (activate existing flag)
+- **implementer (planning)**: The "index.js needs zero changes" insight should be explicitly validated before including in plans — it's easy to miss that context flows automatically. Read the orchestrator code to verify before committing to "no changes" claims
+- **coder**: When fixing child process output capture, consider both stdout and stderr channels independently — they serve different purposes (results vs diagnostics). `stdio: 'inherit'` is clean for real-time streaming but means stdout is no longer capturable programmatically
+- **unit-tester**: When testing child process spawn behavior, mock `child_process` spawn module rather than using real subprocesses — this avoids side effects and keeps tests fast. Use `vi.mock` with factory functions to control `stdio` arg and `env` values
+- **tracker**: Record dead-code discoveries alongside implementation details — the "existing but unused infrastructure" finding is a recurring pattern worth tracking across sessions

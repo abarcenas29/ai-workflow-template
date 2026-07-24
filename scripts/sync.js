@@ -13,6 +13,7 @@ const excludedRelativePaths = new Set([])
 const args = new Set(process.argv.slice(2))
 const forceOverwrite = args.has('--force')
 const dryRun = args.has('--dry-run')
+const isVerbose = process.env.AI_WORKFLOW_VERBOSE === '1'
 
 function hashFile(filePath) {
   const contents = readFileSync(filePath)
@@ -104,6 +105,7 @@ for (const sourceFile of sourceFiles) {
   const recordedHash = manifest.files[trackedKey] ?? null
 
   if (!existsSync(targetFile)) {
+    if (isVerbose) console.error(`  … syncing: .agents/${relativePath}`)
     syncFile(sourceFile, targetFile)
     manifest.files[trackedKey] = sourceHash
     copied += 1
@@ -114,6 +116,7 @@ for (const sourceFile of sourceFiles) {
   const isUntouched = recordedHash !== null && existingHash === recordedHash
 
   if (forceOverwrite || isUntouched) {
+    if (isVerbose) console.error(`  … syncing: .agents/${relativePath}`)
     syncFile(sourceFile, targetFile)
     manifest.files[trackedKey] = sourceHash
     copied += 1
@@ -145,6 +148,7 @@ if (existsSync(sourceOpenCodeDir)) {
     const recordedHash = manifest.files[trackedKey] ?? null
 
     if (!existsSync(targetFile)) {
+      if (isVerbose) console.error(`  … syncing: .opencode/${relativePath}`)
       syncFile(sourceFile, targetFile)
       manifest.files[trackedKey] = sourceHash
       copied += 1
@@ -155,6 +159,7 @@ if (existsSync(sourceOpenCodeDir)) {
     const isUntouched = recordedHash !== null && existingHash === recordedHash
 
     if (forceOverwrite || isUntouched) {
+      if (isVerbose) console.error(`  … syncing: .opencode/${relativePath}`)
       syncFile(sourceFile, targetFile)
       manifest.files[trackedKey] = sourceHash
       copied += 1
@@ -179,6 +184,7 @@ for (const rootFile of rootFiles) {
   const recordedHash = manifest.files[trackedKey] ?? null
 
   if (!existsSync(targetFile)) {
+    if (isVerbose) console.error(`  … syncing: ${rootFile}`)
     syncFile(sourceFile, targetFile)
     manifest.files[trackedKey] = sourceHash
     copied += 1
@@ -189,6 +195,7 @@ for (const rootFile of rootFiles) {
   const isUntouched = recordedHash !== null && existingHash === recordedHash
 
   if (forceOverwrite || isUntouched) {
+    if (isVerbose) console.error(`  … syncing: ${rootFile}`)
     syncFile(sourceFile, targetFile)
     manifest.files[trackedKey] = sourceHash
     copied += 1
@@ -265,6 +272,7 @@ for (const [fileName, fileContent] of Object.entries(memoryBankStubs)) {
   }
 
   ensureParentDirectory(targetFile)
+  if (isVerbose) console.error(`  … scaffolding: memory-bank/${fileName}`)
   writeFileSync(targetFile, fileContent, 'utf8')
   manifest.files[trackedKey] = hashFile(targetFile)
   scaffolded += 1
@@ -277,6 +285,7 @@ const targetMcpFile = resolve(consumerRoot, 'opencode.mcp.json')
 const mcpTrackedKey = '__root__/opencode.mcp.json'
 
 if (existsSync(exampleMcpFile) && !existsSync(targetMcpFile)) {
+  if (isVerbose) console.error('  … scaffolding: opencode.mcp.json from example')
   copyFileSync(exampleMcpFile, targetMcpFile)
   manifest.files[mcpTrackedKey] = hashFile(targetMcpFile)
   scaffolded += 1
