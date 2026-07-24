@@ -12,9 +12,19 @@ category: "context"
 
 ## Current Focus
 
-**README Updated — Setup Command Documentation** — README.md updated with the new `🪝 Git Hook Setup` section documenting `npx ai-workflow-setup`, its phases, options, and hook merging behavior. Also updated the `🚀 Install` section and `🔔 Important Notes` to reference the setup command.
+**Verbose Logging Spike — Research Complete** — Completed deep-dive research into `npx ai-workflow-setup` hanging behavior and verbose logging gaps. Spike document at `docs/spike-verbose-logging.md`. Critical finding: `sync-phase.js` `spawnScript()` captures all child process output silently — the most likely cause of "loading... hangs". The `--verbose` flag is defined and parsed but **never used** anywhere in the codebase. 7 files identified for modification to implement verbose/debug output.
 
 ## Recent Changes
+
+- **2026-07-24**: Verbose/Debug Logging Spike Research — `docs/spike-verbose-logging.md` created
+  - Examined all 13 files in the setup pipeline (bin/setup.js, 9 scripts/setup/ modules, sync.js, normalize-memory.js, package.json)
+  - **P0 Finding**: `sync-phase.js` `spawnScript()` captures all child stdout/stderr into a dead `output` string — if sync.js or normalize-memory.js hangs, user sees absolutely nothing
+  - **P0 Finding**: `--verbose`/`-V` flag is defined in `constants.js` and parsed by `parseCliArgs()` but NEVER checked in any phase module — flag infrastructure exists but does nothing
+  - **P1 Finding**: `husky-init.js` dynamic `import(huskyPath)` at line 73 has no progress indicator — could hang silently if consumer's husky install is broken
+  - **P1 Finding**: `discover.js` runs 9 detection steps silently — user can't tell where detection might be stuck
+  - **P2 Finding**: `sync.js` file-by-file copy loop (lines 94-125, 133-166) has no per-file logging — hundreds of files copied silently with only a final summary
+  - **Inconsistency**: `husky-init.js` uses raw `console.log` instead of ui.js functions; no shared verbose/debug utility exists
+  - Recommended approach: Use existing `--verbose` flag via new `verbose()` function in `ui.js`, pass through Context, P0 fix is to stream child process output in real-time when verbose
 
 - **2026-07-24**: Implemented T17 — Created `scripts/setup/index.test.js`
   - 24 unit tests covering all 23 required scenarios from the plan
@@ -189,11 +199,72 @@ category: "context"
   - Edge cases: partial failure (one hook succeeds, other fails), .husky as file (not dir), executable permission check, empty .husky/ dir, flags.force alternative path, partial existingHooks map, result structure validation, dry-run with existing unmanaged hooks, idempotent overwrite no .bak, result message traceability
   - Run: `npx vitest run scripts/setup/hooks.test.js` — 16 passed, 0 failed, 100ms
 
+- **2026-07-24**: Implemented T1 — Added `verbose()` export function to `scripts/setup/ui.js`
+  - New `export function verbose(enabled, message)` added after the `write` helper (line 141)
+  - No-op when `enabled` is falsy; prints `  … message` with dim ANSI styling when enabled
+  - Uses existing `DIM`, `RST`, and `write()` from module scope — no new imports
+  - Verified: `verbose(true, 'test message')` prints `  … test message` (dim style); `verbose(false, ...)` prints nothing
+  - Plan file `plan/feature-verbose-logging-v1.md` marked T1 as completed
+
 - **2026-07-24**: Updated `README.md` to document the new `npx ai-workflow-setup` command
   - Added `🪝 Git Hook Setup` section after `🚀 Install` covering: one-step setup, phases table, CLI options, hook merging behavior, npm v12 compatibility note
   - Updated `🚀 Install` section: changed "sync configurations" to "sync files" + cross-reference to setup command
   - Updated `🔔 Important Notes`: appended bullet about `npx ai-workflow-setup` with npm v12+ compatibility note
 
+- **2026-07-24**: Implemented T3 — Modified `scripts/setup/sync-phase.js` to stream child process output in real-time when verbose mode is active
+  - Added `import { verbose } from './ui.js'` at the top of the file
+  - Modified `spawnScript()` signature to accept 5th parameter: `verbose = false`
+  - When `verbose` is truthy: uses `stdio: 'inherit'` (real-time terminal output) and sets `AI_WORKFLOW_VERBOSE=1` in child env; returns `output: '(streamed to terminal)'`
+  - When `verbose` is falsy: keeps existing `stdio: 'pipe'` + captured output behavior unchanged; sets `AI_WORKFLOW_VERBOSE=0` in child env
+  - Added pre-spawn verbose log messages (`'Spawning sync.js…'`, `'Spawning normalize-memory.js…'`)
+  - Passes `context.verbose` as the 5th argument to both `spawnScript()` calls
+  - P0 fix: root cause of "loading... hangs" — users now see real-time progress from child processes in verbose mode
+
+- **2026-07-24**: Implemented T6 — Added verbose logging for per-hook file operations in `scripts/setup/hooks.js`
+
+- **2026-07-24**: Implemented T4 — Added verbose logging to `scripts/setup/husky-init.js`
+  - Added `import { info, warn, verbose } from './ui.js'` at the top of the file
+  - Destructured `verbose: verboseFlag` from `context` to gate verbose output
+  - Added 6 verbose log points: before husky resolution, after husky path found, in error catch (not found), before `husky()` call, in error catch (failed), and before post-condition verification
+  - Replaced raw `console.log` on line 44 (dry-run) with `info()` from ui.js
+  - Replaced raw `console.log` on line 52 (CI) with `warn()` from ui.js
+  - Added `@param {boolean} context.verbose` JSDoc to the function signature
+  - All 88 existing tests pass — zero regressions
+  - Added `verbose` to the existing `import { … } from './ui.js'` block
+  - **Case A** (no .husky/ dir): logs "Creating .husky/ directory…", "Writing {hookName} hook…", "Setting executable permissions…", "  ✓ done"
+  - **Case B** (no existing hook file): logs "Writing {hookName} hook…", "Setting executable permissions…", "  ✓ done"
+  - **Case C** (managed overwrite): logs "Overwriting {hookName} (idempotent update)…", "Setting executable permissions…", "  ✓ done"
+  - **Case D** (force backup+overwrite): logs "Backing up existing {hookName}…", "Writing {hookName} hook (force)…", "Setting executable permissions…", "  ✓ done"
+  - **Case E** (merge): logs "Reading existing {hookName} for merge…", "Writing merged {hookName}…", "Setting executable permissions…", "  ✓ done"
+  - All calls gated by `context.verbose` — no output when verbose is falsy (REQ-02 regression guarantee)
+  - All 16 existing tests pass unchanged; syntax valid; plan file updated
+- **2026-07-24**: Implemented T7 — Added per-file copy logging to `scripts/sync.js` for verbose mode
+  - Added `const isVerbose = process.env.AI_WORKFLOW_VERBOSE === '1'` at the top of the module (line 16)
+  - Added `if (isVerbose) console.error(...)` calls before each `syncFile()` / `copyFileSync()` / `writeFileSync()` call across all 5 file operation sections:
+    - `.agents/` loop (lines 108, 119): `'  … syncing: .agents/{relativePath}'`
+    - `.opencode/` loop (lines 151, 162): `'  … syncing: .opencode/{relativePath}'`
+    - Root files loop (lines 187, 198): `'  … syncing: {rootFile}'`
+    - Memory-bank scaffold (line 275): `'  … scaffolding: memory-bank/{fileName}'`
+    - opencode.mcp.json auto-copy (line 288): `'  … scaffolding: opencode.mcp.json from example'`
+  - Uses `console.error` for verbose output (stderr, not captured stdout) — consistent with child process architecture
+  - Uses simple `'  …'` prefix format without ANSI codes (no ui.js import needed in child process)
+  - Plan file `plan/feature-verbose-logging-v1.md` marked T7 as completed; Phase 3 status updated to ✅ COMPLETE
+
+- **2026-07-24**: Implemented T5 — Added 9 verbose log steps to `scripts/setup/discover.js`
+  - Added `import { verbose } from './ui.js'` alongside existing imports
+  - Added `const verboseEnabled = !!flags.verbose` inside `discover()` for local verbose gating
+  - 9 detection steps now emit dim `…` progress messages when `--verbose` is active: consumer root resolution, git repo, .husky/ dir, package.json, hook detection (per-hook granularity), prepare script, CI env, Node.js version, and "Discovery complete" summary
+  - All result messages use context-aware formatting (e.g., `'Git repository found'` / `'No git repository'`)
+  - Per-hook detection shows `'<hookName>: managed'`, `'<hookName>: found (unmanaged)'`, or `'<hookName>: not found'`
+  - Zero new dependencies, all existing 88 tests pass (21 discover tests, 16 hooks, 27 prepare, 24 index)
+  - Part of Batch B (Phase 2) — parallel with T3 (sync-phase), T4 (husky-init), T6 (hooks)
+
 ## Next Actions
 
-(All setup command implementation tasks complete, README documented) — Move on to the next feature or integration testing.
+- **Verbose logging implementation plan** — See `plan/feature-verbose-logging-v1.md`
+  - 10 tasks across 4 parallel batches (A: foundation, B: core fixes, C: child process, D: tests)
+  - Phase 1 (T1–T2): Core infrastructure — ✅ `verbose()` in ui.js + ✅ Context `verbose` field in discover.js
+  - Phase 2 (T3–T6): Critical silent spots + detail logging — ✅ sync-phase.js, ✅ husky-init.js, ✅ discover.js, ✅ hooks.js
+  - Phase 3 (T7): Child process pass-through — ✅ `sync.js` per-file logging via `AI_WORKFLOW_VERBOSE` env var
+  - Phase 4 (T8–T10): Tests — discover.test.js, index.test.js, sync-phase.test.js (new)
+  - No new dependencies, uses existing `--verbose` flag infrastructure, zero code changes needed in index.js

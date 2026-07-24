@@ -385,4 +385,24 @@ describe('discover()', () => {
     expect(h.content).toBe(content)
     expect(h.isManaged).toBe(true)
   })
+
+  // ── 21. verbose flag passthrough ─────────────────────────────────────────
+
+  it('should set verbose=true when verbose flag is passed', async () => {
+    const dir = createProject()
+    mockConsumerRoot = dir
+
+    const ctx = await discover({ verbose: true })
+
+    expect(ctx.verbose).toBe(true)
+  })
+
+  it('should set verbose=false when verbose flag is absent', async () => {
+    const dir = createProject()
+    mockConsumerRoot = dir
+
+    const ctx = await discover()
+
+    expect(ctx.verbose).toBe(false)
+  })
 })

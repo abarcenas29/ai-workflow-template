@@ -14,6 +14,8 @@ import {
   safeReadJson,
 } from './utils.js'
 
+import { verbose } from './ui.js'
+
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 /**
@@ -52,6 +54,7 @@ function createDefaultContext(flags = {}) {
     isCI: false,
     nodeVersion: 0,
     dryRun: !!flags.dryRun,
+    verbose: !!flags.verbose,
   }
 }
 
@@ -144,8 +147,10 @@ function detectHook(consumerRoot, hookName) {
  */
 export async function discover(flags = {}) {
   const ctx = createDefaultContext(flags)
+  const verboseEnabled = !!flags.verbose
 
   // ── 1. Resolve consumer root ──────────────────────────────────────────
+  verbose(verboseEnabled, 'Resolving consumer root from INIT_CWD\u2026')
   try {
     ctx.consumerRoot = getConsumerRoot()
   } catch {
@@ -163,25 +168,31 @@ export async function discover(flags = {}) {
   }
 
   // ── 2. Detect git repository ──────────────────────────────────────────
+  verbose(verboseEnabled, 'Checking for .git directory\u2026')
   try {
     ctx.hasGit = dirExists(resolve(ctx.consumerRoot, '.git'))
+    verbose(verboseEnabled, ctx.hasGit ? 'Git repository found' : 'No git repository')
   } catch {
     // Non-fatal — hasGit stays false
   }
 
   // ── 3. Detect .husky/ directory ───────────────────────────────────────
+  verbose(verboseEnabled, 'Checking for .husky/ directory\u2026')
   try {
     ctx.hasHuskyDir = dirExists(resolve(ctx.consumerRoot, '.husky'))
+    verbose(verboseEnabled, ctx.hasHuskyDir ? '.husky/ directory found' : '.husky/ directory not found')
   } catch {
     // Non-fatal — hasHuskyDir stays false
   }
 
   // ── 4. Detect + parse package.json ────────────────────────────────────
+  verbose(verboseEnabled, 'Reading package.json\u2026')
   try {
     const pkgPath = resolve(ctx.consumerRoot, 'package.json')
     const pkg = safeReadJson(pkgPath)
     ctx.hasPackageJson = pkg !== undefined
     ctx.consumerPackageJson = pkg ?? null
+    verbose(verboseEnabled, ctx.hasPackageJson ? 'package.json found' : 'package.json not found')
   } catch {
     // Non-fatal — hasPackageJson stays false, consumerPackageJson stays null
   }
@@ -190,21 +201,30 @@ export async function discover(flags = {}) {
   // existingHooks is pre-initialised by createDefaultContext() so the loop
   // below only overrides the entries it successfully reads.  Any hook that
   // cannot be read keeps its safe default (exists: false).
+  verbose(verboseEnabled, 'Detecting existing hooks\u2026')
   try {
     for (const hookName of Object.keys(TEMPLATE_HOOKS)) {
       ctx.existingHooks[hookName] = detectHook(ctx.consumerRoot, hookName)
+      const hook = ctx.existingHooks[hookName]
+      if (hook.exists) {
+        verbose(verboseEnabled, `${hookName}: ${hook.isManaged ? 'managed' : 'found (unmanaged)'}`)
+      } else {
+        verbose(verboseEnabled, `${hookName}: not found`)
+      }
     }
   } catch {
     // Non-fatal — existingHooks already contains default entries
   }
 
   // ── 6. Extract existing prepare script ────────────────────────────────
+  verbose(verboseEnabled, 'Extracting prepare script\u2026')
   try {
     const prepare = ctx.consumerPackageJson?.scripts?.prepare
     ctx.existingPrepare =
       typeof prepare === 'string' && prepare.trim().length > 0
         ? prepare.trim()
         : null
+    verbose(verboseEnabled, ctx.existingPrepare ? `Prepare script: ${ctx.existingPrepare}` : 'No prepare script')
   } catch {
     // Non-fatal — existingPrepare stays null
   }
@@ -217,20 +237,25 @@ export async function discover(flags = {}) {
   }
 
   // ── 8. Detect CI environment ──────────────────────────────────────────
+  verbose(verboseEnabled, 'Detecting CI environment\u2026')
   try {
     ctx.isCI = isCI()
+    verbose(verboseEnabled, ctx.isCI ? 'CI detected' : 'Not CI')
   } catch {
     ctx.isCI = false
   }
 
   // ── 9. Detect Node.js version ─────────────────────────────────────────
+  verbose(verboseEnabled, 'Detecting Node.js version\u2026')
   try {
     ctx.nodeVersion = getNodeVersion()
+    verbose(verboseEnabled, `Node.js v${ctx.nodeVersion}`)
   } catch {
     ctx.nodeVersion = 0
   }
 
   // NOTE: `ctx.dryRun` is already set by createDefaultContext(flags)
 
+  verbose(verboseEnabled, 'Discovery complete')
   return ctx
 }

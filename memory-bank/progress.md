@@ -297,7 +297,7 @@ Updated `README.md` with comprehensive documentation for the new `npx ai-workflo
 
 ## Current Status
 
-**Phase:** Setup Command — ✅ ALL TASKS COMPLETE (T1-T17), ✅ README DOCUMENTED
+**Phase:** Setup Command — ✅ ALL TASKS COMPLETE, ✅ VERBOSE LOGGING COMPLETE (10/10 tasks, 0 known issues remaining)
 
 The implementation plan covers:
 - ✅ 17 tasks across 6 parallel batches with clear dependency ordering
@@ -307,8 +307,137 @@ The implementation plan covers:
 - ✅ 5 requirements, 4 constraints, 2 security constraints tracked
 - ✅ 5 risks with mitigations, 5 assumptions documented
 - ✅ Manual integration test procedure defined
+- ✅ Verbose logging gaps documented in `docs/spike-verbose-logging.md`
 
-Progress: ✅ T1-T17 complete. All 88 tests pass across 4 test files. Feature fully documented in `docs/setup-command/tracker.md` and `docs/tracker-log.md`.
+Progress: ✅ All 96 tests pass (91 existing + 5 new sync-phase tests). Setup command complete (T1-T17). Verbose logging complete (T1-T10).
+
+**Next:** Future enhancements — `--debug` flag for ultra-granular output, `--uninstall` flag for setup command, hook manifest tracking, husky v10 compatibility.
+
+### 2026-07-24: T5 — Added verbose logging for all 9 detection steps in discover.js
+
+Implemented the 9 verbose logging step calls in `scripts/setup/discover.js` (Batch B, Phase 2):
+- Added `import { verbose } from './ui.js'` for the verbose output function
+- Added `const verboseEnabled = !!flags.verbose` local variable for verbose gating
+- 9 detection steps now emit dim `…` progress messages when `--verbose` is active:
+  1. Resolving consumer root from INIT_CWD
+  2. Checking for .git directory → "Git repository found" / "No git repository"
+  3. Checking for .husky/ directory → ".husky/ directory found" / ".husky/ directory not found"
+  4. Reading package.json → "package.json found" / "package.json not found"
+  5. Detecting existing hooks → per-hook: "<name>: managed" / "<name>: found (unmanaged)" / "<name>: not found"
+  6. Extracting prepare script → "Prepare script: <script>" / "No prepare script"
+  7. Detecting CI environment → "CI detected" / "Not CI"
+  8. Detecting Node.js version → "Node.js v<version>"
+  9. Discovery complete (summary message before return)
+- Zero new dependencies, follows existing ESM conventions
+- All 88 existing tests pass with zero regressions
+- Plan file `plan/feature-verbose-logging-v1.md` marked T5 as completed
+- Part of Batch B (Phase 2) — run in parallel with T3, T4, T6
+
+### 2026-07-24: T1 — Added `verbose()` export function to `scripts/setup/ui.js`
+
+Implemented the verbose output function for the setup command pipeline:
+- Added `export function verbose(enabled, message)` after the `write` helper (line 141 of ui.js)
+- No-op when `enabled` is falsy; prints `  … message` with dim ANSI styling when enabled
+- Uses existing `DIM`, `RST`, and `write()` from module scope — zero new imports
+- Follows existing code conventions (ESM exports, JSDoc comments, consistent formatting)
+- Verified: `verbose(true, 'test message')` prints `  … test message` in dim style; `verbose(false, ...)` silent
+- Part of Batch A (Phase 1) — runs in parallel with T2 (Context verbose field)
+- Plan file `plan/feature-verbose-logging-v1.md` marked T1 as completed (2026-07-24)
+
+### 2026-07-24: T2 — Added `verbose` field to Context in discover.js
+
+Added `verbose: !!flags.verbose` to the Context object returned by `createDefaultContext(flags)` in `scripts/setup/discover.js`:
+- New field placed after `dryRun: !!flags.dryRun` (line 54 → line 55) for logical grouping of flag-derived fields
+- Uses double-bang (`!!`) coercion to ensure a strict boolean value, matching the existing pattern for `dryRun`
+- The `flags` parameter is already passed to `createDefaultContext(flags)` — no signature changes needed
+- This ensures every downstream phase module receiving the Context can check `context.verbose`
+- Part of Batch A (Phase 1) — runs in parallel with T1 (ui.js `verbose()` function)
+- Plan file `plan/feature-verbose-logging-v1.md` marked T2 as completed, Phase 1 status updated to ✅ COMPLETE
+
+### 2026-07-24: T3 — Stream child output in sync-phase.js when verbose
+
+Implemented T3 from `plan/feature-verbose-logging-v1.md` — the P0 critical fix for "loading... hangs":
+- Modified `scripts/setup/sync-phase.js`:
+  - Added `import { verbose } from './ui.js'` at the top of the file
+  - Added `verbose` parameter (default `false`) to `spawnScript()` — 5th positional arg
+  - When `verbose` is truthy: `stdio: 'inherit'` streams child stdout/stderr to parent terminal in real-time; `AI_WORKFLOW_VERBOSE=1` set in child env; output stored as `'(streamed to terminal)'`
+  - When `verbose` is falsy: existing `stdio: 'pipe'` + captured output behavior preserved exactly; `AI_WORKFLOW_VERBOSE=0` in child env
+  - stdout/stderr data listeners only registered when not verbose (avoids collecting empty output)
+  - Added pre-spawn verbose messages: `verbose(context.verbose, 'Spawning sync.js…')` and `verbose(context.verbose, 'Spawning normalize-memory.js…')`
+  - Passes `context.verbose` as 5th argument to both `spawnScript()` calls
+- File parses cleanly (`node --check` passes)
+- Plan file updated: T3 completed 2026-07-24
+- Batch B (Phase 2) still has T4, T5, T6 pending
+
+### 2026-07-24: T4 — Added verbose progress messages to husky-init.js
+
+Implemented T4 from `plan/feature-verbose-logging-v1.md` — verbose logging in `scripts/setup/husky-init.js`:
+- Added `import { info, warn, verbose } from './ui.js'` at the top of the file
+- Destructured `verbose: verboseFlag` from context to gate verbose output (renamed to avoid collision with `verbose` import)
+- Added verbose logging at 6 key points:
+  - **Before husky resolution**: `verbose(verboseFlag, 'Resolving husky from consumer node_modules…')`
+  - **After husky path found**: `verbose(verboseFlag, \`Found husky at ${huskyPath}\`)`
+  - **Error catch (husky not installed)**: `verbose(verboseFlag, 'husky not found — skipping init')`
+  - **Before `husky()` call**: `verbose(verboseFlag, 'Calling husky()…')`
+  - **Error catch (husky() throws)**: `verbose(verboseFlag, \`husky() failed: ${err.message}\`)`
+  - **Before post-condition check**: `verbose(verboseFlag, 'Verifying .husky/_/h exists…')`
+- Replaced raw `console.log` at line 44 (dry-run) with `info()` from ui.js
+- Replaced raw `console.log` at line 52 (CI) with `warn()` from ui.js
+- Added `@param {boolean} context.verbose` JSDoc to the function signature
+- All 88 existing tests pass — zero regressions
+- Part of Phase 2 (Batch B) — runs in parallel with T3, T5, T6
+
+### 2026-07-24: T6 — Added per-hook verbose logging to hooks.js
+
+Implemented T6 from `plan/feature-verbose-logging-v1.md` — per-file operation logging in `scripts/setup/hooks.js`:
+- Added `verbose` to existing `import` from `'./ui.js'`
+- Added verbose calls around every filesystem operation across all 5 merge cases (A–E):
+  - **Case A** (3 operations: ensureDir → safeWriteFile → chmodX): 4 verbose calls including completion marker
+  - **Case B** (2 operations: safeWriteFile → chmodX): 3 verbose calls
+  - **Case C** (2 operations: safeWriteFile → chmodX): 3 verbose calls
+  - **Case D** (4 operations: safeReadFile → safeWriteFile.bak → safeWriteFile → chmodX): 4 verbose calls
+  - **Case E** (3 operations: safeReadFile → safeWriteFile → chmodX): 4 verbose calls
+- Total: **18 verbose calls** added across all 5 cases, each gated by `context.verbose`
+- All calls use the `verbose()` function from ui.js (dim ANSI `…` prefix, per CON-04/PAT-01)
+- Case F (dry-run) intentionally has no verbose calls — no filesystem operations occur
+- Zero regression: all 16 existing hooks.test.js tests pass (verbosity is falsy in tests)
+- Plan file `plan/feature-verbose-logging-v1.md` marked T6 as completed
+
+### 2026-07-24: T7 — Added per-file copy logging to scripts/sync.js for verbose mode
+
+Implemented T7 from `plan/feature-verbose-logging-v1.md` — Phase 3 (Batch C) deprecating on T3:
+- Added `const isVerbose = process.env.AI_WORKFLOW_VERBOSE === '1'` at module scope (line 16) — reads the env var set by `sync-phase.js` when `--verbose` is active
+- Added 10 verbose logging calls across all 5 file operation sections in `scripts/sync.js`:
+  - **`.agents/` sync loop**: 2 calls before each `syncFile()` — one for new files, one for force/untouched overwrite
+  - **`.opencode/` sync loop**: 2 calls before each `syncFile()` — same pattern
+  - **`root files` loop**: 2 calls before each `syncFile()` — logs the root filename
+  - **`memory-bank` scaffold**: 1 call before `writeFileSync()` — logs each scaffolded file
+  - **`opencode.mcp.json` auto-copy**: 1 call before `copyFileSync()` — logs scaffolding from example
+- Uses `console.error` (stderr) for verbose output — stdout is captured for result parsing; stderr streams to terminal in `stdio: 'inherit'` mode
+- Uses simple two-space + ellipsis format (`'  … syncing: path'`) without ANSI codes — child process has no ui.js import
+- File validates: `node --check scripts/sync.js` passes (no syntax errors)
+- Plan file updated: T7 completed 2026-07-24; Phase 3 (Batch C) status updated to ✅ COMPLETE
+
+### 2026-07-24: Tracker — Verbose Logging Pipeline Fully Documented
+
+Completed all tracker documentation for the verbose logging feature pipeline:
+- Appended pipeline entry to `docs/tracker-log.md` — comprehensive record of 10 tasks across 4 batches, 9 files modified, 1 new test file, 96 total tests, key decisions, and follow-up notes
+- Updated `docs/TRACKER-INDEX.md` — added Verbose Logging pipeline row and entry location
+- Updated `memory-bank/progress.md` — appended tracker summary; resolved 5 known issues now fixed by this pipeline
+- [ ] Run `memory_bank_memory_update` to re-index changed files
+
+### 2026-07-24: Implementer — Verbose Logging Implementation Plan Created
+
+Created `plan/feature-verbose-logging-v1.md` — detailed implementation plan for activating the dormant `--verbose` flag:
+- 10 tasks across 4 parallel batches (A: T1–T2 foundation, B: T3–T6 core fixes, C: T7 child process, D: T8–T10 tests)
+- Phase 1: `ui.js` `verbose()` function + `discover.js` Context `verbose` field
+- Phase 2: `sync-phase.js` real-time child output streaming, `husky-init.js` pre-import logging, `discover.js` 9-step detection logging, `hooks.js` per-file operation logging
+- Phase 3: `sync.js` per-file copy logging via `AI_WORKFLOW_VERBOSE` env var (depends on T3)
+- Phase 4: 3 test files — 2 updated (discover.test.js, index.test.js) + 1 new (sync-phase.test.js)
+- 15 test scenarios defined (2 unit tests for Context, 1 passthrough test, 5 sync-phase tests, 4 manual integration tests)
+- 5 risks documented with mitigations, 5 assumptions verified
+- Notable decision: `index.js` requires NO code changes — Context `verbose` field flows from `discover(flags)` through all phase modules automatically
+- Zero new npm dependencies — all changes use Node.js built-ins only
 
 ## Known Issues
 
@@ -325,3 +454,11 @@ Recorded comprehensive session entry capturing all discoveries from the setup co
 - **Agent tuning notes added**: Specific prompting guidance for researcher (investigate npm ecosystem changes), architect (modular design with interface contracts), implementer (parallel batch plan with dependency edges), coder (batch ordering discipline), unit-tester (real temp dirs over mocks), tracker (capture ecosystem discoveries)
 - **Pipeline structure captured**: researcher → architect → implementer → coder (6 parallel batches) → unit-tester → tracker
 - Appended to `.agents/instructions/learned-knowledge.instructions.md`
+
+### 2026-07-24: Tracker — Verbose Logging Pipeline Documented
+
+Completed all tracker documentation for the verbose logging feature pipeline:
+- Created `docs/verbose-logging/tracker.md` — feature documentation covering all 3 pipeline steps (researcher, implementer/planner, coder) with files produced, key decisions, and known gaps
+- Updated `docs/TRACKER-INDEX.md` — added verbose logging pipeline entry and doc path
+- Updated `docs/tracker-log.md` — appended comprehensive pipeline summary (9 files modified, 1 new, 96 tests, key decisions)
+- Updated `.agents/instructions/learned-knowledge.instructions.md` — appended session entry with 8 key learnings (dead code infrastructure, spawnScript root cause, env var communication, stderr for diagnostics, index.js zero changes, parallel batch validation, normalize-memory free benefit, dim ANSI style) and agent tuning notes for researcher, implementer, coder, unit-tester, and tracker

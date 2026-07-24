@@ -135,6 +135,7 @@ const defaultContext = {
   isCI: false,
   nodeVersion: 20,
   dryRun: false,
+  verbose: false,
 }
 
 /**
@@ -557,7 +558,31 @@ describe('main() — setup orchestrator', () => {
     expect(runSyncPhase).toHaveBeenCalledWith(ctx)
   })
 
-  // ── 19. Flags object passed to discover ─────────────────────────────────
+  // ── 19a. --verbose flag passthrough to Context ──────────────────────────
+
+  it('--verbose: passes verbose flag through to Context', async () => {
+    const flags = { ...defaultFlags, verbose: true }
+    parseCliArgs.mockReturnValue(flags)
+    const ctx = { ...defaultContext, verbose: true }
+    discover.mockResolvedValue(ctx)
+
+    await main(['--verbose'])
+
+    // parseCliArgs was called with the expected argv
+    expect(parseCliArgs).toHaveBeenCalledWith(['--verbose'])
+    // discover received the flags with verbose: true
+    expect(discover).toHaveBeenCalledWith(flags)
+    // Every phase receives the context with verbose: true preserved
+    expect(installHooks).toHaveBeenCalledWith(ctx)
+    expect(handlePrepare).toHaveBeenCalledWith(ctx)
+    expect(initHusky).toHaveBeenCalledWith(ctx)
+    expect(runSyncPhase).toHaveBeenCalledWith(ctx)
+    // Normal pipeline — header and summary shown
+    expect(header).toHaveBeenCalledTimes(1)
+    expect(summary).toHaveBeenCalledTimes(1)
+  })
+
+  // ── 20. Flags object passed to discover ─────────────────────────────────
 
   it('passes the flags object to discover()', async () => {
     const flags = { ...defaultFlags, dryRun: true }

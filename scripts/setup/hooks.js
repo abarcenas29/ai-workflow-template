@@ -29,6 +29,7 @@ import {
   stepError,
   stepSuccess,
   stepWarn,
+  verbose,
 } from './ui.js'
 
 // ── Content builder ──────────────────────────────────────────────────────────
@@ -191,9 +192,13 @@ export async function installHooks(context) {
     try {
       // ── Case A: No .husky/ directory — create it and write hook ──
       if (!hasHuskyDir) {
+        verbose(context.verbose, `Creating .husky/ directory\u2026`)
         ensureDir(resolve(context.consumerRoot, '.husky'))
+        verbose(context.verbose, `Writing ${hookName} hook\u2026`)
         safeWriteFile(target, content)
+        verbose(context.verbose, 'Setting executable permissions\u2026')
         chmodX(target)
+        verbose(context.verbose, '  \u2713 done')
         const msg = `${hookName} hook created (\u2713 ${desc})`
         stepSuccess(msg)
         results.push({ hook: hookName, action: 'created', message: msg })
@@ -202,8 +207,11 @@ export async function installHooks(context) {
 
       // ── Case B: .husky/ exists but no hook file ─────────────────
       if (!existing) {
+        verbose(context.verbose, `Writing ${hookName} hook\u2026`)
         safeWriteFile(target, content)
+        verbose(context.verbose, 'Setting executable permissions\u2026')
         chmodX(target)
+        verbose(context.verbose, '  \u2713 done')
         const msg = `${hookName} hook created (\u2713 ${desc})`
         stepSuccess(msg)
         results.push({ hook: hookName, action: 'created', message: msg })
@@ -212,8 +220,11 @@ export async function installHooks(context) {
 
       // ── Case C: Hook exists AND is managed by us — overwrite ────
       if (isManaged) {
+        verbose(context.verbose, `Overwriting ${hookName} (idempotent update)\u2026`)
         safeWriteFile(target, content)
+        verbose(context.verbose, 'Setting executable permissions\u2026')
         chmodX(target)
+        verbose(context.verbose, '  \u2713 done')
         const msg = `${hookName} hook overwritten (idempotent update, ${desc})`
         stepSuccess(msg)
         results.push({ hook: hookName, action: 'overwritten', message: msg })
@@ -222,11 +233,15 @@ export async function installHooks(context) {
 
       // ── Case D: Hook exists, not ours, --force — back up + overwrite
       if (force) {
+        verbose(context.verbose, `Backing up existing ${hookName}\u2026`)
         const bakPath = target + '.bak'
         const originalContent = safeReadFile(target)
         safeWriteFile(bakPath, originalContent ?? '')
+        verbose(context.verbose, `Writing ${hookName} hook (force)\u2026`)
         safeWriteFile(target, content)
+        verbose(context.verbose, 'Setting executable permissions\u2026')
         chmodX(target)
+        verbose(context.verbose, '  \u2713 done')
         const msg =
           `${hookName} hook overwritten (original backed up to .bak, ${desc})`
         stepSuccess(msg)
@@ -235,11 +250,15 @@ export async function installHooks(context) {
       }
 
       // ── Case E: Hook exists, not ours, no --force — append ──────
+      verbose(context.verbose, `Reading existing ${hookName} for merge\u2026`)
       const existingContent = safeReadFile(target)
       const mergedContent =
         (existingContent ?? '') + '\n' + HOOK_MERGE_SEPARATOR + '\n' + content
+      verbose(context.verbose, `Writing merged ${hookName}\u2026`)
       safeWriteFile(target, mergedContent)
+      verbose(context.verbose, 'Setting executable permissions\u2026')
       chmodX(target)
+      verbose(context.verbose, '  \u2713 done')
       const msg = `${hookName} hook merged with existing content (${desc})`
       stepSuccess(msg)
       results.push({ hook: hookName, action: 'merged', message: msg })

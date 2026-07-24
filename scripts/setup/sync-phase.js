@@ -7,6 +7,7 @@ import { spawn } from 'child_process'
 import { join } from 'path'
 
 import { resolvePackageRoot, logInfo, logWarn, logError } from './utils.js'
+import { verbose } from './ui.js'
 
 // ── Main export ─────────────────────────────────────────────────────────────
 
@@ -72,20 +73,24 @@ export async function runSyncPhase(context) {
 
   // ── Spawn sync.js ──────────────────────────────────────────────────────
   const syncPath = join(packageRoot, 'scripts', 'sync.js')
+  verbose(context.verbose, 'Spawning sync.js\u2026')
   const syncResult = await spawnScript(
     'sync.js',
     syncPath,
     consumerRoot,
     extraArgs,
+    context.verbose,
   )
 
   // ── Spawn normalize-memory.js ──────────────────────────────────────────
   const normPath = join(packageRoot, 'scripts', 'normalize-memory.js')
+  verbose(context.verbose, 'Spawning normalize-memory.js\u2026')
   const normResult = await spawnScript(
     'normalize-memory.js',
     normPath,
     consumerRoot,
     extraArgs,
+    context.verbose,
   )
 
   const results = [syncResult, normResult]
@@ -133,30 +138,32 @@ export async function runSyncPhase(context) {
  *   output: string
  * }>}
  */
-function spawnScript(name, scriptPath, cwd, extraArgs) {
+function spawnScript(name, scriptPath, cwd, extraArgs, verbose = false) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [scriptPath, ...extraArgs], {
       cwd,
-      env: { ...process.env, INIT_CWD: cwd },
-      stdio: 'pipe',
+      env: { ...process.env, INIT_CWD: cwd, AI_WORKFLOW_VERBOSE: verbose ? '1' : '0' },
+      stdio: verbose ? 'inherit' : 'pipe',
     })
 
     let output = ''
 
-    child.stdout.on('data', (data) => {
-      output += data.toString()
-    })
+    if (!verbose) {
+      child.stdout.on('data', (data) => {
+        output += data.toString()
+      })
 
-    child.stderr.on('data', (data) => {
-      output += data.toString()
-    })
+      child.stderr.on('data', (data) => {
+        output += data.toString()
+      })
+    }
 
     child.on('close', (exitCode) => {
       resolve({
         script: name,
         success: exitCode === 0,
         exitCode: exitCode ?? -1,
-        output: output.trim(),
+        output: verbose ? '(streamed to terminal)' : output.trim(),
       })
     })
 
