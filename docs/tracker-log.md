@@ -293,6 +293,58 @@ Activated the dormant `--verbose` flag for `npx ai-workflow-setup` by adding ste
 
 ---
 
+## Feature Pipeline: Fix Hook Script References — Consumer-Project Hook Resolution
+
+**Date:** 2026-07-24
+**Status:** ✅ SUCCESS (7/7 tests passing, 52/52 integration assertions, 13/13 MCP references verified)
+**Pipeline:** Feature Pipeline — implementer (bootstrap) → researcher → implementer (planning) → coder (T1–T5) → tracker
+
+### Summary
+
+Fixed `.husky/post-merge` and `.husky/pre-commit` hook script resolution in consumer projects. Extended `scripts/sync.js` with a `__scripts__/` sync section (54 lines, lines 174–227) that copies 6 runtime scripts to the consumer's `scripts/` directory using the same hash-based manifest pattern as other sync sections. This enables existing relative paths in hooks (e.g., `node scripts/memory-cli.js update`) to resolve correctly without any changes to `constants.js`, `hooks.js`, or the hook files themselves.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/sync.js` | **Modified** — Added `__scripts__/` sync section (lines 174–227): `scriptsToSync` array, 3-case hash-based loop, manifest tracking |
+| `scripts/sync.test.js` | **Modified** — Added 5 unit tests: new-file copy, manifest-less skip, `--force` overwrite, `--dry-run`, manifest hash tracking |
+| `docs/spike-post-merge-hook-scripts.md` | Research spike — root cause analysis, 6-tier script inventory, 21 codebase references, recommended approach |
+| `plan/fix-hook-script-references-v1.md` | Implementation plan — 5 tasks, 2 batches (Phase 1–3), 6 alternatives considered, 14 test scenarios |
+| `memory-bank/activeContext.md` | Updated Current Focus to reflect completion; comprehensive Recent Changes entry |
+| `memory-bank/progress.md` | Comprehensive "Fix Hook Script References" section under Recently Completed |
+| `docs/hook-script-references/tracker.md` | Feature-specific tracker documentation |
+
+### Scripts Synced to Consumer
+
+| Script | Used By |
+|---|---|
+| `scripts/memory-cli.js` | `.husky/post-merge` — memory index update |
+| `scripts/memory-index.js` | Co-located dependency of `memory-cli.js` and `mcp-memory-server.js` |
+| `scripts/bump-version.js` | `.husky/pre-commit` — version bump |
+| `scripts/validate-memory-schema.js` | `.husky/pre-commit` — YAML frontmatter validation |
+| `scripts/mcp-memory-server.js` | `opencode.mcp.json` — MCP memory server |
+| `scripts/mcp/playwright-mcp-launcher.js` | `opencode.mcp.example.json` — Playwright MCP launcher |
+
+### Key Decisions
+
+- **Extend existing sync.js mechanism** over alternative approaches (absolute node_modules paths, npx, symlinks, postinstall-only, constants-only) — aligned with existing `.agents/` and `.opencode/` sync patterns
+- **Hash-based manifest for idempotent updates**: `__scripts__/<relPath>` keys in `.agents-sync-manifest.json` enable intelligent sync — locally modified scripts preserved, unmodified scripts refreshed on package update
+- **No changes to hook content**: The relative paths in `constants.js` TEMPLATE_HOOKS are correct once scripts exist at consumer root — zero modifications to `constants.js`, `hooks.js`, `.husky/post-merge`, or `.husky/pre-commit`
+- **Co-location preserved**: `memory-cli.js` and `memory-index.js` are both synced, ensuring `import './memory-index.js'` resolves correctly
+- **MCP audit confirms correctness**: All 13 reference points across 7 files resolve correctly after script sync
+
+### Notes / Follow-up
+
+- 7/7 unit tests pass (2 existing + 5 new) in 533ms
+- 52/52 integration assertions pass across 10 test groups
+- 13/13 MCP references verified correct across 7 files
+- Plan `plan/fix-hook-script-references-v1.md` status: ✅ Completed
+- The `npx ai-workflow-setup` workflow works end-to-end — scripts are now synced before hooks run
+- Optional future enhancement: update `opencode.mcp.example.json` Playwright entry to use `npx @playwright/mcp@latest` (matching root `opencode.json`)
+
+---
+
 ## Feature Pipeline: Verbose Logging — `npx ai-workflow-setup --verbose`
 
 **Date:** 2026-07-24

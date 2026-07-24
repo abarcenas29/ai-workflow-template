@@ -171,6 +171,61 @@ if (existsSync(sourceOpenCodeDir)) {
   }
 }
 
+/* ──  Sync scripts/ directory ──────────────────────────────── */
+
+const scriptsToSync = [
+  'memory-cli.js',
+  'memory-index.js',
+  'bump-version.js',
+  'validate-memory-schema.js',
+  'mcp-memory-server.js',
+  'mcp/playwright-mcp-launcher.js',
+]
+
+const sourceScriptsDir = resolve(packageRoot, 'scripts')
+const targetScriptsDir = resolve(consumerRoot, 'scripts')
+let scriptsCopied = 0
+let scriptsSkipped = 0
+
+for (const scriptRelPath of scriptsToSync) {
+  const sourceFile = resolve(sourceScriptsDir, scriptRelPath)
+  const targetFile = resolve(targetScriptsDir, scriptRelPath)
+
+  if (!existsSync(sourceFile)) {
+    continue
+  }
+
+  const sourceHash = hashFile(sourceFile)
+  const existingHash = existsSync(targetFile) ? hashFile(targetFile) : null
+  const trackedKey = `__scripts__/${scriptRelPath}`
+  const recordedHash = manifest.files[trackedKey] ?? null
+
+  if (!existsSync(targetFile)) {
+    if (isVerbose) console.error(`  … syncing: scripts/${scriptRelPath}`)
+    syncFile(sourceFile, targetFile)
+    manifest.files[trackedKey] = sourceHash
+    scriptsCopied += 1
+    copied += 1
+    added += 1
+    continue
+  }
+
+  const isUntouched = recordedHash !== null && existingHash === recordedHash
+
+  if (forceOverwrite || isUntouched) {
+    if (isVerbose) console.error(`  … syncing: scripts/${scriptRelPath}`)
+    syncFile(sourceFile, targetFile)
+    manifest.files[trackedKey] = sourceHash
+    scriptsCopied += 1
+    copied += 1
+    continue
+  }
+
+  scriptsSkipped += 1
+  skipped += 1
+  console.warn(`[ai-workflow-template] Skipped locally modified script file: scripts/${scriptRelPath}`)
+}
+
 for (const rootFile of rootFiles) {
   const sourceFile = resolve(packageRoot, rootFile)
   if (!existsSync(sourceFile)) {
