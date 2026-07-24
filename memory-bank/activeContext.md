@@ -2,8 +2,8 @@
 id: "activeContext"
 title: "Active Context"
 updated: "2026-07-24"
-tags: [architect, orchestrator, bootstrap, setup, implementation, discovery]
-entities: [vitest, graphify, memory-bank, husky, opencode]
+tags: [architect, orchestrator, bootstrap, setup, implementation, discovery, verification, agent-exercise]
+entities: [vitest, graphify, memory-bank, husky, opencode, architecture-context]
 category: "context"
 ---
 
@@ -12,10 +12,58 @@ category: "context"
 
 ## Current Focus
 
-**Verbose Logging Spike — Research Complete** — Completed deep-dive research into `npx ai-workflow-setup` hanging behavior and verbose logging gaps. Spike document at `docs/spike-verbose-logging.md`. Critical finding: `sync-phase.js` `spawnScript()` captures all child process output silently — the most likely cause of "loading... hangs". The `--verbose` flag is defined and parsed but **never used** anywhere in the codebase. 7 files identified for modification to implement verbose/debug output.
+**Hook Script References Fix — ✅ ALL TASKS COMPLETE (T1–T5)** — The `.husky/post-merge` and `.husky/pre-commit` hook script references fix is fully implemented and verified. `scripts/sync.js` now copies 6 runtime scripts to consumer projects using the hash-based manifest (`__scripts__/` namespace). All 52 integration tests pass, 7 unit tests pass, and MCP audit confirms all 13 script references resolve correctly. See `plan/fix-hook-script-references-v1.md` (status: Completed).
 
 ## Recent Changes
 
+- **2026-07-24**: Implemented T5 — Memory-bank final updates (this task)
+  - Updated `plan/fix-hook-script-references-v1.md`: overall status → Completed, marked T5 with 2026-07-24, Phase 3 → ✅ COMPLETED
+  - Updated `memory-bank/activeContext.md`: Current Focus reflects completion, Next Actions cleaned up, comprehensive Recent Changes entry added
+  - Updated `memory-bank/progress.md`: comprehensive "Fix hook script references" section under Recently Completed, What's Left cleaned up
+  - Synced memory-bank vector index with `memory_bank_memory_update`
+  - **Result**: All 5 tasks across all 3 phases of plan `plan/fix-hook-script-references-v1.md` are now ✅ COMPLETE
+
+- **2026-07-24**: **Hook Script References Fix — Full Summary (T1–T5)**
+  - **Problem**: `.husky/post-merge` and `.husky/pre-commit` hooks reference scripts using relative paths (`node scripts/memory-cli.js update`) that fail in consumer projects because `scripts/` isn't synced — only `.agents/`, `.opencode/`, and root files were.
+  - **Solution**: Extended `scripts/sync.js` with a `__scripts__/` sync section (lines 174–227) that copies 6 runtime scripts to `{consumerRoot}/scripts/` using the same hash-based manifest pattern as other sync sections.
+  - **Files modified/created**: `scripts/sync.js` (54 lines added), `scripts/sync.test.js` (5 new unit tests), `memory-bank/activeContext.md`, `memory-bank/progress.md`
+  - **Files audited (no change)**: `opencode.mcp.example.json`, `opencode.mcp.json`, `opencode.json`, `scripts/mcp-memory-server.js`, `docs/playwright-mcp-configuration.md`, `.agents-sync-manifest.json`
+  - **Tests added**: 5 unit tests (new-file copy, manifest-less skip, --force overwrite, --dry-run, manifest hash tracking) + 52 integration assertions in manual verification (10 test groups: first-run sync, idempotent re-run, locally modified preservation, --force, --dry-run, hook path resolution, syntax validation, post-merge path, script execution from consumer root)
+  - **Verification**: All 7 unit tests pass (2 existing + 5 new), all 52 integration assertions pass, MCP audit confirms all 13 script reference points are correct
+  - **Scripts synced**: `memory-cli.js`, `memory-index.js`, `bump-version.js`, `validate-memory-schema.js`, `mcp-memory-server.js`, `mcp/playwright-mcp-launcher.js`
+  - **Key insight**: No changes needed to `scripts/setup/constants.js`, `scripts/setup/hooks.js`, `.husky/post-merge`, or `.husky/pre-commit` — the relative paths become valid once scripts exist at consumer root
+  - **Plan**: `plan/fix-hook-script-references-v1.md` — status: ✅ Completed
+
+- **2026-07-24**: Implemented T4 — MCP configuration audit
+  - Audited 13 locations across 7 files referencing `mcp-memory-server` or `playwright-mcp-launcher`
+  - **Confirmed correct**: `opencode.mcp.example.json` (lines 39, 59), `opencode.mcp.json` (lines 39, 59), `opencode.json` root (line 56), `docs/playwright-mcp-configuration.md` (lines 47, 139, 163), `scripts/mcp-memory-server.js` (line 12), `scripts/sync.js` (lines 181-182), `scripts/sync.test.js` (lines 56-57), `.agents-sync-manifest.json` (lines 107-108)
+  - **Key discovery**: Root `opencode.json` uses `npx @playwright/mcp@latest` (no launcher script needed for template's own config), while `opencode.mcp.example.json` uses the launcher script wrapper with env var support (`HEADLESS`, `SLOW_MO`, `VIEWPORT`) — both valid by design
+  - **Zero path adjustments needed**: All references resolve correctly to `{consumerRoot}/scripts/mcp-memory-server.js` and `{consumerRoot}/scripts/mcp/playwright-mcp-launcher.js` after sync.js copies them
+  - Plan `plan/fix-hook-script-references-v1.md` marked T4 completed
+
+- **2026-07-24**: Implemented T3 — Manual integration verification in simulated consumer project
+  - 52 integration tests covering all scenarios: first-run sync (all 6 scripts copied with content integrity), manifest tracking (all 6 `__scripts__/` entries with correct SHA-256), idempotent re-run (no unnecessary overwrites or warnings), locally modified file preservation (consumer edits respected), `--force` overwrite (bypasses local modification protection), `--dry-run` (no files written), hook path resolution (`node scripts/memory-cli.js --help` resolves correctly from consumer root), post-merge hook path (`node scripts/memory-cli.js update` found and executes), syntax validation of all scripts (`node -c` passes for all 6)
+  - Verified: `npx ai-workflow-setup` workflow works end-to-end via `INIT_CWD` simulation
+  - Temp directories cleaned up after test
+  - Plan `plan/fix-hook-script-references-v1.md` marked T3 completed
+
+- **2026-07-24**: Implemented T2 — Added 5 unit tests to `scripts/sync.test.js` for `__scripts__/` sync behavior
+  - 5 new tests covering: new-file copy (all 6 scripts created when missing), skip when not tracked in manifest (mtimes unchanged), --force overwrite (dummy content replaced with source), --dry-run (no files written, mode in output), manifest tracking (all 6 `__scripts__/` entries with valid SHA-256 hashes after sync)
+  - Uses `child_process.spawnSync` to invoke `sync.js` in temp directories with `INIT_CWD` isolation (same pattern as `sync-phase.js`)
+  - Temp dirs cleaned up in `afterAll` hook
+  - All 7 tests pass (2 existing + 5 new) in 533ms with `npx vitest run scripts/sync.test.js`
+  - Plan `plan/fix-hook-script-references-v1.md` marked T2 completed; Phase 2 status updated to ✅ COMPLETED
+
+- **2026-07-24**: Implemented T1 — Added `__scripts__/` sync section to `scripts/sync.js`
+  - Added new sync section (lines 174–227) after the `.opencode/` block and before root files
+  - Defines `scriptsToSync` array with 6 script paths (memory-cli.js, memory-index.js, bump-version.js, validate-memory-schema.js, mcp-memory-server.js, mcp/playwright-mcp-launcher.js)
+  - Uses same hash-based manifest pattern as other sync sections with `__scripts__/<relPath>` tracked keys
+  - Handles new-file, untouched, and locally-modified cases identically to `.agents/` and `.opencode/` sections
+  - `scriptsCopied` and `scriptsSkipped` accumulators added to global `copied`/`skipped`/`added` totals
+  - Verified: syntax check passes, `--dry-run` shows intent for all 6 scripts, `--force` populates manifest, idempotent re-run shows 0 skipped
+  - Plan: `plan/fix-hook-script-references-v1.md` marked T1 completed
+
+- **2026-07-24**: Implementer agent bootstrap verification — checked `docs/.architecture-context.md` (exists, real content — 85 lines documenting agent-based workflow distribution system with 6 layers) and `memory-bank/` core files (all 6 exist with substantial project context). No bootstrapping needed — project is fully initialized.
 - **2026-07-24**: Verbose/Debug Logging Spike Research — `docs/spike-verbose-logging.md` created
   - Examined all 13 files in the setup pipeline (bin/setup.js, 9 scripts/setup/ modules, sync.js, normalize-memory.js, package.json)
   - **P0 Finding**: `sync-phase.js` `spawnScript()` captures all child stdout/stderr into a dead `output` string — if sync.js or normalize-memory.js hangs, user sees absolutely nothing
