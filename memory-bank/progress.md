@@ -1027,3 +1027,29 @@ Completed all tracker documentation for the centralized knowledgebase feature pi
 - `npm run kb:search "pgvector"` → 5 results (0.072–0.197 similarity)
 
 **Key finding**: Argument parsing (`parseFlags` + `positional.join(' ')`) and SQL query logic were both correct. The raw `<=>` cosine similarity operator works. The sole bug was the threshold value being inappropriate for the `all-MiniLM-L6-v2` model's score distribution. With `threshold: 0.0`, the `LIMIT` clause controls result count, and threshold becomes an opt-in quality filter.
+
+### 2026-07-30: Coder — Fixed deprecated husky v9 lines + missing vocabulary tags
+
+**Fix 1 — Deprecated `husky.sh` lines in hook files**:
+- Removed `. "$(dirname "$0")/_/husky.sh"` from `.husky/post-commit` (line 3) and `.husky/post-merge` (line 3)
+- These lines cause "File not found" warnings in husky v9+ because the `h` script handles setup natively
+- The `constants.js` `TEMPLATE_HOOKS` was already fixed (Bug 1 from July 30) but the actual hook files in the repo root were never updated
+- `.husky/pre-commit` was already clean (only managed-by marker and script calls)
+- **Verification**: `bash -n .husky/post-commit` and `bash -n .husky/post-merge` both pass syntax check
+
+**Fix 2 — Missing tags in `memory-bank/.vocabulary.json`**:
+- Added 11 missing tags across 3 groups:
+  - `workflow` (+2): `implementation-planning`, `documentation`
+  - `memory_ops` (+2): `bug-fix`, `verification`
+  - `topic` (new group, +7): `knowledgebase`, `pgvector`, `mcp`, `embeddings`, `dotenv`, `chunk-parser`, `agent-exercise`
+- Tags discovered from `activeContext.md` and `progress.md` YAML frontmatter
+- **Verification**: JSON valid (`node -e` parse check passes). `node scripts/validate-memory-schema.js` exits 0.
+
+**Files modified**:
+| File | Change |
+|------|--------|
+| `.husky/post-commit` | Removed deprecated `. "$(dirname "$0")/_/husky.sh"` line (line 3) |
+| `.husky/post-merge` | Removed deprecated `. "$(dirname "$0")/_/husky.sh"` line (line 3) |
+| `memory-bank/.vocabulary.json` | Added 11 tags across 3 groups |
+
+**No plan file**: Ad-hoc fixes.

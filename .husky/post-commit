@@ -1,6 +1,5 @@
 # Managed by @abarcenas/ai-workflow-template setup
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
 
 # After commit, check if learned knowledge file changed
 # and sync to the centralized knowledgebase

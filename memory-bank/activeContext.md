@@ -12,6 +12,8 @@ category: "context"
 
 ## Current Focus
 
+**Ad-hoc fixes: Deprecated husky lines in hook files + missing vocabulary tags** — Removed the deprecated `. "$(dirname "$0")/_/husky.sh"` line from `.husky/post-commit` and `.husky/post-merge` (already fixed in `constants.js` TEMPLATE_HOOKS but not in actual hook files). Added 11 missing tags to `memory-bank/.vocabulary.json` across 3 groups (workflow, memory_ops, topic).
+
 **Centralized Knowledgebase — Batches A+B+C Complete (T1–T11), Batch D started (T13 done)** — The core engine, CLI, MCP server, and setup integration are now fully implemented. Phase 3 (setup integration) is complete with all 3 tasks done. Batch D (config + agent permissions) is in progress — T13 (package.json) completed. Remaining: T12 (opencode.json), T14 (13 agent files), and Batch E (tests).
 
 The plan covers:
@@ -555,3 +557,14 @@ The plan covers:
   - `npm run kb:search "template distribution package"` — 5 results, top match has similarity 0.265 ✅
 - **Key insight**: The `parseFlags()` + `positional.join(' ')` in the CLI correctly reassembles multi-word queries. The raw SQL `<=>` operator works. The only issue was the threshold being too high for the model's output distribution. The LIMIT clause now controls result count, while threshold is effectively opt-in for filtering low-confidence matches
 - **No plan file**: Ad-hoc fix
+
+### 2026-07-30: Coder — Fixed deprecated husky `husky.sh` lines + missing vocabulary tags
+
+- **Fix 1**: Removed deprecated `. "$(dirname "$0")/_/husky.sh"` line from `.husky/post-commit` and `.husky/post-merge` — these lines cause "File not found" warnings in husky v9+. The `constants.js` TEMPLATE_HOOKS was already fixed in a previous bug fix round, but the actual hook files in the repo root were never updated.
+- **Fix 1 verification**: `bash -n .husky/post-commit` and `bash -n .husky/post-merge` both pass syntax check. `.husky/pre-commit` was already clean.
+- **Fix 2**: Added 11 missing tags to `memory-bank/.vocabulary.json`:
+  - `workflow` group: added `implementation-planning`, `documentation`
+  - `memory_ops` group: added `bug-fix`, `verification`
+  - `topic` group (new): added `knowledgebase`, `pgvector`, `mcp`, `embeddings`, `dotenv`, `chunk-parser`, `agent-exercise`
+- **Fix 2 verification**: `node -e "JSON.parse(require('fs').readFileSync('memory-bank/.vocabulary.json'))"` passes. `node scripts/validate-memory-schema.js` exits 0 with fewer warnings.
+- **No plan file**: Ad-hoc fixes

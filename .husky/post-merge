@@ -1,6 +1,5 @@
 # Managed by @abarcenas/ai-workflow-template setup
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
 
 # After git pull/merge, check if memory-bank files changed
 # and update the vector index incrementally
