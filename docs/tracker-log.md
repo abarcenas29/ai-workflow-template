@@ -522,3 +522,64 @@ Implemented a centralized knowledgebase layer using PostgreSQL + pgvector for cr
 - **Manual integration steps:** Set up PostgreSQL with pgvector, configure `DATABASE_URL`, run `node scripts/knowledgebase-cli.js sync` to index existing learned knowledge, verify MCP server responds to `tools/list`
 - **OpenAI upgrade path:** Set `OPENAI_API_KEY` in `.env` to use higher-quality embeddings. Migration steps documented in `knowledgebase-init.sql`
 - **Future enhancement:** Implement `setEmbeddingProvider()` for runtime embedding model switching
+
+---
+
+## Feature Pipeline: MCP Config Rename — Consumer Provisioning to `opencode.json`
+
+**Date:** 2026-07-30
+**Status:** ✅ SUCCESS — 109 tests passing (7 sync + 102 setup), 0 regressions
+**Pipeline:** Feature Pipeline — implementer (bootstrap) → researcher → implementer (corrected plan) → coder → reviewer → tracker
+
+### Summary
+
+Changed how `npx ai-workflow-setup` provisions MCP configuration to consumer projects. Replaced the old dual-file pattern (tracked `opencode.mcp.example.json` template + auto-copied `opencode.mcp.json` live file) with a simplified approach: the template stays in the repo as-is, and the sync script copies it to `opencode.json` (opencode's default config filename) on consumer projects. The coder deviated from the original `git mv` plan with a corrected approach: `opencode.mcp.example.json` kept as template, `opencode.mcp.json` deleted, sync script updated to provision `opencode.json` instead, `.gitignore` updated to `opencode.mcp` pattern, and documentation references changed to `opencode.mcp`. 6 files modified, 1 file deleted, all 109 tests passing.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `opencode.mcp.json` | **DELETED** — Untracked/gitignored live file, byte-for-byte identical to template |
+| `scripts/sync.js` | **MODIFIED** — `rootFiles` updated (`opencode.mcp.example.json` → `opencode.json`); auto-copy target + manifest key changed to `opencode.json` |
+| `.gitignore` | **MODIFIED** — Entry changed from `opencode.mcp.json` → `opencode.mcp` (broader pattern) |
+| `README.md` | **MODIFIED** — MCP Tooling section: `opencode.mcp.json` → `opencode.mcp` |
+| `docs/playwright-mcp-configuration.md` | **MODIFIED** — 2 references: `opencode.mcp.json` → `opencode.mcp` |
+| `memory-bank/activeContext.md` | **MODIFIED** — Current Focus + Recent Changes updated |
+| `memory-bank/progress.md` | **MODIFIED** — What's Left updated (MCP rename marked complete) |
+| `docs/spike-opencode-mcp-rename.md` | Research spike (218 lines, 59 refs across 14 files) |
+| `plan/config-opencode-mcp-rename-v1.md` | Implementation plan — 9 tasks across 4 batches, corrected plan note |
+| `docs/config-opencode-mcp-rename/tracker.md` | Feature-specific tracker documentation (this pipeline) |
+
+### Files Intentionally Left Unchanged
+
+| File | Reason |
+|---|---|
+| `opencode.mcp.example.json` | Template source — kept as-is for consumer provisioning |
+| `package.json` | `files` array remains correct — template file still in repo under original name |
+| `scripts/setup/` modules | Setup delegates to `sync.js` — no direct MCP references |
+| `scripts/sync.test.js` | No MCP-specific filename assertions — zero test changes needed |
+
+### Key Decisions
+
+- **Corrected plan over original plan**: The original proposal (`git mv` → `opencode.mcp`) was rejected. Instead, `opencode.mcp.example.json` stays as the repo template, and consumer provisioning copies it to `opencode.json`. This avoids git history churn on the template file and uses opencode's default config filename for consumers.
+- **Three naming contexts**: Repo template (`opencode.mcp.example.json`), consumer provisioning (`opencode.json`), and documentation (`opencode.mcp`) — each with a different purpose.
+- **`.gitignore` broadened to `opencode.mcp`**: Catches any stray `opencode.mcp` files (with or without extension) without affecting `opencode.json` (already gitignored on line 2).
+- **`package.json` left untouched**: The template file remains in the repo under its original name, so the `files` array entry and npm packaging are unaffected.
+- **Historical docs preserved**: Spike docs, archived plans, and old tracker entries retain original filenames as historical snapshots.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run scripts/sync.test.js` | ✅ 7/7 pass |
+| `npx vitest run scripts/setup/` | ✅ 102/102 pass |
+| `node --check scripts/sync.js` | ✅ Syntax OK |
+| `opencode.mcp.json` on disk | ✅ Deleted |
+| `opencode.mcp.example.json` on disk | ✅ Exists (unchanged) |
+| No stale `opencode.mcp.example.json` or `opencode.mcp.json` refs in sync.js | ✅ Confirmed |
+
+### Notes / Follow-up
+
+- Consumers with a previous setup will have a stale `opencode.mcp.json` alongside the new `opencode.json` — safe to delete manually
+- The corrected approach means there is no `opencode.mcp` file on disk: the template is `opencode.mcp.example.json` and the consumer target is `opencode.json`
+- All documentation consistently refers to the config as `opencode.mcp` (the generic opencode MCP config identifier)

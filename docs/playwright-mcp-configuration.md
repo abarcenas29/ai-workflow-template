@@ -36,7 +36,7 @@ VIEWPORT=1920x1080
 
 ### MCP Configuration
 
-The MCP configuration is located in `opencode.mcp.json`:
+The MCP configuration is located in `opencode.mcp`:
 
 ```json
 {
@@ -159,7 +159,7 @@ Both should use the same environment variables. The configuration ensures:
 ## Files Summary
 
 - **playwright.config.ts** - Test runner configuration
-- **opencode.mcp.json** - MCP server configuration
+- **opencode.mcp** - MCP server configuration
 - **scripts/mcp/playwright-mcp-launcher.js** - MCP launcher wrapper
 - **.vscode/settings.json** - VSCode extension settings
 - **.vscode/launch.json** - Debug configurations

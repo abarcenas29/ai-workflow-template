@@ -79,7 +79,7 @@ function syncFile(sourceFile, targetFile) {
   copyFileSync(sourceFile, targetFile)
 }
 
-const rootFiles = ['AGENTS.md', 'opencode.mcp.example.json', 'skills-lock.json']
+const rootFiles = ['AGENTS.md', 'opencode.json', 'skills-lock.json']
 
 if (!existsSync(sourceAgentsDir)) {
   console.warn('[ai-workflow-template] No .agents directory found to sync.')
@@ -367,14 +367,14 @@ for (const [fileName, fileContent] of Object.entries(agentInstructionsStubs)) {
   scaffolded += 1
 }
 
-/* ──  Auto-copy opencode.mcp.json from example ────────────────── */
+/* ──  Auto-copy opencode.mcp.example.json → opencode.json ────── */
 
 const exampleMcpFile = resolve(packageRoot, 'opencode.mcp.example.json')
-const targetMcpFile = resolve(consumerRoot, 'opencode.mcp.json')
-const mcpTrackedKey = '__root__/opencode.mcp.json'
+const targetMcpFile = resolve(consumerRoot, 'opencode.json')
+const mcpTrackedKey = '__root__/opencode.json'
 
 if (existsSync(exampleMcpFile) && !existsSync(targetMcpFile)) {
-  if (isVerbose) console.error('  … scaffolding: opencode.mcp.json from example')
+  if (isVerbose) console.error('  … scaffolding: opencode.json from example')
   copyFileSync(exampleMcpFile, targetMcpFile)
   manifest.files[mcpTrackedKey] = hashFile(targetMcpFile)
   scaffolded += 1

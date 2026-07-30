@@ -1,7 +1,7 @@
 ---
 id: "tracker-index"
 title: "Tracker Pipeline Index"
-updated: "2026-07-29"
+updated: "2026-07-30"
 tags: [tracker, index, pipeline, orchestrator]
 doc_type: "tracker-index"
 ---
@@ -19,6 +19,7 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Feature Pipeline | Verbose Logging — `npx ai-workflow-setup --verbose` | 2026-07-24 | ✅ Complete (96/96 tests) |
 | Feature Pipeline | Fix Hook Script References — Consumer-Project Hook Resolution | 2026-07-24 | ✅ Complete (7/7 tests, 52/52 assertions, 13/13 MCP refs) |
 | Feature Pipeline | Centralized Knowledgebase — PostgreSQL + pgvector MCP | 2026-07-29 | ✅ Complete (158 tests, 0 failures) |
+| Feature Pipeline | MCP Config Rename — Consumer Provisioning to `opencode.json` | 2026-07-30 | ✅ Complete (109 tests, 0 regressions) |
 
 ## Entry Locations
 
@@ -31,6 +32,7 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Verbose Logging | `docs/tracker-log.md`, `docs/spike-verbose-logging.md`, `docs/verbose-logging/tracker.md` |
 | Fix Hook Script References | `docs/tracker-log.md`, `docs/spike-post-merge-hook-scripts.md`, `docs/hook-script-references/tracker.md`, `.agents/instructions/learned-knowledge.instructions.md` |
 | Centralized Knowledgebase (pgvector MCP) | `docs/tracker-log.md`, `docs/knowledgebase-pgvector/tracker.md`, `.agents/instructions/learned-knowledge.instructions.md` |
+| MCP Config Rename | `docs/tracker-log.md`, `docs/config-opencode-mcp-rename/tracker.md` |
 
 ### Learned Knowledge Sessions
 
@@ -41,3 +43,4 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | 2026-07-24 | Verbose Logging (10 tasks, 4 batches) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-07-24 | Fix Hook Script References (5 tasks, 2 batches) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-07-29 | Centralized Knowledgebase (17 tasks, 5 batches) | `.agents/instructions/learned-knowledge.instructions.md` |
+| 2026-07-30 | MCP Config Rename (8 files modified, 1 deleted, 109 tests) | `.agents/instructions/learned-knowledge.instructions.md`, `docs/config-opencode-mcp-rename/tracker.md` |
