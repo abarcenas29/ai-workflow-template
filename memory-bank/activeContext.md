@@ -28,6 +28,12 @@ The plan covers:
 
 ## Recent Changes
 
+- **2026-07-30**: **Coder — Fixed `embed()` returning Array instead of Float32Array**
+  - **Root cause**: `embed()` in `scripts/knowledgebase-index.js` line 310 used `Array.from(result.data)` which converted the `Float32Array` from the transformers pipeline into a plain `Array`. The JSDoc also incorrectly documented it as returning `number[]`.
+  - **Fix**: Changed to `new Float32Array(result.data)` on line 310, updated JSDoc to reflect `Float32Array` return type. pgvector's `toSql()` accepts both typed arrays and plain arrays (uses `Array.from()` internally for typed arrays), so no pgvector compatibility issue.
+  - **File modified**: `scripts/knowledgebase-index.js` (lines 288-311 — JSDoc + return statement)
+  - **Verification**: `npx vitest run scripts/knowledgebase-index.test.js` → 36 passed. `npx vitest run scripts/` → 158 passed across 9 test files.
+
 - **2026-07-30**: **Coder — MCP Config File Changes** — Implemented corrected plan for MCP configuration provisioning. Deviated from original plan (no `git mv`). Changes: deleted `opencode.mcp.json`, updated `.gitignore` (removed `opencode.mcp.json`, added `opencode.mcp`), updated `scripts/sync.js` (rootFiles `'opencode.mcp.example.json'` → `'opencode.json'`, auto-copy target `opencode.mcp.json` → `opencode.json` with source `opencode.mcp.example.json`), updated `README.md` and `docs/playwright-mcp-configuration.md` to reference `opencode.mcp`, updated memory-bank current-state references. `opencode.mcp.example.json` kept as-is. `package.json` unchanged. `opencode.mcp` (no extension) not found on disk. Added to `.gitignore` for future-proofing. All 7 sync tests pass, 102 setup tests pass, syntax valid.
 
 - **2026-07-30**: **Implementer — Bootstrap verification** — Verified all project scaffolding is fully initialized:

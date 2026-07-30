@@ -30,7 +30,7 @@ category: "progress"
 - Knowledgebase architecture design: ADR-001 complete (`docs/adr-knowledgebase-pgvector.md`)
 - Knowledgebase implementation plan: `plan/feature-knowledgebase-pgvector-v1.md` — Batch A complete (T1–T6)
 - Knowledgebase core engine: `scripts/knowledgebase-index.js` — 11 exports with lazy imports, embedding, CRUD, semantic search, graceful degradation
-- Knowledgebase embedding pipeline: `embed()` returns plain `Array` (compatible with pgvector `toSql()`), vectors correctly stored as `VECTOR(384)`
+- Knowledgebase embedding pipeline: `embed()` returns `Float32Array` (compatible with pgvector `toSql()`), vectors correctly stored as `VECTOR(384)`
 - Knowledgebase CLI: `scripts/knowledgebase-cli.js` — 4 commands (sync, search, list, stats) with graceful degradation when DATABASE_URL unset
 - Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation
 - Knowledgebase foundation files (all companion files + T7 CLI + T8 MCP server): `knowledgebase-init.sql`, `.husky/post-commit`, `knowledgebase.instructions.md`, `.env.example` updated, `constants.js` updated
@@ -163,6 +163,18 @@ Fixed 3 gaps that prevented consumer projects from getting a `learned-knowledge.
 **Verification**: `npx vitest run scripts/setup/hooks.test.js` — 16 passed, 0 failed, 107ms.
 
 ## Recently Completed
+
+### 2026-07-30: Coder — Fixed `embed()` returning Array instead of Float32Array
+
+**Problem**: The `embed()` function was returning a plain `Array` instead of a `Float32Array`. The test `returns a Float32Array of length 384` was failing with `AssertionError: expected [ 0.10000000149011612, …(383) ] to be an instance of Float32Array`.
+
+**Root cause**: `scripts/knowledgebase-index.js` line 310 used `Array.from(result.data)` which converted the native `Float32Array` from the transformers pipeline into a plain `Array`.
+
+**Fix**: Changed to `new Float32Array(result.data)`. pgvector's `toSql()` accepts both typed arrays and plain arrays via `Array.from()` fallback, so there is no compatibility concern.
+
+**File modified**: `scripts/knowledgebase-index.js` — JSDoc (lines 288-298) + return statement (line 310).
+
+**Verification**: `npx vitest run scripts/knowledgebase-index.test.js` — 36 passed. `npx vitest run scripts/` — 158 passed across 9 test files.
 
 ### 2026-07-30: Coder — Fixed `chunkLearnedKnowledge()` — empty content parser bug
 

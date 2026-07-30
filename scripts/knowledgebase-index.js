@@ -289,12 +289,12 @@ async function getEmbedder() {
  * Generate an embedding vector for the given text.
  *
  * Uses the local @xenova/transformers pipeline with all-MiniLM-L6-v2 (384d).
- * Returns a regular Array of 384 floats using mean pooling + L2 normalization.
- * Must return a plain Array (not Float32Array) for pgvector's `toSql()`
- * compatibility — pgvector expects `Array.isArray()` to be true.
+ * Returns a Float32Array of 384 floats using mean pooling + L2 normalization.
+ * pgvector's `toSql()` accepts both Float32Array and plain arrays, so callers
+ * can rely on receiving a Float32Array.
  *
  * @param {string} text - Text to embed
- * @returns {Promise<number[]>} Array of 384 floats
+ * @returns {Promise<Float32Array>} Float32Array of 384 floats
  * @throws {Error} When the embedding model is not available
  */
 async function embed(text) {
@@ -306,8 +306,8 @@ async function embed(text) {
   }
 
   const result = await model(text, { pooling: 'mean', normalize: true });
-  // Convert Float32Array to plain Array — pgvector's toSql() rejects typed arrays
-  return Array.from(result.data);
+  // Wrap in Float32Array — the pipeline may return a different typed array type
+  return new Float32Array(result.data);
 }
 
 /**
