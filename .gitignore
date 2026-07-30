@@ -1,6 +1,6 @@
 *.tgz
 opencode.json
-opencode.mcp.json
+opencode.mcp
 .agents-sync-manifest.json
 node_modules/
 graphify-out/

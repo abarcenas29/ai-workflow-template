@@ -12,9 +12,13 @@ category: "context"
 
 ## Current Focus
 
+**MCP Config File Changes — `plan/config-opencode-mcp-rename-v1.md` — ✅ COMPLETE** — Execution completed per corrected plan. `opencode.mcp.json` deleted. `.gitignore` updated (removed `opencode.mcp.json`, added `opencode.mcp`). `scripts/sync.js` updated (rootFiles `opencode.mcp.example.json` → `opencode.json`, auto-copy target `opencode.mcp.json` → `opencode.json`). Documentation references (`README.md`, `docs/playwright-mcp-configuration.md`) updated to `opencode.mcp`. `opencode.mcp.example.json` kept as-is. `package.json` unchanged. All 7 sync tests + 102 setup tests pass.
+
+**Implementer bootstrap verification — ✅ COMPLETE** — All project scaffolding verified. No bootstrapping needed — project is fully initialized across all layers. See Recent Changes for full summary.
+
 **Ad-hoc fixes: Deprecated husky lines in hook files + missing vocabulary tags** — Removed the deprecated `. "$(dirname "$0")/_/husky.sh"` line from `.husky/post-commit` and `.husky/post-merge` (already fixed in `constants.js` TEMPLATE_HOOKS but not in actual hook files). Added 11 missing tags to `memory-bank/.vocabulary.json` across 3 groups (workflow, memory_ops, topic).
 
-**Centralized Knowledgebase — Batches A+B+C Complete (T1–T11), Batch D started (T13 done)** — The core engine, CLI, MCP server, and setup integration are now fully implemented. Phase 3 (setup integration) is complete with all 3 tasks done. Batch D (config + agent permissions) is in progress — T13 (package.json) completed. Remaining: T12 (opencode.json), T14 (13 agent files), and Batch E (tests).
+**Centralized Knowledgebase — All 5 Batches (A–E) Complete ✅** — The complete knowledgebase feature is implemented. All 17 tasks done: core engine, CLI, MCP server, setup integration, config, agent permissions, and tests. Reviewer findings pending resolution.
 
 The plan covers:
 - **7 new files**: `knowledgebase-index.js`, `knowledgebase-cli.js`, `mcp-knowledgebase-server.js`, `setup/knowledgebase.js`, `knowledgebase-init.sql`, `.husky/post-commit`, `.agents/instructions/knowledgebase.instructions.md`
@@ -23,6 +27,15 @@ The plan covers:
 - **5 parallel batches**: Batch A (foundation — 6 tasks), Batch B (CLI + MCP — 2 tasks), Batch C (integration — 3 tasks), Batch D (config — 3 tasks), Batch E (tests — 3 tasks)
 
 ## Recent Changes
+
+- **2026-07-30**: **Coder — MCP Config File Changes** — Implemented corrected plan for MCP configuration provisioning. Deviated from original plan (no `git mv`). Changes: deleted `opencode.mcp.json`, updated `.gitignore` (removed `opencode.mcp.json`, added `opencode.mcp`), updated `scripts/sync.js` (rootFiles `'opencode.mcp.example.json'` → `'opencode.json'`, auto-copy target `opencode.mcp.json` → `opencode.json` with source `opencode.mcp.example.json`), updated `README.md` and `docs/playwright-mcp-configuration.md` to reference `opencode.mcp`, updated memory-bank current-state references. `opencode.mcp.example.json` kept as-is. `package.json` unchanged. `opencode.mcp` (no extension) not found on disk. Added to `.gitignore` for future-proofing. All 7 sync tests pass, 102 setup tests pass, syntax valid.
+
+- **2026-07-30**: **Implementer — Bootstrap verification** — Verified all project scaffolding is fully initialized:
+  - `docs/.architecture-context.md` — EXISTS with real content (85 lines). Documents agent-based workflow distribution system with 6 layers, tech stack (Node.js ESM, Playwright, Vitest, Husky, graphify, OpenCode), key abstractions, dependency rules. Generated 2026-06-13. NOT template-only.
+  - `memory-bank/` — All 6 core files exist with substantial content (`projectbrief.md` 31L, `productContext.md` 34L, `systemPatterns.md` 54L, `techContext.md` 59L, `activeContext.md` 570L, `progress.md` 518+L, `tasks/_index.md`).
+  - `opencode.mcp*` files — 1 found: `opencode.mcp.example.json` (consumer template, kept as-is). `opencode.mcp.json` deleted (was untracked/gitignored, identical content). No `.opencode/` directory contains MCP files.
+  - `npx ai-workflow-setup` / `opencode setup` — `bin/setup.js` is the CLI entry point (via `package.json` `bin` field), delegates to `scripts/setup/index.js` 5-phase pipeline. No separate "opencode setup" command exists — the setup command is `npx ai-workflow-setup`. No `"setup"` script in `package.json` scripts (known minor gap — works via `npx` bin alias).
+  - **Result**: Zero bootstrapping required. All infrastructure layers present, documented, and operational.
 
 - **2026-07-29**: **Coder — T9: Created `scripts/setup/knowledgebase.js` — Setup Phase 6 module (~120 lines)**
   - Created Setup Phase 6 module for consumer project registration in the centralized knowledgebase

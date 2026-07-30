@@ -52,7 +52,10 @@ category: "progress"
 
 ## What's Left
 
+- ~~**MCP Config File Changes** — Plan at `plan/config-opencode-mcp-rename-v1.md`. Changes applied: `opencode.mcp.json` deleted (untracked/gitignored), `.gitignore` updated (removed `opencode.mcp.json`, added `opencode.mcp`), `scripts/sync.js` updated (rootFiles, auto-copy target), `README.md` and `docs/playwright-mcp-configuration.md` renamed `opencode.mcp.json` → `opencode.mcp` for consumers. `opencode.mcp.example.json` kept as-is. memory-bank current-state references updated. ✅ Complete~~
 - **Knowledgebase implementation** — Plan at `plan/feature-knowledgebase-pgvector-v1.md` — ✅ All 5 batches (A–E) complete. 28 new tests, 158 total passing, 0 failures. 7 new source files, 3 new test files, 19 modified files. Reviewer findings (4 major, 6 minor) pending resolution.
+- **Reviewer findings** — 4 major + 6 minor findings from knowledgebase review pending resolution
+- **Minor gap**: `"setup"` script missing from `package.json` scripts — command works via `npx ai-workflow-setup` but not `npm run setup`
 
 - **Setup command implementation**: Architecture designed, implementation plan created (see `plan/feature-setup-command-v1.md`) — 17 tasks across 6 parallel batches
   - ✅ `scripts/setup/constants.js` — T1 done
@@ -79,7 +82,23 @@ category: "progress"
 - **Feature pipeline**: Haven't been exercised since bootstrap
 - **Remaining instruction files**: Some may still contain Copilot references needing porting to opencode
 
+### 2026-07-30: Implementer — Bootstrap verification
+
+Verified complete project scaffolding state as part of orchestrator bootstrap step:
+
+| Check | Status | Details |
+|-------|--------|---------|
+| `docs/.architecture-context.md` | ✅ Exists | 85 lines, real content — agent-based workflow distribution system, 6 layers, tech stack, key abstractions |
+| `memory-bank/` core files | ✅ All 6 | `projectbrief.md` (31L), `productContext.md` (34L), `systemPatterns.md` (54L), `techContext.md` (59L), `activeContext.md` (570L), `progress.md` (1055L) |
+| `opencode.mcp*` files | ✅ 2 found | `opencode.mcp.json` (root, active 9-server config), `opencode.mcp.example.json` (consumer template) |
+| `npx setup` references | ✅ Documented | `bin/setup.js` → `scripts/setup/index.js` 5-phase pipeline. Works via `npx ai-workflow-setup`. |
+| Detected tech stack | Node.js ESM + Playwright + Vitest + Husky + graphify + OpenCode |
+| Architectural pattern | Agent-based workflow distribution (layered: Instructions → Skills → Agents → Orchestrators) |
+
+**Result**: No bootstrapping required. All infrastructure fully initialized.
+
 ### 2026-07-30: Coder — Fixed 3 pre-existing husky bugs
+
 
 Fixed 3 bugs in the setup command hook infrastructure:
 

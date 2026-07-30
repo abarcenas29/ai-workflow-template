@@ -189,7 +189,7 @@ All subsequent runs skip this — agents get architecture context pre-filled.
 
 #### MCP Tooling
 
-Some agents require MCP servers configured in `opencode.mcp.json` (copy from `opencode.mcp.example.json`):
+Some agents require MCP servers configured in `opencode.mcp`:
 
 | Agent | Required MCP | Purpose |
 |---|---|---|
