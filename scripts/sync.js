@@ -9,7 +9,9 @@ const sourceAgentsDir = resolve(packageRoot, '.agents')
 const consumerRoot = process.env.INIT_CWD ? resolve(process.env.INIT_CWD) : process.cwd()
 const targetAgentsDir = resolve(consumerRoot, '.agents')
 const manifestPath = resolve(consumerRoot, '.agents-sync-manifest.json')
-const excludedRelativePaths = new Set([])
+const excludedRelativePaths = new Set([
+  'instructions/learned-knowledge.instructions.md',
+])
 const args = new Set(process.argv.slice(2))
 const forceOverwrite = args.has('--force')
 const dryRun = args.has('--dry-run')
@@ -180,6 +182,11 @@ const scriptsToSync = [
   'validate-memory-schema.js',
   'mcp-memory-server.js',
   'mcp/playwright-mcp-launcher.js',
+  // Knowledgebase scripts
+  'knowledgebase-cli.js',
+  'knowledgebase-index.js',
+  'mcp-knowledgebase-server.js',
+  'knowledgebase-init.sql',
 ]
 
 const sourceScriptsDir = resolve(packageRoot, 'scripts')
@@ -328,6 +335,33 @@ for (const [fileName, fileContent] of Object.entries(memoryBankStubs)) {
 
   ensureParentDirectory(targetFile)
   if (isVerbose) console.error(`  … scaffolding: memory-bank/${fileName}`)
+  writeFileSync(targetFile, fileContent, 'utf8')
+  manifest.files[trackedKey] = hashFile(targetFile)
+  scaffolded += 1
+}
+
+/* ──  Scaffold .agents/instructions/ directory ───────────────── */
+
+const agentInstructionsStubs = {
+  'learned-knowledge.instructions.md': `# Learned Knowledge
+
+Cross-session knowledge accumulated by agent pipelines. Each session records discoveries, patterns, gotchas, and agent tuning notes for future reference.
+
+---
+
+`,
+}
+
+for (const [fileName, fileContent] of Object.entries(agentInstructionsStubs)) {
+  const targetFile = resolve(targetAgentsDir, 'instructions', fileName)
+  const trackedKey = `__agents-instructions__/${fileName}`
+
+  if (existsSync(targetFile)) {
+    continue
+  }
+
+  ensureParentDirectory(targetFile)
+  if (isVerbose) console.error(`  … scaffolding: .agents/instructions/${fileName}`)
   writeFileSync(targetFile, fileContent, 'utf8')
   manifest.files[trackedKey] = hashFile(targetFile)
   scaffolded += 1

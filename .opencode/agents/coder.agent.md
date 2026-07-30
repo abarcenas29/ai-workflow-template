@@ -7,6 +7,7 @@ permission:
   edit: "allow"
   execute: "allow"
   "memory-bank/*": allow
+  "knowledgebase/*": allow
 model: deepseek/deepseek-v4-flash
 ---
 

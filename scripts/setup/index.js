@@ -11,8 +11,9 @@
 //   6. Phase 3 — Prepare (configure consumer package.json prepare script)
 //   7. Phase 4 — Husky Init (generate .husky/_/ shims, unless --skip-hooks)
 //   8. Phase 5 — Sync (spawn sync.js + normalize-memory.js, unless --skip-sync)
-//   9. Render summary table via ui.summary()
-//  10. Determine exit code and return it
+//   9. Phase 6 — Knowledgebase (register with centralized knowledgebase, unless --skip-knowledgebase)
+//  10. Render summary table via ui.summary()
+//  11. Determine exit code and return it
 //
 // Each phase is wrapped in try/catch. Only discovery failure is fatal.
 // All other phase errors are logged and the pipeline continues (REQ-04).
@@ -38,6 +39,7 @@ import { installHooks } from './hooks.js'
 import { handlePrepare } from './prepare.js'
 import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
+import { registerKnowledgebase } from './knowledgebase.js'
 
 // ── Package version (lazy, cached) ───────────────────────────────────────────
 
@@ -85,6 +87,7 @@ function actionStatus(action) {
     case 'dry-run':
     case 'overwritten':
     case 'merged':
+    case 'indexed':
       return 'success'
     // These actions indicate the phase was intentionally skipped or
     // only partially completed — not an error but worth noting
@@ -327,6 +330,30 @@ export async function main(argv) {
         phase: 'sync',
         status: 'error',
         message: err.message,
+      })
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Phase 6 — Knowledgebase (unless --skip-knowledgebase)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (!flags.skipKnowledgebase) {
+    section('Phase 6: Knowledgebase')
+
+    try {
+      const kbResult = await registerKnowledgebase(context)
+      context.kbResult = kbResult
+      phases.push({
+        phase: 'knowledgebase',
+        status: actionStatus(kbResult.action),
+        message: kbResult.message,
+      })
+    } catch (err) {
+      stepWarn(`Knowledgebase registration skipped: ${err.message}`)
+      phases.push({
+        phase: 'knowledgebase',
+        status: 'warn',
+        message: `Skipped \u2014 ${err.message}`,
       })
     }
   }
