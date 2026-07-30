@@ -52,8 +52,8 @@ function buildHookContent(hookName) {
   const template = TEMPLATE_HOOKS[hookName]
   // The `content` field is always a string in our constants (pre-composed).
   const raw = template.content
-  // Marker is first line, then content.
-  return HOOK_MARKER + '\n' + raw
+  // Template content already has the marker on its first line.
+  return raw
 }
 
 // ── Hook file path helper ────────────────────────────────────────────────────

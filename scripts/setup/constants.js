@@ -41,8 +41,14 @@ export const HOOK_MERGE_SEPARATOR = '# --- @abarcenas/ai-workflow-template ---'
 export const TEMPLATE_HOOKS = {
   'pre-commit': {
     source: '.husky/pre-commit',
-    content:
-      '# Managed by @abarcenas/ai-workflow-template setup\n\nnode scripts/bump-version.js\nnode scripts/validate-memory-schema.js\n',
+    content: [
+      '# Managed by @abarcenas/ai-workflow-template setup',
+      '#!/bin/sh',
+      '',
+      'node scripts/bump-version.js',
+      'node scripts/validate-memory-schema.js',
+      '',
+    ].join('\n'),
     description:
       'Auto-bump version + validate memory-bank schema before commits',
   },
@@ -51,7 +57,6 @@ export const TEMPLATE_HOOKS = {
     content: [
       '# Managed by @abarcenas/ai-workflow-template setup',
       '#!/bin/sh',
-      '. "$(dirname "$0")/_/husky.sh"',
       '',
       '# After git pull/merge, check if memory-bank files changed',
       '# and update the vector index incrementally',
@@ -64,6 +69,26 @@ export const TEMPLATE_HOOKS = {
     ].join('\n'),
     description:
       'Auto-update memory bank vector index after pull/merge',
+  },
+  'post-commit': {
+    source: '.husky/post-commit',
+    content: [
+      '# Managed by @abarcenas/ai-workflow-template setup',
+      '#!/bin/sh',
+      '',
+      '# After commit, check if learned knowledge file changed',
+      '# and sync to the centralized knowledgebase',
+      '',
+      'CHANGED=$(git diff HEAD~1 --name-only 2>/dev/null | grep ".agents/instructions/learned-knowledge.instructions.md")',
+      '',
+      'if [ -n "$CHANGED" ]; then',
+      '  echo "[knowledgebase] Learned knowledge file changed. Syncing to knowledgebase..."',
+      '  node scripts/knowledgebase-cli.js sync 2>/dev/null || echo "[knowledgebase] Sync skipped (DATABASE_URL not configured or service unavailable)"',
+      'fi',
+      '',
+    ].join('\n'),
+    description:
+      'Auto-sync learned knowledge to centralized knowledgebase after commits',
   },
 }
 
@@ -113,6 +138,7 @@ export const SUPPORTED_FLAGS = {
   '--skip-hooks': 'skipHooks',
   '--skip-prepare': 'skipPrepare',
   '--skip-sync': 'skipSync',
+  '--skip-knowledgebase': 'skipKnowledgebase',
   '--help': 'help',
   '-h': 'help',
   '--version': 'version',
@@ -222,5 +248,12 @@ export const MEMORY_BANK_STUBS = {
 - **To Build**: {{what remains}}
 - **Status**: {{overall project status}}
 - **Known Issues**: {{list known issues}}
+`,
+  'learned-knowledge.instructions.md': `# Learned Knowledge
+
+Cross-session knowledge accumulated by agent pipelines. Each session records discoveries, patterns, gotchas, and agent tuning notes for future reference.
+
+---
+
 `,
 }

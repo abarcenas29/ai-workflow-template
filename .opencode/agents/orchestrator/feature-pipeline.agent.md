@@ -7,6 +7,7 @@ permission:
   agent: allow
   todo: allow
   "memory-bank/*": allow
+  "knowledgebase/*": allow
 model: deepseek/deepseek-v4-pro
 ---
 

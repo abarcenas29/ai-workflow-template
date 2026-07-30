@@ -12,6 +12,7 @@ permission:
   "github/*": allow
   "chrome-devtools/*": allow
   "memory-bank/*": allow
+  "knowledgebase/*": allow
 model: deepseek/deepseek-v4-pro
 ---
 

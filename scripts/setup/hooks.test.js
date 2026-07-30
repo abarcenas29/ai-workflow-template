@@ -66,15 +66,16 @@ function cleanupTempDirs() {
 }
 
 /**
- * Replicates the internal `buildHookContent()` logic so we can assert on
- * expected file content without exporting a private function.
+ * Returns the expected hook file content as produced by `buildHookContent()`.
  *
- * @param {string} hookName - Key from `TEMPLATE_HOOKS` ('pre-commit' | 'post-merge')
+ * The template content in `TEMPLATE_HOOKS` already includes `HOOK_MARKER`
+ * as its first line, so this just returns the raw content directly.
+ *
+ * @param {string} hookName - Key from `TEMPLATE_HOOKS` ('pre-commit' | 'post-merge' | 'post-commit')
  * @returns {string} The full hook file content as written by hooks.js.
  */
 function expectedContent(hookName) {
-  const raw = TEMPLATE_HOOKS[hookName].content
-  return HOOK_MARKER + '\n' + raw
+  return TEMPLATE_HOOKS[hookName].content
 }
 
 /**
@@ -169,6 +170,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: true },
         'post-merge': { exists: true, isManaged: true },
+        'post-commit': { exists: true, isManaged: true },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
@@ -203,6 +205,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: false },
         'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
@@ -240,6 +243,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: false },
         'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
@@ -400,12 +404,14 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: false },
         'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
     mkdirSync(huskyDir)
     writeFileSync(join(huskyDir, 'pre-commit'), '# orig\n')
     writeFileSync(join(huskyDir, 'post-merge'), '# orig\n')
+    writeFileSync(join(huskyDir, 'post-commit'), '# orig\n')
 
     const results = await installHooks(ctx)
 
@@ -414,6 +420,7 @@ describe('installHooks', () => {
     }
     expect(existsSync(join(huskyDir, 'pre-commit.bak'))).toBe(true)
     expect(existsSync(join(huskyDir, 'post-merge.bak'))).toBe(true)
+    expect(existsSync(join(huskyDir, 'post-commit.bak'))).toBe(true)
   })
 
   // ── 12. Partial existingHooks map ─────────────────────────────────────
@@ -424,6 +431,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: true },
         // post-merge absent → treated as exists=false, isManaged=false
+        // post-commit absent → treated as exists=false, isManaged=false
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')

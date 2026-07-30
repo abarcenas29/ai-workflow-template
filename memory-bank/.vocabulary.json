@@ -18,10 +18,16 @@
     "workflow": [
       "bootstrap", "setup", "configuration", "migration", "refactor",
       "tdd", "feature-pipeline", "onboarding", "normalization",
-      "research", "spike", "implementation"
+      "research", "spike", "implementation", "implementation-planning",
+      "documentation"
     ],
     "memory_ops": [
-      "decision", "discovery", "status-update", "task-plan", "retrospective"
+      "decision", "discovery", "status-update", "task-plan", "retrospective",
+      "bug-fix", "verification"
+    ],
+    "topic": [
+      "knowledgebase", "pgvector", "mcp", "embeddings", "dotenv",
+      "chunk-parser", "agent-exercise"
     ]
   },
 

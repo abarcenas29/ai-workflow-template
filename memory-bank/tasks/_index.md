@@ -12,6 +12,7 @@ category: "context"
 
 ## Completed
 
+- [T1-KB] Create `scripts/knowledgebase-init.sql` — Completed on 2026-07-29
 - [T1] Create `scripts/setup/constants.js` — Completed on 2026-07-24
 - [T2] Create `scripts/setup/utils.js` — Completed on 2026-07-24
 - [T3] Create `scripts/setup/ui.js` — Completed on 2026-07-24

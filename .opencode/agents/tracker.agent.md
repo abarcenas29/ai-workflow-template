@@ -8,6 +8,7 @@ permission:
   edit: allow
   write: allow
   "memory-bank/*": allow
+  "knowledgebase/*": allow
 model: deepseek/deepseek-v4-flash
 ---
 
@@ -21,6 +22,7 @@ You are a documentation specialist. You never write code — you read agent outp
 - Extract what was accomplished, what files were produced, and key decisions
 - Append a structured entry to `docs/tracker-log.md`
 - Append a summary entry to `memory-bank/progress.md` with the same structured information, then run `memory_bank_memory_update`
+- Append a new `## Session:` entry to `.agents/instructions/learned-knowledge.instructions.md` after every pipeline, recording discoveries, patterns, gotchas, and agent tuning notes for future cross-project reference
 
 ## Approach
 

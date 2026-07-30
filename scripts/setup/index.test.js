@@ -72,6 +72,10 @@ vi.mock('./sync-phase.js', () => ({
   runSyncPhase: vi.fn(),
 }))
 
+vi.mock('./knowledgebase.js', () => ({
+  registerKnowledgebase: vi.fn(),
+}))
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Imports — these resolve to the mocked modules above
 // ═════════════════════════════════════════════════════════════════════════════
@@ -93,6 +97,7 @@ import { installHooks } from './hooks.js'
 import { handlePrepare } from './prepare.js'
 import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
+import { registerKnowledgebase } from './knowledgebase.js'
 import { EXIT_CODES } from './constants.js'
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -110,6 +115,7 @@ const defaultFlags = {
   skipHooks: false,
   skipPrepare: false,
   skipSync: false,
+  skipKnowledgebase: false,
   help: false,
   version: false,
   quiet: false,
@@ -190,6 +196,12 @@ describe('main() — setup orchestrator', () => {
     handlePrepare.mockResolvedValue(defaultPrepareResult)
     initHusky.mockResolvedValue(defaultHuskyResult)
     runSyncPhase.mockResolvedValue(defaultSyncResult)
+    registerKnowledgebase.mockResolvedValue({
+      action: 'indexed',
+      message: 'Registered "test-consumer" — 5 chunks indexed, 0 skipped',
+      chunks_indexed: 5,
+      chunks_skipped: 0,
+    })
 
     // Spy on console.log for --version tests
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -214,6 +226,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).not.toHaveBeenCalled()
     expect(initHusky).not.toHaveBeenCalled()
     expect(runSyncPhase).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
     // No header or summary for early-exit flags
     expect(header).not.toHaveBeenCalled()
     expect(summary).not.toHaveBeenCalled()
@@ -231,6 +244,7 @@ describe('main() — setup orchestrator', () => {
     expect(discover).not.toHaveBeenCalled()
     expect(installHooks).not.toHaveBeenCalled()
     expect(header).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
   })
 
   // ── 3. --version flag ────────────────────────────────────────────────────
@@ -246,6 +260,7 @@ describe('main() — setup orchestrator', () => {
     // Early exit means no pipeline phases run
     expect(discover).not.toHaveBeenCalled()
     expect(help).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
   })
 
   // ── 4. -v short flag ─────────────────────────────────────────────────────
@@ -259,6 +274,7 @@ describe('main() — setup orchestrator', () => {
     expect(logSpy).toHaveBeenCalled()
     expect(logSpy.mock.calls[0][0]).toEqual(expect.any(String))
     expect(discover).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
   })
 
   // ── 5. --dry-run flag ────────────────────────────────────────────────────
@@ -287,6 +303,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
     // Header and summary shown (not quiet)
     expect(header).toHaveBeenCalledTimes(1)
     expect(summary).toHaveBeenCalledTimes(1)
@@ -307,6 +324,7 @@ describe('main() — setup orchestrator', () => {
     expect(discover).toHaveBeenCalledTimes(1)
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 7. --skip-sync flag ──────────────────────────────────────────────────
@@ -323,6 +341,7 @@ describe('main() — setup orchestrator', () => {
     expect(installHooks).toHaveBeenCalledTimes(1)
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 8. --skip-prepare flag ───────────────────────────────────────────────
@@ -339,6 +358,7 @@ describe('main() — setup orchestrator', () => {
     expect(installHooks).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 9. Unknown flag ──────────────────────────────────────────────────────
@@ -362,7 +382,7 @@ describe('main() — setup orchestrator', () => {
 
   // ── 10. Full pipeline (default flags) ────────────────────────────────────
 
-  it('full pipeline: all 5 phases called in order, exits 0', async () => {
+  it('full pipeline: all 6 phases called in order, exits 0', async () => {
     const code = await main([])
 
     expect(code).toBe(EXIT_CODES.SUCCESS)
@@ -372,6 +392,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
     // Header displayed
     expect(header).toHaveBeenCalledTimes(1)
     // Summary displayed
@@ -398,6 +419,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).not.toHaveBeenCalled()
     expect(initHusky).not.toHaveBeenCalled()
     expect(runSyncPhase).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
     // Summary is shown even on fatal (not quiet mode)
     expect(summary).toHaveBeenCalledTimes(1)
   })
@@ -419,6 +441,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
     // Summary is shown
     expect(summary).toHaveBeenCalledTimes(1)
   })
@@ -445,6 +468,7 @@ describe('main() — setup orchestrator', () => {
     expect(discover).toHaveBeenCalledTimes(1)
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
     // Summary shown
     expect(summary).toHaveBeenCalledTimes(1)
   })
@@ -463,6 +487,7 @@ describe('main() — setup orchestrator', () => {
     expect(ciModeBanner).toHaveBeenCalledTimes(1)
     // CI mode doesn't skip phases (that's done by --skip-hooks)
     expect(discover).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   it('CI mode: ciModeBanner NOT shown in quiet mode even when isCI is true', async () => {
@@ -496,6 +521,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 16. Multiple skips combined ─────────────────────────────────────────
@@ -520,6 +546,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).not.toHaveBeenCalled()
     expect(initHusky).not.toHaveBeenCalled()
     expect(runSyncPhase).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 17. Verify parseCliArgs receives the argv ───────────────────────────
@@ -536,6 +563,7 @@ describe('main() — setup orchestrator', () => {
     await main(argv)
 
     expect(parseCliArgs).toHaveBeenCalledWith(argv)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 18. Discovery context is passed to each phase ───────────────────────
@@ -556,6 +584,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).toHaveBeenCalledWith(ctx)
     expect(initHusky).toHaveBeenCalledWith(ctx)
     expect(runSyncPhase).toHaveBeenCalledWith(ctx)
+    expect(registerKnowledgebase).toHaveBeenCalledWith(ctx)
   })
 
   // ── 19a. --verbose flag passthrough to Context ──────────────────────────
@@ -577,6 +606,7 @@ describe('main() — setup orchestrator', () => {
     expect(handlePrepare).toHaveBeenCalledWith(ctx)
     expect(initHusky).toHaveBeenCalledWith(ctx)
     expect(runSyncPhase).toHaveBeenCalledWith(ctx)
+    expect(registerKnowledgebase).toHaveBeenCalledWith(ctx)
     // Normal pipeline — header and summary shown
     expect(header).toHaveBeenCalledTimes(1)
     expect(summary).toHaveBeenCalledTimes(1)
@@ -591,6 +621,7 @@ describe('main() — setup orchestrator', () => {
     await main(['--dry-run'])
 
     expect(discover).toHaveBeenCalledWith(flags)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 20. Verify --help takes priority over --version ─────────────────────
@@ -608,6 +639,7 @@ describe('main() — setup orchestrator', () => {
     expect(help).toHaveBeenCalledTimes(1)
     expect(logSpy).not.toHaveBeenCalled() // console.log NOT called for version
     expect(discover).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
   })
 
   // ── 21. Error in prepare phase → continues ──────────────────────────────
@@ -626,6 +658,7 @@ describe('main() — setup orchestrator', () => {
     expect(installHooks).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 22. Error in husky-init → continues ────────────────────────────────
@@ -644,6 +677,7 @@ describe('main() — setup orchestrator', () => {
     expect(installHooks).toHaveBeenCalledTimes(1)
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(runSyncPhase).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 
   // ── 23. Error in sync phase → continues ────────────────────────────────
@@ -660,5 +694,6 @@ describe('main() — setup orchestrator', () => {
     expect(installHooks).toHaveBeenCalledTimes(1)
     expect(handlePrepare).toHaveBeenCalledTimes(1)
     expect(initHusky).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
 })

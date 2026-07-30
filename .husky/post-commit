@@ -1,0 +1,10 @@
+# Managed by @abarcenas/ai-workflow-template setup
+#!/bin/sh
+
+# After commit, check if learned knowledge file changed
+# and sync to the centralized knowledgebase
+
+if git diff HEAD~1 --name-only 2>/dev/null | grep -q ".agents/instructions/learned-knowledge.instructions.md"; then
+  echo "[knowledgebase] Learned knowledge file changed. Syncing to knowledgebase..."
+  node scripts/knowledgebase-cli.js sync 2>/dev/null || echo "[knowledgebase] Sync skipped (DATABASE_URL not configured or service unavailable)"
+fi
