@@ -290,8 +290,11 @@ async function getEmbedder() {
  *
  * Uses the local @xenova/transformers pipeline with all-MiniLM-L6-v2 (384d).
  * Returns a Float32Array of 384 floats using mean pooling + L2 normalization.
- * pgvector's `toSql()` accepts both Float32Array and plain arrays, so callers
- * can rely on receiving a Float32Array.
+ *
+ * NOTE: pgvector@0.3.0's `toSql()` rejects typed arrays (`Array.isArray()`
+ * returns false for Float32Array and it throws 'expected array or sparse
+ * vector'). Callers MUST convert to a plain Array (`Array.from(vec)`) at the
+ * pgvector boundary before passing to `_toSql()`.
  *
  * @param {string} text - Text to embed
  * @returns {Promise<Float32Array>} Float32Array of 384 floats
@@ -398,7 +401,9 @@ async function upsertChunks(chunks) {
           (chunk.pipeline ? ` — Pipeline: ${chunk.pipeline}` : '') +
           `\n${chunk.content}`;
         const vec = await embed(contextText);
-        embeddingSql = _toSql(vec);
+        // pgvector toSql() requires a plain Array (Array.isArray() === true);
+        // Float32Array would throw 'expected array or sparse vector'.
+        embeddingSql = _toSql(Array.from(vec));
       } catch (embedErr) {
         console.warn('[knowledgebase] Embedding failed for chunk, ' +
           'inserting without vector:', embedErr.message);
@@ -502,7 +507,8 @@ async function search(query, options = {}) {
       WHERE embedding IS NOT NULL
         AND 1 - (embedding <=> $1) >= $2
     `;
-    const params = [_toSql(queryEmbedding), threshold];
+    // pgvector toSql() requires a plain Array (see embed() note)
+    const params = [_toSql(Array.from(queryEmbedding)), threshold];
 
     if (project_id) {
       sql += ` AND project_id = $${params.length + 1}`;
