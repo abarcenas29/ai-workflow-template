@@ -20,6 +20,10 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+
+// Load .env file into process.env before any configuration reads
+import 'dotenv/config';
+
 import {
   search,
   upsertChunks,

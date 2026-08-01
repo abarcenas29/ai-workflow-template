@@ -1,7 +1,7 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-08-01"
+updated: "2026-08-02"
 
 tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
@@ -32,7 +32,7 @@ category: "progress"
 - Knowledgebase core engine: `scripts/knowledgebase-index.js` — 11 exports with lazy imports, embedding, CRUD, semantic search, graceful degradation
 - Knowledgebase embedding pipeline: `embed()` returns `Float32Array` (API contract, satisfies unit test); call sites convert to plain `Array` via `Array.from()` at the pgvector boundary (pgvector@0.3.0 `toSql()` REJECTS typed arrays). Vectors correctly stored as `VECTOR(384)` — 8 chunks indexed, search verified working
 - Knowledgebase CLI: `scripts/knowledgebase-cli.js` — 4 commands (sync, search, list, stats) with graceful degradation when DATABASE_URL unset
-- Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation
+- Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation. **2026-08-02**: now loads `.env` via `import 'dotenv/config'` (was missing dotenv import → DATABASE_URL invisible → all tools returned "not configured"). Local `opencode.json` knowledgebase entry now has `env: { DATABASE_URL: $DATABASE_URL }`. Verified via MCP handshake — `knowledgebase_list` returns real indexed projects.
 - Knowledgebase foundation files (all companion files + T7 CLI + T8 MCP server): `knowledgebase-init.sql`, `.husky/post-commit`, `knowledgebase.instructions.md`, `.env.example` updated, `constants.js` updated
 
 - Playwright E2E testing (2 spec files in `tests/`)

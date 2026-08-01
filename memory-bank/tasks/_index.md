@@ -1,7 +1,7 @@
 ---
 id: "_index"
 title: "Tasks Index"
-updated: "2026-08-01"
+updated: "2026-08-02"
 tags: []
 entities: []
 category: "context"
@@ -12,6 +12,7 @@ category: "context"
 
 ## Completed
 
+- [kb-mcp-dotenv-fix] Fix knowledgebase MCP server to load `.env` (DATABASE_URL) — library-level dotenv import + local `opencode.json` env block — Completed on 2026-08-02
 - [fix-setup-env-loading T1] Move `dotenv` from devDependencies → dependencies — Completed on 2026-08-01
 - [fix-setup-env-loading T2] Add `import 'dotenv/config'` at top of `bin/setup.js` — Completed on 2026-08-01
 - [fix-setup-env-loading T5] Bump package version 1.39.0 → 1.39.1 — Completed on 2026-08-01
