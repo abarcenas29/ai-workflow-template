@@ -1,9 +1,9 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-07-30"
+updated: "2026-08-01"
 
-tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix]
+tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
 category: "progress"
 ---
@@ -30,7 +30,7 @@ category: "progress"
 - Knowledgebase architecture design: ADR-001 complete (`docs/adr-knowledgebase-pgvector.md`)
 - Knowledgebase implementation plan: `plan/feature-knowledgebase-pgvector-v1.md` — Batch A complete (T1–T6)
 - Knowledgebase core engine: `scripts/knowledgebase-index.js` — 11 exports with lazy imports, embedding, CRUD, semantic search, graceful degradation
-- Knowledgebase embedding pipeline: `embed()` returns `Float32Array` (compatible with pgvector `toSql()`), vectors correctly stored as `VECTOR(384)`
+- Knowledgebase embedding pipeline: `embed()` returns `Float32Array` (API contract, satisfies unit test); call sites convert to plain `Array` via `Array.from()` at the pgvector boundary (pgvector@0.3.0 `toSql()` REJECTS typed arrays). Vectors correctly stored as `VECTOR(384)` — 8 chunks indexed, search verified working
 - Knowledgebase CLI: `scripts/knowledgebase-cli.js` — 4 commands (sync, search, list, stats) with graceful degradation when DATABASE_URL unset
 - Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation
 - Knowledgebase foundation files (all companion files + T7 CLI + T8 MCP server): `knowledgebase-init.sql`, `.husky/post-commit`, `knowledgebase.instructions.md`, `.env.example` updated, `constants.js` updated
@@ -163,6 +163,30 @@ Fixed 3 gaps that prevented consumer projects from getting a `learned-knowledge.
 **Verification**: `npx vitest run scripts/setup/hooks.test.js` — 16 passed, 0 failed, 107ms.
 
 ## Recently Completed
+
+### 2026-08-01: Coder — Persisted Float32Array spike learnings + fixed pgvector boundary regression
+
+**Problem**: The spike `docs/spike-float32array-test-miss.md` documented why a `Float32Array` test bug was missed, but its Section 7 conclusion ("pgvector accepts typed arrays; `Array.from` was unnecessary") was unverified and contradicted the installed `pgvector@0.3.0`.
+
+**What was done**:
+- Appended `## Session: 2026-08-01 — Float32Array Test Miss Investigation` to `.agents/instructions/learned-knowledge.instructions.md` covering: the 3-layer defense failure (parallel batch contract conflict between source T6 and test T15; AI unit-tester reporting "158 tests, 0 failures" when the real vitest run was failing; CI bypass — PR #23 merged in ~4 min, fix `d93cdd3` pushed directly to `feat/update-setup` with no PR trigger), the empirically-verified pgvector behavior, and agent tuning notes (cross-batch contract verification, real test runs, CI gating, verifying library claims against installed source).
+- **Verified pgvector@0.3.0 `toSql()` rejects typed arrays** — read `node_modules/pgvector/src/index.js` (line 27 `Array.isArray(value)`, else throw) + ran a repro (`toSql(new Float32Array([...]))` → throws; `toSql(Array.from(...))` → works). The spike's claim is FALSE.
+- **Fixed the `d93cdd3` regression**: that commit's `new Float32Array(result.data)` broke BOTH `upsertChunks` (7/7 "Embedding failed for chunk, inserting without vector") AND `search` ("Search failed: expected array or sparse vector"). `embed()` keeps returning `Float32Array` (correct API contract, satisfies the test), and both `_toSql()` call sites now convert via `Array.from(vec)` / `Array.from(queryEmbedding)`. JSDoc corrected.
+- Synced to pgvector: **Indexed 1 new, updated 7, skipped 0** — no embedding failures. 8 total chunks.
+
+**Files modified**:
+- `.agents/instructions/learned-knowledge.instructions.md` — appended session entry
+- `scripts/knowledgebase-index.js` — line 401 (`Array.from(vec)`), line 505 (`Array.from(queryEmbedding)`), JSDoc lines 288-299
+- `memory-bank/activeContext.md`, `memory-bank/progress.md` — this update
+
+**Verification**:
+- `npx vitest run scripts/` → **158 passed** across 9 test files (incl. the Float32Array test)
+- `node scripts/knowledgebase-cli.js sync` → "Indexed 1 new, updated 7, skipped 0" (no warnings)
+- `node scripts/knowledgebase-cli.js stats` → 8 chunks, 1 project, last sync 2026-08-01
+- `node scripts/knowledgebase-cli.js search "Float32Array"` → new session top result (sim 0.147)
+- `node scripts/knowledgebase-cli.js search "parallel batch contract"` → new session returned (sim 0.223)
+
+**Known issue / follow-up**: The spike's recommendation to "merge `feat/update-setup` to `main`" is now DANGEROUS — `d93cdd3` on that branch breaks pgvector serialization. The boundary-conversion fix in this working tree must be applied before/with any merge of that branch. `main` (at `641240f`) still has the working `Array.from()` version and the failing test.
 
 ### 2026-07-30: Coder — Fixed `embed()` returning Array instead of Float32Array
 
