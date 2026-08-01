@@ -12,6 +12,7 @@ category: "context"
 
 ## Completed
 
+- [release-v1.40.0] Release v1.40.0: commit (1aa4775), annotated tag v1.40.0, pushed to origin — Completed on 2026-08-02
 - [kb-mcp-dotenv-fix] Fix knowledgebase MCP server to load `.env` (DATABASE_URL) — library-level dotenv import + local `opencode.json` env block — Completed on 2026-08-02
 - [fix-setup-env-loading T1] Move `dotenv` from devDependencies → dependencies — Completed on 2026-08-01
 - [fix-setup-env-loading T2] Add `import 'dotenv/config'` at top of `bin/setup.js` — Completed on 2026-08-01
