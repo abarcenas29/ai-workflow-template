@@ -32,7 +32,7 @@ category: "progress"
 - Knowledgebase core engine: `scripts/knowledgebase-index.js` — 11 exports with lazy imports, embedding, CRUD, semantic search, graceful degradation
 - Knowledgebase embedding pipeline: `embed()` returns `Float32Array` (API contract, satisfies unit test); call sites convert to plain `Array` via `Array.from()` at the pgvector boundary (pgvector@0.3.0 `toSql()` REJECTS typed arrays). Vectors correctly stored as `VECTOR(384)` — 8 chunks indexed, search verified working
 - Knowledgebase CLI: `scripts/knowledgebase-cli.js` — 4 commands (sync, search, list, stats) with graceful degradation when DATABASE_URL unset
-- Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation. **2026-08-02**: now loads `.env` via `import 'dotenv/config'` (was missing dotenv import → DATABASE_URL invisible → all tools returned "not configured"). Local `opencode.json` knowledgebase entry now has `env: { DATABASE_URL: $DATABASE_URL }`. Verified via MCP handshake — `knowledgebase_list` returns real indexed projects.
+- Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation. **2026-08-02**: now loads `.env` via `import 'dotenv/config'` (was missing dotenv import → DATABASE_URL invisible → all tools returned "not configured"). Local `opencode.json` knowledgebase entry now has `env: { DATABASE_URL: $DATABASE_URL }`. Verified via MCP handshake — `knowledgebase_list` returns real indexed projects. **2026-08-02 (threshold fix)**: `knowledgebase_search` default threshold changed `args.threshold || 0.6` → `args.threshold ?? 0.1` (line 143) — the 0.6 default filtered out ALL results because all-MiniLM-L6-v2 similarities for this corpus are ~0.01–0.41; `??` also allows an explicit `threshold: 0`. Verified end-to-end via MCP handshake — `tools/call knowledgebase_search` with no threshold now returns results (top sim 0.396).
 - Knowledgebase foundation files (all companion files + T7 CLI + T8 MCP server): `knowledgebase-init.sql`, `.husky/post-commit`, `knowledgebase.instructions.md`, `.env.example` updated, `constants.js` updated
 
 - Playwright E2E testing (2 spec files in `tests/`)
@@ -164,6 +164,25 @@ Fixed 3 gaps that prevented consumer projects from getting a `learned-knowledge.
 **Verification**: `npx vitest run scripts/setup/hooks.test.js` — 16 passed, 0 failed, 107ms.
 
 ## Recently Completed
+
+### 2026-08-02: Coder — Fixed knowledgebase MCP search default threshold (0.6 → 0.1)
+
+Fixed the `knowledgebase_search` MCP tool returning "No results found" at its default threshold.
+
+**Root cause** (verified by `docs/spike-knowledgebase-search-empty-results.md`): `scripts/mcp-knowledgebase-server.js` line 143 used `args.threshold || 0.6`. The all-MiniLM-L6-v2 embedding model produces cosine similarities in the range ~0.01–0.41 for this corpus, so the 0.6 default filtered out **all** results. A secondary bug: `||` coerces an explicit `threshold: 0` to the default because `0` is falsy.
+
+**Fix**: single line — `threshold: args.threshold || 0.6` → `threshold: args.threshold ?? 0.1`:
+- Default lowered 0.6 → 0.1 (below the lowest observed similarity ~0.06, still filters pure noise)
+- `||` → `??` (nullish coalescing) so explicit `threshold: 0` passes through as intended
+
+**Scope discipline**: No other behavior touched — no changes to CLI defaults (`knowledgebase-cli.js` still passes `undefined` → core 0.0), core engine default (`knowledgebase-index.js` 0.0), `knowledgebase-init.sql`, or `package.json` (version still 1.40.0).
+
+**Verification**:
+- `node --check scripts/mcp-knowledgebase-server.js` → syntax OK ✅
+- CLI path: `node scripts/knowledgebase-cli.js search "DATABASE_URL env loading dotenv MCP server"` → 5 results (0.125–0.396) ✅
+- Full MCP handshake: spawn server, `initialize` → `knowledgebase 1.0.0`, `tools/list` → 4 tools, `tools/call knowledgebase_search` with no explicit threshold → `### Result 1 (similarity: 0.396)` (NOT "No results found") ✅
+
+**Files modified**: `scripts/mcp-knowledgebase-server.js` (line 143, 1 line), `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
 
 ### 2026-08-01: Coder — T12 from `plan/fix-setup-env-loading-v1.md` (Batch C — consumer smoke test)
 
@@ -1358,3 +1377,25 @@ Completed all tracker documentation for the centralized knowledgebase feature pi
 - **Hook interaction discovered**: `.husky/pre-commit` runs `scripts/bump-version.js` which auto-bumps the minor version on EVERY commit. First commit attempt bumped package.json 1.40.0 → 1.41.0. Corrected: `git reset --soft HEAD~1`, restored package.json to 1.40.0, re-committed with `--no-verify` (memory-schema validation re-run manually and passed; only bump script skipped). `package.json` stays at 1.40.0 per user constraint.
 - **⚠️ Publish trigger caveat**: `.github/workflows/npm-publish.yml` triggers on push to `main` (not tags). npm publish runs only after the branch reaches `main` (PR merge); tag push alone does not trigger it.
 - **⚠️ Pre-existing security issue**: `.env` is tracked in git and contains a real 32-char `DATABASE_URL` password (`postgres@192.168.31.200`). Recommend `git rm --cached .env`, add to `.gitignore`, and rotate the credential. Out of scope for this release.
+
+### 2026-08-02: Tracker — Fix npm E404 + Setup `.env` Loading Pipeline Documented
+
+Completed all tracker documentation for the "Fix npm E404 for ai-workflow-template consumption + Setup `.env` Loading" pipeline:
+
+- **Pipeline**: implementer (bootstrap) → researcher (npm E404) → researcher (DATABASE_URL/.env) → implementer (plan) → coder (3 batches A/B/C) → coder (MCP server fix) → deployer (release) → tracker
+- **Appended pipeline entry to `docs/tracker-log.md`** — full 7-step record: npm E404 root cause (unscoped name), `.env`-not-loaded root cause, `plan/fix-setup-env-loading-v1.md` (12 tasks, 3 batches), 160/160 tests passing, MCP server fix with handshake verification, release commit `1aa4775` / tag `v1.40.0`
+- **Appended Session entry to `.agents/instructions/learned-knowledge.instructions.md`** — 8 knowledge items (setup CLI never loaded consumer `.env`; MCP server had same bug class; `--knowledgebase` flag semantics; warning-text bug; Husky auto-bump minor; npm-publish trigger on main not tags; `.env` tracked with real password; npx scoped-bin behavior) + agent tuning notes
+- **Updated `docs/TRACKER-INDEX.md`** — added pipeline row and learned-knowledge session row
+- **Pipeline summary**: 2 spikes + 1 plan + 8 modified files + 1 release commit/tag. Fixes shipped: dotenv → runtime deps, `import 'dotenv/config'` in `bin/setup.js`, scoped warning message, `--knowledgebase` flag, help text, MCP server dotenv + opencode.json env block. **User action pending**: merge `feat/update-setup` → `main` to trigger npm publish via workflow; rotate leaked `DATABASE_URL` password.
+
+### 2026-08-02: Tracker — Knowledgebase MCP Search Threshold Fix Documented (housekeeping #2)
+
+Completed all tracker documentation for the "empty knowledgebase search results despite 9 chunks indexed" follow-up:
+
+- **Pipeline**: research spike → coder (one-line fix) → verify after restart → tracker (this entry)
+- **Root cause**: `scripts/mcp-knowledgebase-server.js:143` defaulted `threshold` to `0.6`, but `all-MiniLM-L6-v2` embeddings for this corpus score only ~0.01–0.41 cosine similarity → all results filtered out → `knowledgebase_search` returned "No results found" even though 9 chunks were indexed (stats showed them). CLI worked because it defaults to threshold 0.0.
+- **Fix**: `threshold: args.threshold || 0.6` → `threshold: args.threshold ?? 0.1` — lowers the default and fixes the `||` falsy-coercion bug (explicit `threshold: 0` was being coerced to 0.6).
+- **Verification**: (a) CLI search returned ranked results (top 0.396); (b) full fresh MCP handshake (`initialize` → `tools/list` → `tools/call knowledgebase_search`) returned "Result 1 (similarity: 0.396)"; (c) after restarting opencode, the live tool returned 5 results (top 0.396).
+- **Appended Session entry to `.agents/instructions/learned-knowledge.instructions.md`** — 4 knowledge items (empty result ≠ empty index — check threshold vs embedding score range; `||` vs `??` falsy-coercion; MCP server code changes require a server/opencode restart; CLI + fresh-handshake verification workflow) + agent tuning notes (researcher CLI-threshold diagnostics, coder sibling-call-site scan, tracker restart gotcha)
+- **Appended follow-up entry to `docs/tracker-log.md`** and updated `docs/TRACKER-INDEX.md` with the pipeline row + learned-knowledge session row
+- **Central knowledge status after restart**: `knowledgebase_search` operational (5 results, top sim 0.396), stats 1 project / 9 chunks. The new lesson is indexed and searchable.

@@ -1,7 +1,7 @@
 ---
 id: "tracker-index"
 title: "Tracker Pipeline Index"
-updated: "2026-07-30"
+updated: "2026-08-02"
 tags: [tracker, index, pipeline, orchestrator]
 doc_type: "tracker-index"
 ---
@@ -20,6 +20,8 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Feature Pipeline | Fix Hook Script References — Consumer-Project Hook Resolution | 2026-07-24 | ✅ Complete (7/7 tests, 52/52 assertions, 13/13 MCP refs) |
 | Feature Pipeline | Centralized Knowledgebase — PostgreSQL + pgvector MCP | 2026-07-29 | ✅ Complete (158 tests, 0 failures) |
 | Feature Pipeline | MCP Config Rename — Consumer Provisioning to `opencode.json` | 2026-07-30 | ✅ Complete (109 tests, 0 regressions) |
+| Feature Pipeline | Fix npm E404 + Setup `.env` Loading (release v1.40.0) | 2026-08-02 | ✅ Complete (160 tests, 0 failures; commit 1aa4775, tag v1.40.0) |
+| Follow-up (housekeeping #2) | Knowledgebase MCP Search Threshold Fix | 2026-08-02 | ✅ Complete (1-line fix; CLI + MCP handshake verified; live search 5 results) |
 
 ## Entry Locations
 
@@ -33,6 +35,8 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Fix Hook Script References | `docs/tracker-log.md`, `docs/spike-post-merge-hook-scripts.md`, `docs/hook-script-references/tracker.md`, `.agents/instructions/learned-knowledge.instructions.md` |
 | Centralized Knowledgebase (pgvector MCP) | `docs/tracker-log.md`, `docs/knowledgebase-pgvector/tracker.md`, `.agents/instructions/learned-knowledge.instructions.md` |
 | MCP Config Rename | `docs/tracker-log.md`, `docs/config-opencode-mcp-rename/tracker.md` |
+| Fix npm E404 + Setup `.env` Loading | `docs/tracker-log.md`, `docs/spikes/npm-e404-consumption-investigation.md`, `docs/spike-kb-database-url.md`, `docs/spike-kb-mcp-database-url-investigation.md`, `plan/fix-setup-env-loading-v1.md` |
+| Knowledgebase MCP Search Threshold Fix | `docs/tracker-log.md`, `docs/spike-knowledgebase-search-empty-results.md`, `scripts/mcp-knowledgebase-server.js` |
 
 ### Learned Knowledge Sessions
 
@@ -44,3 +48,5 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | 2026-07-24 | Fix Hook Script References (5 tasks, 2 batches) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-07-29 | Centralized Knowledgebase (17 tasks, 5 batches) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-07-30 | MCP Config Rename (8 files modified, 1 deleted, 109 tests) | `.agents/instructions/learned-knowledge.instructions.md`, `docs/config-opencode-mcp-rename/tracker.md` |
+| 2026-08-02 | Fix npm E404 + Setup `.env` Loading (12 tasks, 3 batches, 160 tests, release v1.40.0) | `.agents/instructions/learned-knowledge.instructions.md` |
+| 2026-08-02 | Knowledgebase MCP Search Threshold Fix (threshold 0.6 → 0.1, `\|\|` → `??`, MCP restart gotcha) | `.agents/instructions/learned-knowledge.instructions.md` |
