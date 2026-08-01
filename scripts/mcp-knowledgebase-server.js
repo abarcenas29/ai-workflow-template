@@ -20,6 +20,10 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+
+// Load .env file into process.env before any configuration reads
+import 'dotenv/config';
+
 import {
   search,
   upsertChunks,
@@ -136,7 +140,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'knowledgebase_search': {
         const results = await search(args.query, {
           project_id: args.projectId || undefined,
-          threshold: args.threshold || 0.6,
+          threshold: args.threshold ?? 0.1,
           limit: args.limit || 5,
         });
 

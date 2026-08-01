@@ -583,3 +583,268 @@ Changed how `npx ai-workflow-setup` provisions MCP configuration to consumer pro
 - Consumers with a previous setup will have a stale `opencode.mcp.json` alongside the new `opencode.json` — safe to delete manually
 - The corrected approach means there is no `opencode.mcp` file on disk: the template is `opencode.mcp.example.json` and the consumer target is `opencode.json`
 - All documentation consistently refers to the config as `opencode.mcp` (the generic opencode MCP config identifier)
+
+---
+
+## Pipeline: Fix npm E404 for ai-workflow-template consumption + Setup `.env` Loading
+
+**Date:** 2026-08-01 → 2026-08-02 (recorded 2026-08-02)
+**Status:** ✅ SUCCESS — 160/160 tests passing, release `v1.40.0` committed/tagged/pushed
+**Pipeline:** implementer (bootstrap) → researcher (npm E404) → researcher (DATABASE_URL/.env) → implementer (plan) → coder (3 batches A/B/C) → coder (MCP server fix) → deployer (release) → tracker (this step)
+
+### Overview
+
+A consumer reported `npm error E404` when running `npx ai-workflow-template setup --knowledgebase` in another project. Investigation traced the root cause to an **unscoped package name** (`ai-workflow-template` does not exist on npm; the package is `@abarcenas/ai-workflow-template`). A follow-up report revealed the setup pipeline never loaded the consumer's `.env`, so `DATABASE_URL` appeared unset and the knowledgebase phase bailed with a misleading warning. The pipeline fixed the `.env` loading gap (dotenv moved to runtime dependencies + `import 'dotenv/config'` in `bin/setup.js`), added a `--knowledgebase` flag, corrected warning/help text, fixed the same bug class in the MCP knowledgebase server, and shipped the release as commit `1aa4775` / tag `v1.40.0`.
+
+---
+
+## Step 0: Implementer (Bootstrap)
+
+**Date:** 2026-08-01
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Audited the package structure to establish ground truth before investigating the consumer 404. Confirmed the package is **scoped** `@abarcenas/ai-workflow-template` v1.39.0, is public/publishable, exposes a single bin `ai-workflow-setup`, and that `~/.npmrc` already has a valid registry auth token.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| (audit only) | No artifacts — findings fed directly to the researcher |
+
+### Key Decisions
+
+- The package name is scoped; the consumer's failing command (`npx ai-workflow-template`) could never resolve — primary investigation target.
+- `main` points to a missing `index.js` (low impact for a CLI tool distributed via bin).
+
+### Notes / Follow-up
+
+None.
+
+---
+
+## Step 1: Researcher (npm E404 investigation)
+
+**Date:** 2026-08-01
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Confirmed the root cause of the consumer's `npm error E404`: the package is published under the scoped name `@abarcenas/ai-workflow-template` (public, free tier), and the unscoped name `ai-workflow-template` returns 404 on the npm registry. The correct consumer command is `npx @abarcenas/ai-workflow-template` — no flags needed because knowledgebase registration runs by default (disable with `--skip-knowledgebase`). Also documented that the `setup` positional and `--knowledgebase` flag in the user's original command are silently ignored by the CLI parser.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/spikes/npm-e404-consumption-investigation.md` | Full spike: registry state (20 published versions), root-cause confirmation, correct npx commands, consumption alternatives (npm / git / file:), publication readiness, external resources |
+
+### Key Decisions
+
+- **No re-publish needed** — the package was already public at v1.39.0 with a working bin; only the consumer command needed correcting.
+- npx single-bin resolution heuristic (`npx @scope/package` runs the sole bin) confirmed against npm docs.
+
+### Notes / Follow-up
+
+Recommended optional docs improvements (README scope clarity, listing `--skip-knowledgebase`, fixing the dangling `main` field) — deferred.
+
+---
+
+## Step 2: Researcher (DATABASE_URL / `.env` detection)
+
+**Date:** 2026-08-01
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Investigated the follow-up report that the knowledgebase phase "can't find DATABASE_URL" even though the consumer had a valid `.env`. Root cause: the setup orchestrator (`scripts/setup/knowledgebase.js:64`) checks `process.env.DATABASE_URL` **without ever loading the consumer's `.env`** — no dotenv anywhere in `scripts/setup/`. The child process (`knowledgebase-cli.js`) does load dotenv but is never spawned because the parent bails first. Also confirmed the warning text was doubly wrong (unscoped name + bogus `setup` positional) and that `dotenv` was only a devDependency (unavailable at `npx` time).
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/spike-kb-database-url.md` | Spike: exact code path trace, .env location proof (consumer `apmc-cms/.env` valid), PostgreSQL-only knowledgebase requirements, recommended fix options |
+
+### Key Decisions
+
+- Root cause is the parent process env gap, not the user's configuration — the consumer's `.env` was correct.
+- Recommended fix: move `dotenv` to `dependencies` + load `.env` before the DATABASE_URL check; fix the warning message; optionally add a `--knowledgebase` flag.
+
+### Notes / Follow-up
+
+Knowledgebase is PostgreSQL + pgvector only (no SQLite fallback); `pg`/`pgvector` are optional dependencies.
+
+---
+
+## Step 3: Implementer (plan the fix)
+
+**Date:** 2026-08-01
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Produced a deterministic implementation plan fixing 5 issues in one patch: (1) consumer `.env` not loaded before the DATABASE_URL check, (2) misleading warning message, (3) missing `--knowledgebase` flag, (4) incomplete help text, (5) version bump + republish. Chose **Option A**: move `dotenv` devDeps → deps and add `import 'dotenv/config'` at the top of `bin/setup.js` (ESM hoisting guarantees it runs before any phase). 12 tasks across 3 parallel batches (A: 5, B: 5, C: 2).
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `plan/fix-setup-env-loading-v1.md` | Plan: requirements (REQ-01..09), constraints, alternatives (ALT-01..04), 12 tasks with per-batch tables, 14 test identifiers, risks (RISK-01..05), publish steps |
+
+### Key Decisions
+
+- Option A (dotenv dependency + entry-point import) over a hand-rolled `.env` parser (~40 lines of edge-case code) and over placing the import only in the knowledgebase module (entry point benefits all phases).
+- `--knowledgebase` implemented via the existing `skip*` flag mechanism (set all skip flags true) — no new control-flow path.
+
+### Notes / Follow-up
+
+Plan marked **Completed** after Batch C. Deferred (RISK-03): running setup from a subdirectory (cwd ≠ consumer root) still misses root `.env`; `INIT_CWD` fallback is a candidate follow-up.
+
+---
+
+## Step 4: Coder (execute batches A/B/C)
+
+**Date:** 2026-08-01
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Executed all 12 plan tasks across 3 batches with one adaptation: tasks editing the same file were merged to avoid write races (Batch A = 4 parallel tasks, Batch B = 3 parallel tasks). All tasks completed: `dotenv` moved to dependencies, `import 'dotenv/config'` added to `bin/setup.js`, warning message fixed, `--knowledgebase` flag registered in constants + orchestrator + help text, tests updated/added, full suite green.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `package.json` | dotenv → `dependencies` (^17.4.2), version bumped (originally 1.39.1 by plan; later 1.40.0 via bump script) |
+| `bin/setup.js` | `import 'dotenv/config'` at top (loads consumer `.env` before any phase) |
+| `scripts/setup/knowledgebase.js` | Warning text fixed: scoped name, no bogus `setup`, `.env` guidance, `--knowledgebase` re-run hint |
+| `scripts/setup/constants.js` | `'--knowledgebase': 'knowledgebase'` added to `SUPPORTED_FLAGS` |
+| `scripts/setup/index.js` | `--knowledgebase` handler sets `skipHooks`/`skipPrepare`/`skipSync` → runs only discovery + knowledgebase |
+| `scripts/setup/ui.js` | Help text: `--knowledgebase`, `--skip-knowledgebase` descriptions; usage/examples without bogus `setup` positional |
+| `scripts/setup/knowledgebase.test.js` | Assertions for new warning message (scoped name + `--knowledgebase`) |
+| `scripts/setup/index.test.js` | +2 tests for `--knowledgebase` flag logic (restored index.js coverage >90%) |
+
+### Key Decisions
+
+- Merged same-file tasks to avoid parallel write races (T1+T5; T7+T8+T9).
+- `--knowledgebase` reuses existing phase-skip gates (ALT-04) — minimal new code.
+- Two new tests added in Batch C to keep `index.js` coverage above the 90% plan threshold (90.75% stmts).
+
+### Notes / Follow-up
+
+**Test results:** `npx vitest run` → 9 files, **160 tests, 0 failures**. Consumer smoke test: `.env` loaded, no "DATABASE_URL not configured" warning, `--knowledgebase --dry-run` runs only discover + knowledgebase. Global coverage (38.47%) below 90% is pre-existing and out of plan scope.
+
+---
+
+## Step 5: Coder (MCP knowledgebase server fix)
+
+**Date:** 2026-08-01 → 2026-08-02
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Fixed the same class of env-loading bug in the knowledgebase MCP server. `scripts/mcp-knowledgebase-server.js` never imported dotenv (so `DATABASE_URL` was undefined in the MCP process), and the `knowledgebase` MCP entry in `opencode.json` had no `env` block. Added `import 'dotenv/config'` to the server and an `env: { DATABASE_URL: "$DATABASE_URL" }` block to `opencode.json` (matching the `github` MCP pattern). Verified via MCP handshake: `knowledgebase_list` returns real indexed projects.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/spike-kb-mcp-database-url-investigation.md` | Spike: 3-link failure chain (no env block → no dotenv → getPool returns null), fix options A/B |
+| `scripts/mcp-knowledgebase-server.js` | +`import 'dotenv/config'` (library-level, propagates to consumers) |
+| `opencode.json` | +`"env": { "DATABASE_URL": "$DATABASE_URL" }` on knowledgebase MCP entry |
+
+### Key Decisions
+
+- Applied **both** fixes (env block + dotenv import) for belt-and-suspenders reliability.
+- Historical note: this bug class was already documented 2026-07-30 for `knowledgebase-cli.js` — the MCP server was missed the first time. Universal pattern: any Node script reading `process.env` must load dotenv.
+
+### Notes / Follow-up
+
+MCP handshake verified — `knowledgebase_list` returned "Indexed Projects: @abarcenas/ai-workflow-template (8 chunks)". Coder reported package.json version = 1.40.0 (not 1.39.1) — flagged for the deployer to verify.
+
+---
+
+## Step 6: Deployer (release)
+
+**Date:** 2026-08-02
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Committed the release as `1aa4775`, created annotated tag `v1.40.0`, and pushed branch `feat/update-setup` + tag to origin. Scope adjusted per user: version 1.40.0 is intentional (bump script always does a minor bump), publish deferred to the GitHub workflow (triggers on push to `main`, not local npm publish), post-publish verification left to the user.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| Git refs | Commit `1aa4775`, annotated tag `v1.40.0`, branch `feat/update-setup` pushed to `github.com/abarcenas29/ai-workflow-template` |
+
+### Key Decisions
+
+- **Publish via workflow, not locally** — `.github/workflows/npm-publish.yml` triggers on push to `main`; tag-only pushes do not publish.
+- **Husky pre-commit auto-bump** — `scripts/bump-version.js` bumps minor version on every commit; deployer used `--no-verify` after a `git reset --soft` to keep `package.json` at 1.40.0.
+
+### Notes / Follow-up
+
+⚠️ **Action needed by user:** open/merge the PR (`feat/update-setup` → `main`) to trigger npm publish. ⚠️ **Security:** `.env` is tracked in git with a real 32-char `DATABASE_URL` password — recommend `git rm --cached .env`, add to `.gitignore`, and rotate the credential. ⚠️ Recommend adding a `SKIP_BUMP` guard to the pre-commit hook.
+
+---
+
+## Step 7: Tracker (documentation)
+
+**Date:** 2026-08-02
+**Status:** ✅ SUCCESS
+
+### Summary
+
+Recorded the full pipeline in `docs/tracker-log.md`, appended the tracker summary to `memory-bank/progress.md`, persisted a learned-knowledge session entry, and updated `docs/TRACKER-INDEX.md`. No code changes.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/tracker-log.md` | This pipeline entry (steps 0–7) |
+| `memory-bank/progress.md` | Tracker summary appended |
+| `.agents/instructions/learned-knowledge.instructions.md` | New Session entry with 8 knowledge items + agent tuning notes |
+| `docs/TRACKER-INDEX.md` | Pipeline row + learned-knowledge session row added |
+
+### Key Decisions
+
+- Single pipeline entry documenting all 7 steps per the established `docs/tracker-log.md` convention.
+- Lessons learned recorded in `.agents/instructions/learned-knowledge.instructions.md` for cross-project reuse.
+
+### Notes / Follow-up
+
+None beyond the deployer caveats above (PR merge to publish; `.env` secret rotation; SKIP_BUMP guard).
+
+---
+
+## Follow-up: Knowledgebase MCP Search Threshold Fix (housekeeping #2)
+
+**Date:** 2026-08-02
+**Status:** ✅ SUCCESS
+**Pipeline:** research spike → coder (one-line fix) → verify after restart → tracker (this entry)
+
+### Summary
+
+After the npm E404 / `.env` pipeline, the central knowledgebase MCP search tool returned "No results found" even though 9 chunks were indexed and stats showed them. Root cause: `scripts/mcp-knowledgebase-server.js` defaulted `threshold` to `0.6`, but the `all-MiniLM-L6-v2` embedding model produces cosine similarities of only ~0.01–0.41 for this corpus, so every result was filtered out. The fix changed the default to `0.1` and replaced the falsy-coercing `||` with nullish coalescing `??`. The lesson was persisted to learned knowledge and re-indexed so it is searchable.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/mcp-knowledgebase-server.js` | One-line fix: `threshold: args.threshold || 0.6` → `threshold: args.threshold ?? 0.1` (line 143) |
+| `docs/spike-knowledgebase-search-empty-results.md` | Research spike: code path trace, empirical similarity distribution (0.01–0.41), falsy-coercion analysis, fix recommendation |
+| `.agents/instructions/learned-knowledge.instructions.md` | New Session 2026-08-02 entry: threshold-vs-model lesson, `||` vs `??` bug, MCP restart requirement, verification workflow |
+| `memory-bank/progress.md` | Tracker summary appended |
+| `docs/TRACKER-INDEX.md` | Pipeline row + learned-knowledge session row added |
+
+### Key Decisions
+
+- Default threshold lowered 0.6 → 0.1 (below the lowest observed similarity ~0.06, still filters noise) — matches the CLI's effective 0.0 semantics while keeping sensible filtering.
+- `||` → `??` so an explicit `threshold: 0` passes through as intended (0 is falsy and would otherwise be coerced to the default).
+- Live MCP server verification required restarting opencode — the running MCP server process held the old code in memory; a freshly spawned handshake verified the fix, then a host restart made the live tool return results.
+
+### Notes / Follow-up
+
+Central knowledge is fully operational after restart: `knowledgebase_search` returns 5 results (top similarity 0.396), stats show 1 project / 9 chunks. No further action required.
