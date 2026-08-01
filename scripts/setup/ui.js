@@ -422,6 +422,8 @@ export function help() {
     skipHooks: 'Skip git hook installation phase',
     skipPrepare: 'Skip prepare script modification phase',
     skipSync: 'Skip file sync phase',
+    skipKnowledgebase: 'Skip knowledgebase registration phase',
+    knowledgebase: 'Run ONLY the knowledgebase registration phase',
     help: 'Show this help message and exit',
     version: 'Show the version number and exit',
     quiet: 'Suppress non-error output (quiet mode)',
@@ -435,6 +437,8 @@ export function help() {
     'skipHooks',
     'skipPrepare',
     'skipSync',
+    'skipKnowledgebase',
+    'knowledgebase',
     'help',
     'version',
     'quiet',
@@ -446,7 +450,7 @@ export function help() {
   write(`${BLD}${PACKAGE_NAME}${RST} ${GRN}v${version}${RST}`)
   write()
   write(`  ${BLD}Usage:${RST}`)
-  write(`    npx ${PACKAGE_NAME} setup [options]`)
+  write(`    npx ${PACKAGE_NAME} [options]`)
   write(`    ${BIN_NAME} [options]`)
   write()
   write(`  ${BLD}Description:${RST}`)
@@ -468,9 +472,10 @@ export function help() {
 
   write()
   write(`  ${BLD}Examples:${RST}`)
-  write(`    npx ${PACKAGE_NAME} setup`)
-  write(`    npx ${PACKAGE_NAME} setup --dry-run --verbose`)
-  write(`    npx ${PACKAGE_NAME} setup --force --skip-hooks`)
+  write(`    npx ${PACKAGE_NAME}`)
+  write(`    npx ${PACKAGE_NAME} --dry-run --verbose`)
+  write(`    npx ${PACKAGE_NAME} --knowledgebase`)
+  write(`    npx ${PACKAGE_NAME} --force --skip-hooks`)
   write(`    ${BIN_NAME} --help`)
   write()
 }

@@ -13,6 +13,9 @@
 //   2 — Fatal error (discovery failure or unexpected exception)
 // ═════════════════════════════════════════════════════════════════════════════
 
+// Load consumer's .env into process.env before any phase runs
+import 'dotenv/config'
+
 try {
   const { main } = await import('../scripts/setup/index.js')
   const exitCode = await main(process.argv.slice(2))

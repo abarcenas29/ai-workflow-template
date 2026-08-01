@@ -116,6 +116,7 @@ const defaultFlags = {
   skipPrepare: false,
   skipSync: false,
   skipKnowledgebase: false,
+  knowledgebase: false,
   help: false,
   version: false,
   quiet: false,
@@ -539,6 +540,48 @@ describe('main() — setup orchestrator', () => {
       '--skip-prepare',
       '--skip-sync',
     ])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(discover).toHaveBeenCalledTimes(1)
+    expect(installHooks).not.toHaveBeenCalled()
+    expect(handlePrepare).not.toHaveBeenCalled()
+    expect(initHusky).not.toHaveBeenCalled()
+    expect(runSyncPhase).not.toHaveBeenCalled()
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
+  })
+
+  // ── 16b. --knowledgebase flag (T6: run ONLY the knowledgebase phase) ─────
+
+  it('--knowledgebase: runs only discovery + knowledgebase phases, exits 0', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, knowledgebase: true })
+
+    const code = await main(['--knowledgebase'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(parseCliArgs).toHaveBeenCalledWith(['--knowledgebase'])
+    // Discovery always runs
+    expect(discover).toHaveBeenCalledTimes(1)
+    // All other phases are skipped by the --knowledgebase shortcut
+    expect(installHooks).not.toHaveBeenCalled()
+    expect(handlePrepare).not.toHaveBeenCalled()
+    expect(initHusky).not.toHaveBeenCalled()
+    expect(runSyncPhase).not.toHaveBeenCalled()
+    // Knowledgebase phase runs
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
+    // Header and summary shown (not quiet)
+    expect(header).toHaveBeenCalledTimes(1)
+    expect(summary).toHaveBeenCalledTimes(1)
+  })
+
+  it('--knowledgebase: still runs knowledgebase phase when skipKnowledgebase was also passed', async () => {
+    // --knowledgebase forces skipKnowledgebase back to false so the phase runs
+    parseCliArgs.mockReturnValue({
+      ...defaultFlags,
+      knowledgebase: true,
+      skipKnowledgebase: true,
+    })
+
+    const code = await main(['--knowledgebase', '--skip-knowledgebase'])
 
     expect(code).toBe(EXIT_CODES.SUCCESS)
     expect(discover).toHaveBeenCalledTimes(1)

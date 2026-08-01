@@ -139,6 +139,7 @@ export const SUPPORTED_FLAGS = {
   '--skip-prepare': 'skipPrepare',
   '--skip-sync': 'skipSync',
   '--skip-knowledgebase': 'skipKnowledgebase',
+  '--knowledgebase': 'knowledgebase',
   '--help': 'help',
   '-h': 'help',
   '--version': 'version',
