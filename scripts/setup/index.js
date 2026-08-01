@@ -141,6 +141,14 @@ export async function main(argv) {
     return EXIT_CODES.SUCCESS
   }
 
+  // When --knowledgebase is passed, run ONLY the knowledgebase phase
+  if (flags.knowledgebase) {
+    flags.skipHooks = true
+    flags.skipPrepare = true
+    flags.skipSync = true
+    flags.skipKnowledgebase = false
+  }
+
   // ── 3. Display header banner ────────────────────────────────────────────
   if (!flags.quiet) {
     header()

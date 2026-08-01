@@ -1,7 +1,7 @@
 ---
 id: "_index"
 title: "Tasks Index"
-updated: "2026-07-23"
+updated: "2026-08-01"
 tags: []
 entities: []
 category: "context"
@@ -12,6 +12,16 @@ category: "context"
 
 ## Completed
 
+- [fix-setup-env-loading T1] Move `dotenv` from devDependencies → dependencies — Completed on 2026-08-01
+- [fix-setup-env-loading T2] Add `import 'dotenv/config'` at top of `bin/setup.js` — Completed on 2026-08-01
+- [fix-setup-env-loading T5] Bump package version 1.39.0 → 1.39.1 — Completed on 2026-08-01
+- [fix-setup-env-loading T6] Add `--knowledgebase` flag handling in `scripts/setup/index.js` — Completed on 2026-08-01
+- [fix-setup-env-loading T10] Update `scripts/setup/knowledgebase.test.js` warning-message assertion — Completed on 2026-08-01
+- [fix-setup-env-loading T7] Add `skipKnowledgebase` description to help text — Completed on 2026-08-01
+- [fix-setup-env-loading T8] Add `knowledgebase` (standalone flag) description to help text — Completed on 2026-08-01
+- [fix-setup-env-loading T9] Fix unscoped package name / bogus `setup` positional in help text — Completed on 2026-08-01
+- [fix-setup-env-loading T11] Run full Vitest test suite + add `--knowledgebase` orchestrator tests — Completed on 2026-08-01
+- [fix-setup-env-loading T12] Consumer-level smoke test with temp `.env` (DATABASE_URL detection) — Completed on 2026-08-01
 - [T1-KB] Create `scripts/knowledgebase-init.sql` — Completed on 2026-07-29
 - [T1] Create `scripts/setup/constants.js` — Completed on 2026-07-24
 - [T2] Create `scripts/setup/utils.js` — Completed on 2026-07-24

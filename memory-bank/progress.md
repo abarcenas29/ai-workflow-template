@@ -3,7 +3,7 @@ id: "progress"
 title: "Progress"
 updated: "2026-08-01"
 
-tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge]
+tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
 category: "progress"
 ---
@@ -53,6 +53,7 @@ category: "progress"
 ## What's Left
 
 - ~~**MCP Config File Changes** — Plan at `plan/config-opencode-mcp-rename-v1.md`. Changes applied: `opencode.mcp.json` deleted (untracked/gitignored), `.gitignore` updated (removed `opencode.mcp.json`, added `opencode.mcp`), `scripts/sync.js` updated (rootFiles, auto-copy target), `README.md` and `docs/playwright-mcp-configuration.md` renamed `opencode.mcp.json` → `opencode.mcp` for consumers. `opencode.mcp.example.json` kept as-is. memory-bank current-state references updated. ✅ Complete~~
+- **Setup Env Loading Fix** — Plan at `plan/fix-setup-env-loading-v1.md`. 12 tasks across 3 parallel batches (A–C). Fixes: consumer `.env` not loaded before `DATABASE_URL` check, misleading warning message (unscoped name + bogus `setup` positional), missing `--knowledgebase` flag, incomplete `--help` text, version bump 1.39.0 → 1.39.1. **Batch A: ✅ ALL 5 TASKS COMPLETE 2026-08-01** — T1 (dotenv → dependencies), T2 (`import 'dotenv/config'` in `bin/setup.js`), T3 (warning message fixed), T4 (`--knowledgebase` flag), T5 (version 1.39.1). **Batch B: ✅ ALL 5 TASKS COMPLETE 2026-08-01** — T6 (flag handling in `index.js`: `--knowledgebase` sets `skipHooks`/`skipPrepare`/`skipSync` → runs only discovery + knowledgebase), T7 (`--skip-knowledgebase` help description), T8 (`--knowledgebase` help description), T9 (bogus `setup` positional removed from usage/examples + `--knowledgebase` example), T10 (test assertion updated). **Batch C: ✅ ALL 2 TASKS COMPLETE 2026-08-01** — **T11** (`npx vitest run` → 160/160 pass across 9 files, 0 failures; added 2 `--knowledgebase` tests to `index.test.js` restoring `index.js` coverage to 90.75% stmts / 90.9% lines — above plan's 90% requirement; global coverage 38.47% remains below 90% but is pre-existing and out of plan scope), **T12** (consumer smoke test: temp consumer dir with `.env` containing `DATABASE_URL` → no "DATABASE_URL not configured" warning; `--knowledgebase --dry-run` runs only discover + knowledgebase). Plan status: **Completed**. Known limitation deferred for v1 (plan RISK-03): running setup from a subdirectory (cwd ≠ consumer root) still misses the root `.env` because `dotenv` resolves from `process.cwd()` — an `INIT_CWD`-based path fallback is a candidate follow-up.
 - **Knowledgebase implementation** — Plan at `plan/feature-knowledgebase-pgvector-v1.md` — ✅ All 5 batches (A–E) complete. 28 new tests, 158 total passing, 0 failures. 7 new source files, 3 new test files, 19 modified files. Reviewer findings (4 major, 6 minor) pending resolution.
 - **Reviewer findings** — 4 major + 6 minor findings from knowledgebase review pending resolution
 - **Minor gap**: `"setup"` script missing from `package.json` scripts — command works via `npx ai-workflow-setup` but not `npm run setup`
@@ -163,6 +164,246 @@ Fixed 3 gaps that prevented consumer projects from getting a `learned-knowledge.
 **Verification**: `npx vitest run scripts/setup/hooks.test.js` — 16 passed, 0 failed, 107ms.
 
 ## Recently Completed
+
+### 2026-08-01: Coder — T12 from `plan/fix-setup-env-loading-v1.md` (Batch C — consumer smoke test)
+
+Verified the end-to-end consumer experience with a temporary consumer project. **No production code changes were needed** — the T2 dotenv fix works as intended.
+
+**Method**: Created a temp consumer dir (`mktemp -d` under the opencode temp area) with `git init`, a `.env` containing `DATABASE_URL=postgresql://localhost:5432/test`, and a minimal `package.json` (`name: kb-smoke-consumer`) so the knowledgebase phase could proceed past its project-name check. Ran `node /Users/aldrichallenbarcenas/develop/ai-workflow-template/bin/setup.js` from that dir. The real consumer project `/Users/aldrichallenbarcenas/develop/apmc-cms` was NOT touched.
+
+**Results (4 scenarios)**:
+1. `--dry-run` with `.env` present → knowledgebase phase does NOT emit "DATABASE_URL not configured"; it proceeds past the `knowledgebase.js:64` env check and spawns the child CLI ✅
+2. `--knowledgebase --dry-run` with `.env` present → summary shows ONLY `discover` + `knowledgebase` phases, no warning ✅
+3. Added a stub `.agents/instructions/learned-knowledge.instructions.md` → `--knowledgebase --dry-run` reports `Registered "kb-smoke-consumer" — 0 chunks indexed, 0 skipped`, exit 0. (Child CLI's `chunkLearnedKnowledge` returns 0 chunks so it never opens a DB connection — port 5432 was confirmed CLOSED; this is the plan's expected "attempt to spawn, fail gracefully" behavior.)
+4. Without `.env` → the FIXED scoped warning appears: `DATABASE_URL not configured. Set DATABASE_URL in your .env file, then re-run: npx @abarcenas/ai-workflow-template --knowledgebase`, exit 1 ✅ (scoped package name, no bogus `setup` positional, correct re-run command)
+
+**dotenv `process.cwd()` verification**: `import 'dotenv/config'` in `bin/setup.js` resolves `.env` from `process.cwd()`. Running from the temp consumer dir picked up the temp `.env` (proven by scenarios 1–3 passing the env check). Also verified the npx-realistic case (`INIT_CWD` set to consumer root, cwd = consumer root) → env loads fine, no warning. **No change needed to `bin/setup.js`** — no `dotenv.config({ path })` workaround required for the documented (root-dir) use case.
+
+**Known limitation (matches plan RISK-03, intentionally deferred for v1)**: running from a SUBDIRECTORY (cwd ≠ consumer root) misses the root `.env` — reproduced: invoked from `$TMP/subdir` → `DATABASE_URL not configured` warning appears. An `INIT_CWD`-based dotenv path fallback (`dotenv.config({ path: resolve(getConsumerRoot(), '.env') })`) is a candidate follow-up but was NOT implemented (plan explicitly deferred for v1; this is not a regression from T1–T10).
+
+**Files modified**: `plan/fix-setup-env-loading-v1.md` (T12 marked completed, Phase 3 → ✅ COMPLETED, plan status → Completed), `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`. Temp consumer dir cleaned up.
+
+**Plan status**: All 12 tasks across 3 batches complete. Plan status: **Completed**. Next: publish steps per plan §8 (commit, tag v1.39.1, `npm publish --access public`).
+
+### 2026-08-01: Coder — T11 from `plan/fix-setup-env-loading-v1.md` (Batch C — validation)
+
+Ran the full Vitest suite and fixed a coverage regression on the T6 `--knowledgebase` block:
+
+**Verification result**: `npx vitest run` → **9 test files passed, 160 tests passed, 0 failures**. The plan expected 158; the extra 2 are new tests added in this task.
+
+**Coverage analysis**:
+- Baseline (before T1–T10): `scripts/setup/index.js` at 90.35% statements / 90.47% lines — above the plan's 90% threshold for this file.
+- After T6 added the `--knowledgebase` block (`index.js:144–150`): dropped to 87.39% / 87.27% — **below the plan's T11 validation requirement** ("above 90% for `scripts/setup/index.js`").
+- **Fix**: Added 2 tests to `scripts/setup/index.test.js` covering the new flag logic:
+  1. `--knowledgebase: runs only discovery + knowledgebase phases, exits 0` — asserts `installHooks`/`handlePrepare`/`initHusky`/`runSyncPhase` NOT called, `registerKnowledgebase` called once, header + summary shown.
+  2. `--knowledgebase: still runs knowledgebase phase when skipKnowledgebase was also passed` — asserts the `flags.skipKnowledgebase = false` guard works.
+  - Also added `knowledgebase: false` to the `defaultFlags` fixture so the mock mirrors real `parseCliArgs` output (which now includes `knowledgebase` via T4's `SUPPORTED_FLAGS` entry).
+- **After fix**: `index.js` at 90.75% statements / 90.9% lines — restored above 90%.
+
+**Global coverage note**: `npx vitest run --coverage` reports overall 38.47% — the 90% global threshold in `vitest.config.ts` is NOT met. This is **pre-existing** (baseline 38.33% before T1–T10) and outside this plan's scope; the plan only requires `index.js` > 90%, which is now satisfied.
+
+**CLI sanity check**: `node bin/setup.js --knowledgebase --dry-run` → summary shows ONLY `discover` + `knowledgebase` phases (verifies T6 behavior end-to-end). `node --check` passes on all modified files.
+
+**Files modified**:
+- `scripts/setup/index.test.js` — +43 lines: `defaultFlags` fixture (`knowledgebase: false`) + 2 new `--knowledgebase` tests (lines 553–592)
+- `plan/fix-setup-env-loading-v1.md` — T11 marked completed, Phase 3 status → ⏳ IN PROGRESS (T12 pending)
+- `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md` — this update
+
+**Plan status**: T11 row marked Completed 2026-08-01. Phase 3 → ✅ COMPLETED after sibling T12 (consumer smoke test) finished in parallel — the full 12-task plan is now complete.
+
+### 2026-08-01: Coder — T6 from `plan/fix-setup-env-loading-v1.md` (Batch B)
+
+Added `--knowledgebase` flag handling to the setup orchestrator, completing Batch B (T6–T10 all done):
+
+**File modified**: `scripts/setup/index.js` — inserted 8 lines (144–151) in `main()` immediately after the `--version` early-exit block and before the header banner:
+
+```js
+// When --knowledgebase is passed, run ONLY the knowledgebase phase
+if (flags.knowledgebase) {
+  flags.skipHooks = true
+  flags.skipPrepare = true
+  flags.skipSync = true
+  flags.skipKnowledgebase = false
+}
+```
+
+**How it works**: Reuses the existing phase-loop skip gates — Phase 2 (Hooks) and Phase 4 (Husky Init) gate on `!flags.skipHooks`, Phase 3 (Prepare) on `!flags.skipPrepare`, Phase 5 (Sync) on `!flags.skipSync`, Phase 6 (Knowledgebase) on `!flags.skipKnowledgebase`. Setting the three skip flags to `true` means `--knowledgebase` runs ONLY Phase 1 (Discovery, always runs) + Phase 6 (Knowledgebase) — the ALT-04 design decision (flag-filter via `skip*` flags; no new control-flow path). `flags.skipKnowledgebase = false` guards the pathological `--knowledgebase --skip-knowledgebase` combination. Depends on T4 (`--knowledgebase` registered in `SUPPORTED_FLAGS` → `flags.knowledgebase`).
+
+**Style note**: Used the file's semicolon-free convention rather than the plan snippet's semicolons, to match surrounding code.
+
+**Verification**:
+- `node --check scripts/setup/index.js` → ✅ syntax OK
+- Real dry-run from temp consumer dir (`env -u DATABASE_URL node bin/setup.js --knowledgebase --dry-run`): summary shows ONLY `discover` + `knowledgebase` phases; knowledgebase early-exits `skipped` (DATABASE_URL unset) → zero DB writes ✅ (matches plan Phase 2 validation)
+- Regression `--skip-knowledgebase --dry-run`: all phases run except knowledgebase ✅
+- `--help` and `--version` still work, exit 0 ✅
+- `npx vitest run scripts/setup/index.test.js` → 25/25 pass ✅
+- No files touched outside `scripts/setup/index.js` — `package.json`, `bin/setup.js`, `constants.js`, `ui.js`, tests untouched (sibling tasks' scope)
+
+**Plan status**: T6 row marked Completed 2026-08-01. Batch B (T6–T10) fully complete; Batch C (T11 full suite, T12 consumer smoke test) pending.
+
+### 2026-08-01: Coder — T7+T8+T9 from `plan/fix-setup-env-loading-v1.md` (Batch B)
+
+Completed all three help-text tasks in `scripts/setup/ui.js` `help()`:
+
+**T7 — `--skip-knowledgebase` description**:
+- `descriptions` object: added `skipKnowledgebase: 'Skip knowledgebase registration phase',` after `skipSync` (now line 425)
+- `order` array: added `'skipKnowledgebase'` after `'skipSync'` (now line 440)
+- Result: `--skip-knowledgebase` now appears in `--help` output
+
+**T8 — `--knowledgebase` (standalone) description**:
+- `descriptions` object: added `knowledgebase: 'Run ONLY the knowledgebase registration phase',` after `skipKnowledgebase` (now line 426)
+- `order` array: added `'knowledgebase'` after `'skipKnowledgebase'` (now line 441)
+- Result: the new standalone `--knowledgebase` flag is now documented in `--help`
+
+**T9 — unscoped/bogus references fixed**:
+- Usage line: `npx ${PACKAGE_NAME} setup [options]` → `npx ${PACKAGE_NAME} [options]` (now line 453)
+- Example `npx ${PACKAGE_NAME} setup` → `npx ${PACKAGE_NAME}` (line 475)
+- Example `npx ${PACKAGE_NAME} setup --dry-run --verbose` → `npx ${PACKAGE_NAME} --dry-run --verbose` (line 476)
+- Added example `npx ${PACKAGE_NAME} --knowledgebase` (line 477)
+- **Deviation (small extension)**: also fixed `npx ${PACKAGE_NAME} setup --force --skip-hooks` → `npx ${PACKAGE_NAME} --force --skip-hooks` (line 478) — the plan's T9 listed only lines 471–472, but the third example had the same bogus `setup` positional; left unfixed it would violate TEST-10 ("no `setup` positional in usage"). `${PACKAGE_NAME}` already resolved to the scoped `@abarcenas/ai-workflow-template` — no unscoped name needed fixing.
+
+**File modified**: `scripts/setup/ui.js` (descriptions 424–426, order 440–441, usage 453, examples 475–478; +6 net lines). No other files touched.
+
+**Verification**:
+- `node --check scripts/setup/ui.js` → ✅ syntax OK
+- `node bin/setup.js --help` → shows `--skip-knowledgebase  Skip knowledgebase registration phase`, `--knowledgebase       Run ONLY the knowledgebase registration phase`, usage `npx @abarcenas/ai-workflow-template [options]` (no `setup`), `--knowledgebase` example present ✅
+- `grep 'npx .*setup' scripts/setup/ui.js` → zero matches ✅
+- `npx vitest run scripts/setup/index.test.js scripts/setup/knowledgebase.test.js` → 31 passed (31), 2 files, 0 failures ✅
+
+**Plan status**: T7/T8/T9 rows marked Completed 2026-08-01. Phase 2 status left untouched (T6 in flight by sibling coder).
+
+### 2026-08-01: Coder — T10 from `plan/fix-setup-env-loading-v1.md` (Batch B)
+
+Updated the knowledgebase test to validate the new warning message introduced by T3:
+
+**File modified**: `scripts/setup/knowledgebase.test.js` — test 2 (`returns action="skipped" with warning when DATABASE_URL is not set`, lines 156–172):
+- Changed the `toEqual` message matcher from generic `expect.stringContaining('DATABASE_URL')` to `expect.stringContaining('DATABASE_URL not configured')`
+- Added `expect(result.message).toContain('@abarcenas/ai-workflow-template')` — asserts the scoped package name (REQ-04)
+- Added `expect(result.message).toContain('--knowledgebase')` — asserts the corrected re-run command (REQ-05)
+- Confirmed the test file had no reference to the old unscoped `ai-workflow-template` name or old message text
+
+**Style note**: The direct `.toContain` assertions mirror test 6's existing multi-assertion style (`result.action` + multiple `result.message.toContain` calls). No source files touched — T3's new message was already in `scripts/setup/knowledgebase.js`.
+
+**Verification**: `npx vitest run scripts/setup/knowledgebase.test.js` → **6 passed (6)**, 1 file, 0 failures.
+
+**Plan status**: T10 row marked Completed 2026-08-01. Phase 2 status left untouched (T6–T9 in flight by sibling coders).
+
+### 2026-08-01: Coder — T2 from `plan/fix-setup-env-loading-v1.md` (Batch A)
+
+Added the dotenv side-effect import to the setup CLI entry point:
+
+**File modified**: `bin/setup.js` — inserted 2 lines (16–17) between the header comment block and the `try {` block:
+- Line 16: `// Load consumer's .env into process.env before any phase runs`
+- Line 17: `import 'dotenv/config'` (semicolon-free, matching project style)
+
+**Why it fixes the bug**: The static ESM side-effect import is hoisted — `dotenv.config()` runs before ANY module code, including the dynamic `await import('../scripts/setup/index.js')` (now line 20). This loads the consumer's `.env` (resolved from `process.cwd()`) into `process.env` before the knowledgebase phase's `process.env.DATABASE_URL` check (`scripts/setup/knowledgebase.js:64`) runs. The child `knowledgebase-cli.js` already had `import 'dotenv/config'` but was never reached because the parent check short-circuited first.
+
+**Reliance on T1**: `dotenv` must be a runtime `dependency` (T1 moved it from devDeps → deps) for the import to resolve in consumer projects — T1 completed by sibling coder in the same batch, so the reference is valid.
+
+**Verification**:
+- `node --check bin/setup.js` → ✅ syntax OK
+- `node bin/setup.js --version` → `1.39.1`, exit 0 ✅ (full module graph loads; import resolves — would hit the fatal handler with exit 2 if it threw)
+- Functional check: `import 'dotenv/config'` from cwd loaded `.env` `DATABASE_URL` into `process.env` ✅
+- `git diff -- bin/setup.js` → exactly the 2 intended lines added
+
+**Plan status**: T2 row marked Completed 2026-08-01. Phase 1 (Batch A) status → ✅ COMPLETED — T2 was the last incomplete task; T1/T3/T4/T5 completed by sibling coders.
+
+### 2026-08-01: Coder — T4 from `plan/fix-setup-env-loading-v1.md` (Batch A)
+
+Registered the new `--knowledgebase` CLI flag in the setup command:
+
+**File modified**: `scripts/setup/constants.js` — added `'--knowledgebase': 'knowledgebase',` to the `SUPPORTED_FLAGS` object (new line 142), immediately after `'--skip-knowledgebase': 'skipKnowledgebase'` and before `'--help'`.
+
+- Maps the CLI flag `--knowledgebase` to the `knowledgebase` property on the parsed flags object
+- Also enables `--no-knowledgebase` via `parseCliArgs()`'s `--no-` prefix handling (sets `knowledgebase: false`)
+- Follows the exact existing pattern of sibling flag entries (`'--flag': 'camelCaseProperty'`)
+- No other files touched — the actual phase-filtering logic is T6 (`scripts/setup/index.js`, Batch B) and help-text entries are T7/T8 (`scripts/setup/ui.js`, Batch B), both out of scope for this task
+
+**Verification**:
+- `node --input-type=module -e "import { SUPPORTED_FLAGS } from './scripts/setup/constants.js'; console.log(SUPPORTED_FLAGS['--knowledgebase'])"` → `knowledgebase` ✅ (plan's T4 verification command)
+- `parseCliArgs(['--knowledgebase'])` → `{ knowledgebase: true }` ✅ (plan Phase 1 validation)
+- All other `SUPPORTED_FLAGS` entries unchanged; file still parses as valid ESM
+
+**Plan status**: T4 row marked Completed 2026-08-01 in `plan/fix-setup-env-loading-v1.md`. Phase 1 status left untouched (T2 still in flight; T1/T3/T5 completed by sibling coders).
+
+### 2026-08-01: Coder — T3 from `plan/fix-setup-env-loading-v1.md` (Batch A)
+
+Fixed the misleading warning message in the setup Phase 6 `DATABASE_URL` check:
+
+**File modified**: `scripts/setup/knowledgebase.js` (lines 65–67 only — the two string literals in the `const message =` concatenation).
+
+| Before | After |
+|--------|-------|
+| `DATABASE_URL not configured. Set up later with: npx ai-workflow-template setup --knowledgebase` | `DATABASE_URL not configured. Set DATABASE_URL in your .env file, then re-run: npx @abarcenas/ai-workflow-template --knowledgebase` |
+
+**Fixes applied**:
+- (a) Scoped package name `@abarcenas/ai-workflow-template` (was unscoped `ai-workflow-template`)
+- (b) Removed the bogus `setup` positional subcommand — it doesn't exist; `parseCliArgs()` would silently drop it
+- (c) Added accurate guidance: set `DATABASE_URL` in a `.env` file at the consumer project root
+- (d) References the new `--knowledgebase` flag for a targeted re-run of just the knowledgebase phase
+
+**Formatting preserved**: Kept the existing `logWarn` convention (`[knowledgebase] Skipping Phase 6 \u2014 ${message}`) and the `'…' + '…'` string concatenation style — no other code touched.
+
+**Verification**:
+- `node --check scripts/setup/knowledgebase.js` → ✅ syntax OK
+- `grep 'ai-workflow-template' scripts/setup/knowledgebase.js` → only the scoped name (line 67) ✅
+- `grep 'npx.*setup' scripts/setup/knowledgebase.js` → zero matches ✅
+- `npx vitest run scripts/setup/knowledgebase.test.js` → 6/6 pass ✅
+
+**Plan status**: T3 row marked Completed 2026-08-01 in `plan/fix-setup-env-loading-v1.md`. Phase 1 status left untouched (T2 still in flight; T1/T4/T5 completed by sibling coders).
+
+### 2026-08-01: Coder — T1 + T5 from `plan/fix-setup-env-loading-v1.md` (Batch A)
+
+Implemented both `package.json` tasks from Batch A of the setup env loading fix:
+
+| Task | Change | Verification |
+|------|--------|--------------|
+| T1 | Moved `dotenv` from `devDependencies` → `dependencies` (same range `^17.4.2`). `dotenv` is now the 4th prod dependency; `devDependencies` dropped 5 → 4 entries. Makes `dotenv` available to consumers at runtime (devDependencies are not installed during `npx`). | `p.dependencies.dotenv` → `^17.4.2`, `p.devDependencies.dotenv` → `undefined` ✅ |
+| T5 | Version bump `1.39.0` → `1.39.1` (patch — bug fix for consumers, no API changes). | `p.version` → `1.39.1` ✅ |
+
+**File modified**: `package.json` (line 3 version; lines 57–67 dependency blocks — removed `dotenv` from devDeps, added after `sqlite-vec` in deps).
+
+**Verification**: `node -e "const p=require('./package.json'); console.log(p.version, p.dependencies.dotenv, p.devDependencies.dotenv)"` → `1.39.1 ^17.4.2 undefined`. `JSON.parse` valid.
+
+**Scope discipline**: Only `package.json` touched — no changes to `bin/setup.js`, `scripts/`, `constants.js`, `ui.js`, or tests (sibling Batch A tasks T2–T4 / Batch B tasks handle those files concurrently).
+
+**Plan status**: T1 and T5 rows marked Completed 2026-08-01 in `plan/fix-setup-env-loading-v1.md`. Phase 1 status left untouched (T2–T4 still in flight).
+
+### 2026-08-01: Implementer — Setup Env Loading Fix implementation plan
+
+Produced a comprehensive, deterministic implementation plan at `plan/fix-setup-env-loading-v1.md`:
+
+- **12 tasks across 3 parallel batches** (A: 5 tasks, B: 5 tasks, C: 2 validation tasks)
+- **Root cause analysis**: `scripts/setup/knowledgebase.js:64` checks `process.env.DATABASE_URL` but nothing in `scripts/setup/` loads consumer `.env`. Child `knowledgebase-cli.js:22` has `import 'dotenv/config'` but is never reached (parent short-circuits).
+- **Fix approach (Option A)**: Move `dotenv` from devDeps → deps, add `import 'dotenv/config'` at top of `bin/setup.js`. ESM hoisting guarantees it runs before the knowledgebase phase's `DATABASE_URL` check. `dotenv.config()` from `process.cwd()` resolves consumer `.env` correctly in npx context.
+- **Secondary fixes**: Warning message fixed (scoped name, no bogus `setup` positional, `.env` guidance, `--knowledgebase` flag reference), `--knowledgebase` flag added to `SUPPORTED_FLAGS` + orchestrator handler, help text updated with missing descriptions, unscoped package name references corrected in usage examples, version bump to 1.39.1.
+- **Files**: 7 modified (`package.json`, `bin/setup.js`, `scripts/setup/knowledgebase.js`, `scripts/setup/constants.js`, `scripts/setup/index.js`, `scripts/setup/ui.js`, `scripts/setup/knowledgebase.test.js`).
+- **Testing**: 14 test identifiers (TEST-01 through TEST-14) covering unit, integration, regression, and consumer smoke test.
+
+### 2026-08-01: Implementer — npm package structure bootstrap verification
+
+Verified complete project scaffolding for the distributable npm package:
+
+| Check | Status | Details |
+|-------|--------|---------|
+| `docs/.architecture-context.md` | ✅ Exists | 85 lines, real content |
+| `memory-bank/` core files | ✅ All 6 | projectbrief, productContext, systemPatterns, techContext, activeContext, progress |
+| `package.json` | ✅ Exists | `@abarcenas/ai-workflow-template` v1.39.0 |
+| `private` flag | Not set | Package IS publishable |
+| `bin` entries | ✅ `ai-workflow-setup` → `./bin/setup.js` |
+| `files` field | ✅ 15 entries | `.agents/`, `.opencode/`, `scripts/`, `.husky/`, `bin/`, etc. |
+| `publishConfig` | ❌ Absent | No registry/tag overrides |
+| `exports` | ❌ Absent | Only `main` field used |
+| `main` | ⚠ `"index.js"` (MISSING) | `index.js` does NOT exist at root |
+| `prepublishOnly`/`prepack`/`build` | ❌ Absent | No build step |
+| `dist/` or `build/` dir | ❌ None | No output directories |
+| `file:` protocol deps | ✅ None | All deps are npm registry |
+| `.npmrc` (project) | ❌ None | No project-level npmrc |
+| `.npmrc` (user) | ⚠ Has auth token | `~/.npmrc` contains `//registry.npmjs.org/:_authToken=` |
+| Git remote | `origin` → `https://github.com/abarcenas29/ai-workflow-template.git` |
+| Package type | npm distributable template (not a deployable app) |
+
+**Key gap identified**: `"main": "index.js"` points to a non-existent file. The package works as-intended via its `bin` entry (`npx ai-workflow-setup`) and `postinstall` scripts, but the `main` field is orphaned. Should be either fixed (create `index.js`) or removed.
 
 ### 2026-08-01: Coder — Persisted Float32Array spike learnings + fixed pgvector boundary regression
 

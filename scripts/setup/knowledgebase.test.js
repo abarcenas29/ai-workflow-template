@@ -161,8 +161,12 @@ describe('registerKnowledgebase', () => {
 
     expect(result).toEqual({
       action: 'skipped',
-      message: expect.stringContaining('DATABASE_URL'),
+      message: expect.stringContaining('DATABASE_URL not configured'),
     })
+    // The warning must guide the consumer to set DATABASE_URL and re-run
+    // with the scoped package name and the --knowledgebase flag.
+    expect(result.message).toContain('@abarcenas/ai-workflow-template')
+    expect(result.message).toContain('--knowledgebase')
     expect(spawn).not.toHaveBeenCalled()
   })
 

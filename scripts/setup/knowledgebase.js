@@ -63,8 +63,8 @@ export async function registerKnowledgebase(context) {
   // ── DATABASE_URL check ───────────────────────────────────────────────
   if (!process.env.DATABASE_URL) {
     const message =
-      'DATABASE_URL not configured. Set up later with: ' +
-      'npx ai-workflow-template setup --knowledgebase'
+      'DATABASE_URL not configured. Set DATABASE_URL in your .env file, ' +
+      'then re-run: npx @abarcenas/ai-workflow-template --knowledgebase'
     logWarn(
       `[knowledgebase] Skipping Phase 6 \u2014 ${message}`,
     )
