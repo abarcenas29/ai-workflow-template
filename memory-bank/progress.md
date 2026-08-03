@@ -1,9 +1,9 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-08-02"
+updated: "2026-08-03"
 
-tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure]
+tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
 category: "progress"
 ---
@@ -12,6 +12,36 @@ category: "progress"
 # Progress
 
 ## What Works
+
+### 2026-08-03: Coder — Vocab-Sync reviewer fixes applied (Pipeline 5, Step 2b)
+
+All Step 4 reviewer CHANGES REQUESTED items implemented and verified:
+
+| Fix | Change | Verification |
+|---|---|---|
+| 🟡 M1 validator normalization parity | `validateFile()` normalizes both frontmatter tags and vocab `allTags` (lowercase/trim/underscore→hyphen) before the unknown-tag filter, mirroring `vocab-sync.js` `normalizeTag` — staged `My Tag` no longer warns after vocab-sync appends `my-tag` | +3 tests (M1-a/b/c) |
+| 🟡 M2 JSON-comment instruction | `memory-schema.instructions.md` step 5 + `reviewer.agent.md` hygiene bullet reworded — rationale goes in commit message/PR/review report or `categories` description strings; explicit strict-JSON no-comment warning | markdownlint: no new structural errors |
+| 🔵 Minor 1 `buildKnownTags` guard | `if (!Array.isArray(group)) continue;` prevents character-iteration when `vocab.tags` is an array (consumer-controlled malformed shape) | +2 malformed-shape tests |
+| 🔵 Minor 3 sync.test.js fixture | `'vocab-sync.js'` added to the `scriptsToSync` fixture (matches real array in `scripts/sync.js`), "6"→"7" comments updated | sync tests pass |
+
+- Full suite: **259/259 across 12 files, 0 failures** ✅ (was 254; +5 tests)
+- Coverage: `scripts/validate-memory-schema.js` **92.7% stmts / 93.1% branch / 92.47% lines**; `scripts/vocab-sync.js` **98.91% stmts / 92.15% branch / 100% lines** — both above the 90% gate (CON-03) ✅
+- `node --check` passed on all 5 modified JS files ✅
+- `memory-bank/.vocabulary.json` untouched (reviewer minor 4 — next-commit self-heal — is by design)
+
+### 2026-08-03: Implementer — Bootstrap verification (orchestrator invocation)
+
+All project scaffolding verified — everything fully initialized:
+
+| Check | Status | Details |
+|---|---|---|
+| `docs/.architecture-context.md` | ✅ | 85 lines, real content |
+| Memory bank core files | ✅ | All 6 present (projectbrief, productContext, systemPatterns, techContext, activeContext, progress) |
+| `memory-bank/tasks/_index.md` | ✅ | 49 lines, 30+ tasks tracked |
+| `graphify-out/graph.json` | ❌ → ✅ | **Regenerated** (was missing): 2879 nodes, 3140 edges, 265 communities |
+| Memory index | ✅ | Synced via `memory_update`: 2963 vectors, 32 files, 5.7 MB |
+| Package | `@abarcenas/ai-workflow-template` v1.42.0 |
+| Tech stack | Node.js ESM, Playwright, Vitest, Husky, graphify, OpenCode |
 
 - Playwright E2E testing (2 spec files in `tests/`)
 - npm package distribution (`@abarcenas/ai-workflow-template` v1.40.0 released 2026-08-02)
@@ -32,7 +62,7 @@ category: "progress"
 - Knowledgebase core engine: `scripts/knowledgebase-index.js` — 11 exports with lazy imports, embedding, CRUD, semantic search, graceful degradation
 - Knowledgebase embedding pipeline: `embed()` returns `Float32Array` (API contract, satisfies unit test); call sites convert to plain `Array` via `Array.from()` at the pgvector boundary (pgvector@0.3.0 `toSql()` REJECTS typed arrays). Vectors correctly stored as `VECTOR(384)` — 8 chunks indexed, search verified working
 - Knowledgebase CLI: `scripts/knowledgebase-cli.js` — 4 commands (sync, search, list, stats) with graceful degradation when DATABASE_URL unset
-- Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation. **2026-08-02**: now loads `.env` via `import 'dotenv/config'` (was missing dotenv import → DATABASE_URL invisible → all tools returned "not configured"). Local `opencode.json` knowledgebase entry now has `env: { DATABASE_URL: $DATABASE_URL }`. Verified via MCP handshake — `knowledgebase_list` returns real indexed projects. **2026-08-02 (threshold fix)**: `knowledgebase_search` default threshold changed `args.threshold || 0.6` → `args.threshold ?? 0.1` (line 143) — the 0.6 default filtered out ALL results because all-MiniLM-L6-v2 similarities for this corpus are ~0.01–0.41; `??` also allows an explicit `threshold: 0`. Verified end-to-end via MCP handshake — `tools/call knowledgebase_search` with no threshold now returns results (top sim 0.396).
+- Knowledgebase MCP server: `scripts/mcp-knowledgebase-server.js` — 4 tools (search, index, stats, list) via stdio transport, graceful degradation. **2026-08-02**: now loads `.env` via `import 'dotenv/config'` (was missing dotenv import → DATABASE_URL invisible → all tools returned "not configured"). Local `opencode.json` knowledgebase entry now has `env: { DATABASE_URL: $DATABASE_URL }`. Verified via MCP handshake — `knowledgebase_list` returns real indexed projects. **2026-08-02 (threshold fix)**: `knowledgebase_search` default threshold changed `args.threshold || 0.6` → `args.threshold ?? 0.1` (line 143) — the 0.6 default filtered out ALL results because all-MiniLM-L6-v2 similarities for this corpus are ~0.01–0.41; `??` also allows an explicit `threshold: 0`. Verified end-to-end via MCP handshake — `tools/call knowledgebase_search` with no threshold now returns results (top sim 0.396). **2026-08-02 (registerProject fix + tests)**: `knowledgebase_index` now calls `registerProject(projectId, projectId)` before `upsertChunks()` (FK-23503 fix). Handler extracted + exported as `handleToolCall` and stdio bootstrap guarded to direct-run (`isDirectRun`) for testability. New test file `scripts/mcp-knowledgebase-server.test.js` — 16 tests covering registration order, empty-chunks guard, default-file reads, ENOENT, counts, projectId validation, search/stats formatting, graceful degradation, empty-kb branch, list formatting, unknown-tool error, index error path, and import integrity. Regression guard verified non-vacuous (mutation test). Full suite: **176/176 across 10 files**. **2026-08-02 (post-review nits + TEST-12 live-spawn)**: nits applied (search schema default 0.1, redacted error messages via local `redactConnectionString`, whitespace-projectId validation + trim flow) → 18 tests, full suite **178/178 across 10 files**. **TEST-12 live-spawn smoke test PASSED** — spawned real server over stdio, MCP `initialize` handshake OK, `tools/call knowledgebase_index` with fresh `smoke-test-<timestamp>` projectId returned **"Indexed 1 chunks, updated 0, skipped 0"** (NOT "skipped 1") proving `registerProject()` ran; test rows cleaned up (0 residual smoke-test rows verified). Mutation test re-run after nits: removing the registerProject call FAILS 3 tests (TEST-01, TEST-16, TEST-06c) — guard still non-vacuous. **2026-08-02 (redaction hardening)**: `redactConnectionString` rewritten to fail CLOSED — single global regex `/(postgres(?:ql)?:\/\/)([^/\s]+)@/gi` → `'$1***@'` replaces URL-parse-with-catch (which leaked `user:secret` for unparseable libpq unix-socket authorities `postgres://user:secret@/var/run/postgresql` / `postgresql://user:secret@/tmp?host=/tmp`); no parsing to fail, so all tokens redact (incl. `@`-in-password via `[^/\s]+`), host/path preserved verbatim (no stray port colon), non-URL messages readable. Tests 18 → **21** (TEST-17/18/19 through the real outer-catch path; helper not exported). Full suite: **181/181 across 10 files, 0 failures**. **2026-08-02 (final minor hygiene)**: `knowledgebase_search` `projectId` now trimmed/validated (`args.projectId?.trim() || undefined` — whitespace-only silently dropped to match-all, graceful degradation; trimmed value passed to engine), `limit: args.limit || 5` → `args.limit ?? 5` (explicit `limit: 0` honored), and `redactConnectionString` regex extended to redact query strings/fragments (`?***`/`#***`; `postgres://user:secret@host:5432/kb?password=hunter2` → `postgres://***@host:5432/kb?***`). Tests 21 → **25** (TEST-20/20b/21/22; TEST-18 expectation updated to `?***`). Full suite: **185/185 across 10 files, 0 failures**.
 - Knowledgebase foundation files (all companion files + T7 CLI + T8 MCP server): `knowledgebase-init.sql`, `.husky/post-commit`, `knowledgebase.instructions.md`, `.env.example` updated, `constants.js` updated
 
 - Playwright E2E testing (2 spec files in `tests/`)
@@ -51,6 +81,10 @@ category: "progress"
 - Unit test framework (Vitest + coverage) — functional but minimal test coverage
 
 ## What's Left
+
+- **Vocab-Sync Feature — `plan/feature-vocab-sync-1.md` — STATUS: COMPLETED 2026-08-03 (all 10 tasks across 2 batches done)** — **Reviewer fixes (Step 2b) ALSO DONE 2026-08-03** — M1 validator normalization parity, M2 JSON-comment instruction reword, minor 1 buildKnownTags array guard, minor 3 sync.test.js fixture — all applied; full suite **259/259** ✅; coverage >90% on both changed files ✅. — 10 tasks across 2 parallel batches (A: 7 tasks, B: 3 tasks). Auto-update `memory-bank/.vocabulary.json` from staged frontmatter tags (new `scripts/vocab-sync.js`), fix validator `entity_patterns` awareness, add agent instructions, wire into pre-commit hook + consumer distribution. Batch A (T1, T3–T6, T8–T9): create vocab-sync.js, fix validator, update constants template, update .husky/pre-commit, add to sync.js scriptsToSync, update memory-schema instructions, update reviewer agent. **Batch A progress: T1 ✅ DONE 2026-08-03 (Coder)** — created `scripts/vocab-sync.js`: scans STAGED memory-bank files (`git diff --cached --name-only --diff-filter=ACM`, `memory-bank/*.md`, excludes `/.index/`), parses frontmatter tags (self-contained `parseFrontmatter` copy per CON-01), known = `tags.*` values + `entity_patterns` keys, normalizes candidates (lowercase kebab-case, drop empty/whitespace-only, dedupe), appends genuinely-new tags to `topic` group (sorted, idempotent), writes 2-space indent + trailing newline, `git add` in try/catch (never blocks), warns only (exit 0 unless unhandled → exit 1); exports 8 fns + `isDirectRun` guard for T2 (DEP-05). Verified: `node --check` ✅; temp-git e2e (append/sort/dedupe, entity_patterns skip `npm`, whitespace drop, staging, idempotent 2nd run, silent no-staged-files, missing/malformed vocab → exit 0) ✅. **T3 ✅ DONE 2026-08-03 (Coder)** — validator `entity_patterns` awareness fixed in `scripts/validate-memory-schema.js`: known-tags set is now `tags.*` group values PLUS `entity_patterns` keys (all 11 keys: `npm`, `vitest`, `playwright`, etc.), eliminating false-positive unknown-tag warnings; warn-don't-block + graceful `|| {}` guard preserved; verified via `node --check`, temp-git fixture (`npm`/`vitest` no warn, `some-random-tag` warns, exit 0), and full suite 185/185. **T5 ✅ DONE 2026-08-03 (Coder)** — `.husky/pre-commit` updated: `node scripts/vocab-sync.js` added between `bump-version.js` and `validate-memory-schema.js` (executable bit preserved, mode `100755`, "Managed by" comment intact). **T6 ✅ DONE 2026-08-03 (Coder)** — `scripts/sync.js` `scriptsToSync` array now includes `'vocab-sync.js'` (line 183) immediately after `'validate-memory-schema.js'` — consumer distribution of the new script via `npm install` / `npm run sync` (verified: `node --check` SYNTAX_OK; node -e introspection confirms array entry + adjacency). **T8 ✅ DONE 2026-08-03 (Coder)** — `## Maintaining the Vocabulary` section added to `.agents/instructions/memory-schema.instructions.md` (lines 67–87, between "Auto-Suggest on Normalization" and "Pre-Commit Validation" — after the schema/field rules, before the pre-commit validation section): instructs agents to check `tags.*` groups AND `entity_patterns` keys before adding a tag; add tools/frameworks/components to `entity_patterns` (new key with ≥1 regex pattern); add concepts/topics to the appropriate `tags.*` group (default `topic`); follow tag format rules (lowercase, kebab-case, max 5 per file, no empty/whitespace tags); add a one-line rationale; and notes `scripts/vocab-sync.js` (pre-commit) auto-appends genuinely new tags to `topic` as a safety net, with manual categorization preferred (plan T8 text verbatim). Verified: `git diff` → 22 insertions in the single target file; markdownlint → only pre-existing MD013/MD032, no new structural errors. **T9 ✅ DONE 2026-08-03 (Coder)** — "Memory-bank hygiene" checklist bullet added to `.opencode/agents/reviewer.agent.md` (Guidelines section, line 41): instructs the reviewer (has `edit: allow`) to verify frontmatter tags in any diff touching `memory-bank/**/*.md` are known to `memory-bank/.vocabulary.json` (check BOTH `tags.*` groups and `entity_patterns` keys), update the vocabulary file if unknown tags exist (add to appropriate `tags.*` group, default `topic`, with one-line rationale, or add to `entity_patterns` for tool/component names), flag the change in the review report, and report unaddressed unknown tags as 🔵 minor findings. Verified: markdownlint → no new structural errors (only pre-existing MD013 line-length). **T7 ✅ DONE 2026-08-03 (Coder, verify-only)** — `scripts/setup/hooks.test.js` (and full `scripts/setup/` suite) verified green after T4's template change: `npx vitest run scripts/setup/` → **104/104 passed across 6 files** (hooks.test.js 16/16). Confirmed NO test edits needed — `expectedContent()` (hooks.test.js:77-79) auto-derives from `TEMPLATE_HOOKS[hookName].content`; grep found zero hardcoded hook-content string literals in any `scripts/setup/*.test.js`. Installed-hook idempotency (marker matching in `discover.js:111-112`, first-line-only vs `HOOK_MARKER`) unaffected — new template content still starts with the marker (verified via node introspection). **Batch B progress: T7 ✅ DONE 2026-08-03 (Coder, verify-only); T10 ✅ DONE 2026-08-03 (Coder)** — created `scripts/validate-memory-schema.test.js` (15 tests: entity_patterns-key no-warn, tags.*-group no-warn, genuinely-unknown warns, mixed warns-only-unknown, no-`entity_patterns`/empty-vocab graceful, main() exit-code contract 0/0/1, `validateFile` error branches) and added the testability seam to `scripts/validate-memory-schema.js` (`export { validateFile, main }` + `isDirectRun` guard replacing unconditional `main()`; `node:url` `fileURLToPath` import). Full suite now **200/200 across 11 files, 0 failures**; direct CLI exit 0; temp-git e2e warns only for genuinely unknown tags, exit 0. **Batch B now: T2 ✅ DONE 2026-08-03 (Coder)** — created `scripts/vocab-sync.test.js` (54 tests, all passing): real temp-dir + `git init` fixtures (chdir + `vi.resetModules` + dynamic import so cwd-derived `VOCAB_PATH` resolves to the fixture; `spawnSync` for real exit codes; `process.argv[1]` for the `isDirectRun` guard in-process). All 14 plan scenarios (TEST-01..14) covered via `main()` end-to-end, plus pure-function tests, loadVocabulary missing/malformed, getStagedMemoryFiles filter + `/.index/` exclusion + non-git, collectNewTags multi-file normalize/dedupe/sort + no-frontmatter + non-array tags, syncVocabulary write/stage/dedupe/no-op/git-add-failure/missing-groups, direct-run success + error→exit(1), spawned CLI exit codes (0 add, 0 missing vocab, 0 malformed vocab, 1 write failure via chmod 444 → EACCES). **Coverage (`scripts/vocab-sync.js`): 98.88% stmts / 92.15% branches / 100% funcs / 100% lines — above the 90% gate (CON-03).** **Verification:** `npx vitest run scripts/vocab-sync.test.js` → 54/54 ✅; full suite `npx vitest run` → **254/254 across 12 files, 0 failures** ✅ (TEST-04 full suite effectively green). `scripts/vocab-sync.js` NOT modified. Plan T2 row + plan status → Completed. Remaining plan-level post-B: TEST-05 manual pre-commit smoke, TEST-06 consumer smoke, TEST-07 coverage check (orchestrator/tracker).
+
+- **Knowledgebase registerProject Bug Fix** — Plan at `plan/fix-kb-registerproject-1.md`. 5 tasks across 3 batches (A, B, C). Fix: add `registerProject()` call in MCP server's `knowledgebase_index` handler before `upsertChunks()`. **ALL 3 BATCHES COMPLETE 2026-08-02** — **Batch A (T1, T2, T5): ✅ COMPLETE** — T1 (import `registerProject`) ✅, T2 (add `await registerProject(projectId, projectId)` call before `upsertChunks()`, after the empty-chunks guard) ✅, T5 (memory-bank updates) ✅. **Batch B (T3): ✅ COMPLETE** — created `scripts/mcp-knowledgebase-server.test.js` (16 tests, all passing); added a testability seam to `scripts/mcp-knowledgebase-server.js` (exported `handleToolCall` + direct-run guard via `isDirectRun`). **Batch C (T4): ✅ COMPLETE 2026-08-02 (Unit Tester)** — `npx vitest run` → **176/176 across 10 files, 0 failures**; `mcp-knowledgebase-server.js` coverage **79.66% stmts / 81.03% lines** (overall 40.93% — pre-existing below 90% gate, flagged); regression guard proven non-vacuous via mutation test; +5 coverage tests added (empty-kb search, stats no-pool, list formatting, unknown tool, index error path). **Post-review nits: ✅ ALL RESOLVED 2026-08-02 (Coder)** — (1) search schema `default: 0.6` → `0.1` matches handler `?? 0.1`; (2) error responses redact connection-string credentials (local `redactConnectionString` helper — engine helper is not exported and `knowledgebase-index.js` is off-limits per constraints; non-URL messages unchanged so generic errors stay readable); (3) whitespace-only `projectId` rejected via `!projectId?.trim()` and trimmed `pid` used consistently downstream; (4) TEST-05 redundant `toContain` removed; +2 tests added (whitespace-only rejection, trim-downstream). Full suite now **178/178 across 10 files, 0 failures**. **TEST-12 live-spawn smoke test: ✅ PASSED 2026-08-02 (Unit Tester)** — spawned real server over stdio, MCP `initialize` handshake OK, `knowledgebase_index` with fresh projectId returned **"Indexed 1 chunks, updated 0, skipped 0"** (proves registerProject ran, no FK 23503 / silent skip); test rows cleaned up (verified 0 residual smoke-test rows). Mutation test re-run after nits: removing the registerProject call FAILS **3 tests** (TEST-01, TEST-16, TEST-06c) — guard non-vacuous, NOT weakened by the whitespace validation. Plan status: **Completed**. All follow-ups closed. **Final minor-hygiene fixes: ✅ DONE 2026-08-02 (Coder)** — search `projectId` trim/validate (`?.trim() || undefined`, whitespace-only → match-all), `limit: args.limit ?? 5` (explicit 0 honored), `redactConnectionString` query-string redaction (`?***`/`#***`); tests 21 → **25**, full suite **185/185 across 10 files, 0 failures**.
 
 - ~~**MCP Config File Changes** — Plan at `plan/config-opencode-mcp-rename-v1.md`. Changes applied: `opencode.mcp.json` deleted (untracked/gitignored), `.gitignore` updated (removed `opencode.mcp.json`, added `opencode.mcp`), `scripts/sync.js` updated (rootFiles, auto-copy target), `README.md` and `docs/playwright-mcp-configuration.md` renamed `opencode.mcp.json` → `opencode.mcp` for consumers. `opencode.mcp.example.json` kept as-is. memory-bank current-state references updated. ✅ Complete~~
 - **Setup Env Loading Fix** — Plan at `plan/fix-setup-env-loading-v1.md`. 12 tasks across 3 parallel batches (A–C). Fixes: consumer `.env` not loaded before `DATABASE_URL` check, misleading warning message (unscoped name + bogus `setup` positional), missing `--knowledgebase` flag, incomplete `--help` text, version bump 1.39.0 → 1.39.1. **Batch A: ✅ ALL 5 TASKS COMPLETE 2026-08-01** — T1 (dotenv → dependencies), T2 (`import 'dotenv/config'` in `bin/setup.js`), T3 (warning message fixed), T4 (`--knowledgebase` flag), T5 (version 1.39.1). **Batch B: ✅ ALL 5 TASKS COMPLETE 2026-08-01** — T6 (flag handling in `index.js`: `--knowledgebase` sets `skipHooks`/`skipPrepare`/`skipSync` → runs only discovery + knowledgebase), T7 (`--skip-knowledgebase` help description), T8 (`--knowledgebase` help description), T9 (bogus `setup` positional removed from usage/examples + `--knowledgebase` example), T10 (test assertion updated). **Batch C: ✅ ALL 2 TASKS COMPLETE 2026-08-01** — **T11** (`npx vitest run` → 160/160 pass across 9 files, 0 failures; added 2 `--knowledgebase` tests to `index.test.js` restoring `index.js` coverage to 90.75% stmts / 90.9% lines — above plan's 90% requirement; global coverage 38.47% remains below 90% but is pre-existing and out of plan scope), **T12** (consumer smoke test: temp consumer dir with `.env` containing `DATABASE_URL` → no "DATABASE_URL not configured" warning; `--knowledgebase --dry-run` runs only discover + knowledgebase). Plan status: **Completed**. Known limitation deferred for v1 (plan RISK-03): running setup from a subdirectory (cwd ≠ consumer root) still misses the root `.env` because `dotenv` resolves from `process.cwd()` — an `INIT_CWD`-based path fallback is a candidate follow-up.
@@ -164,6 +198,423 @@ Fixed 3 gaps that prevented consumer projects from getting a `learned-knowledge.
 **Verification**: `npx vitest run scripts/setup/hooks.test.js` — 16 passed, 0 failed, 107ms.
 
 ## Recently Completed
+
+### 2026-08-03: Tracker — Pipeline 5 (vocab-sync + agent instructions) fully documented
+
+Recorded the complete Pipeline 5 record — the pre-commit vocabulary auto-sync feature (`scripts/vocab-sync.js` + validator `entity_patterns` fix + instruction/agent updates + consumer distribution):
+
+- **Feature outcome:** the pre-commit hook now auto-appends unknown memory-bank frontmatter tags to `memory-bank/.vocabulary.json` (topic group) via `scripts/vocab-sync.js` (runs BEFORE the validator, warn-not-block, idempotent, entity_patterns-aware, stages the vocab); the validator counts `entity_patterns` keys as known tags and normalizes both sides for parity; `memory-schema.instructions.md` + `reviewer.agent.md` updated; consumer distribution via setup `TEMPLATE_HOOKS` + `sync.js` `scriptsToSync`. Final suite: **259/259 + setup 104/104**, coverage ≥ 90% on both changed scripts, reviewer APPROVED (after one ⚠️ CHANGES REQUESTED cycle: M1 normalization parity, M2 strict-JSON doc fix, minors 1/3).
+- **`docs/tracker-log.md`** — appended full Pipeline 5 entry: execution steps table (bootstrap → plan → coder Batch A 7 parallel → coder Batch B 3 parallel → unit-tester → reviewer ⚠️ → coder fixes → reviewer ✅ → tracker), files produced/modified, key decisions, verification results (259/259; 104/104; mutation non-vacuity; chicken-and-egg smoke tests), and follow-up notes.
+- **`.agents/instructions/learned-knowledge.instructions.md`** — appended Session 2026-08-03 with reusable knowledge + agent tuning notes (pre-commit auto-sync pattern, sync-before-validate ordering, normalization-parity requirement, strict-JSON doc rule, distribution wiring) and re-indexed into the PG knowledgebase.
+- **`docs/TRACKER-INDEX.md`** — added Pipeline 5 row + learned-knowledge session row; entry location added; index frontmatter updated.
+- **`memory-bank`** — memory vector index re-synced via `memory_update`.
+
+**Outcome:** first-time tags no longer warn (chicken-and-egg eliminated), unknown tags self-heal into the vocabulary at commit time, and consumers receive the feature through the existing setup/sync distribution channels.
+
+### 2026-08-03: Reviewer — Vocab-Sync REVIEWER-FIXES RE-REVIEW (Pipeline 5, Step 3b) — ✅ APPROVED
+
+Re-reviewed the Step 2b coder fixes for the 4 prior findings (2 🟡 majors + 2 🔵 minors). Independently re-ran **`npx vitest run` → 259/259 across 12 files, 0 failures** ✅ and **`npx vitest run scripts/setup/` → 104/104** ✅. Targeted coverage: `validate-memory-schema.js` **92.7% stmts / 93.1% branch / 100% funcs / 92.47% lines**; `vocab-sync.js` **98.91% stmts / 92.15% branch / 100% funcs / 100% lines** — both above the CON-03 90% gate ✅.
+
+**Fix verification — each finding precisely confirmed:**
+- **🟡 M1 ✅ VERIFIED** — `validateFile()` (validate-memory-schema.js:131-146) normalizes BOTH `fm.tags` and vocab `allTags` with an identical `normalizeTag` (lowercase → trim → `[\s_]+`→`-` → drop-empty) before the unknown-tag filter. +3 tests present (M1-a `My Tag` not flagged when `my-tag` in vocab; M1-b `some-random-tag` still warns; M1-c mixed-case `Random Tag` still warns). **Chicken-and-egg empirically re-verified** in a scratch temp git repo: staged `tags: [My Tag]` → `vocab-sync.js` appended `my-tag` → validator ran with **NO unknown-tag warning, exit 0**; 2nd vocab-sync run silent no-op (idempotent); controls still warn for `some-random-tag`/`Random Tag`, no warn for `npm` (entity_patterns key) and `my-tag`.
+- **🟡 M2 ✅ VERIFIED** — `.agents/instructions/memory-schema.instructions.md` step 5 (line 85) and `.opencode/agents/reviewer.agent.md` hygiene bullet (line 41) both reworded: rationale goes in the commit message/PR/review report or existing `categories` description strings, with explicit strict-JSON no-comment warning. Grep confirms "one-line comment in the JSON" instruction is GONE from both target files (only the historical plan doc at `plan/feature-vocab-sync-1.md:221` retains the superseded wording — informational).
+- **🔵 Minor 1 ✅ VERIFIED** — `buildKnownTags` guard `if (!Array.isArray(group)) continue;` (vocab-sync.js:104) is BEFORE the `for (const tag of group)` iteration (line 105); +2 malformed-shape tests (tags-as-array → empty known set; string group skipped while valid array group collected).
+- **🔵 Minor 3 ✅ VERIFIED** — `scripts/sync.test.js` fixture (line 56) includes `'vocab-sync.js'` adjacent to `'validate-memory-schema.js'`, byte-matching the real `scriptsToSync` array in `scripts/sync.js` (7 core entries, vocab-sync index 4 = adjacent to validator index 3); "6"→"7" comments updated.
+
+**Regression re-checks — all previously-approved aspects intact:** pre-commit ordering (vocab-sync BEFORE validator in both `.husky/pre-commit` and the `constants.js` setup template; verified by node introspection: indices 4<5); marker-first idempotency (discover.js:110-112 first-line check; both hook files start with `# Managed by @abarcenas/ai-workflow-template setup`); warn-not-block (validator exits 0 on warnings — empirically confirmed); entity_patterns awareness (`npm`/`vitest` no false-positive warnings); vocab-sync idempotency (2nd run silent no-op). Scope discipline ✅ — `git diff` shows only the intended feature files (scripts, tests, hook, setup template, instructions, reviewer agent, plan, memory-bank docs). `node --check` clean on all 7 JS files.
+
+**🔵 Minors (informational, non-blocking):** (1) `plan/feature-vocab-sync-1.md:221` T8 spec text still says "Add a one-line comment in the JSON" — superseded by the shipped instruction wording; plan is a historical/completed planning artifact so this is cosmetic, but updating it would prevent future misreading; (2) `normalizeTag` is duplicated in `validate-memory-schema.js` and `vocab-sync.js` (identical today) — inherent to CON-01 self-containment; a future edit to one could silently re-introduce the M1 parity gap. No 🔴 critical, no 🟡 major. **Recommendation: ✅ APPROVE.**
+
+### 2026-08-03: Reviewer — Vocab-Sync Feature Review (Pipeline 5, Step 5) — ⚠️ CHANGES REQUESTED (2 🟡 majors, non-blocking)
+
+Reviewed all 10 files changed/created by `plan/feature-vocab-sync-1.md`. Independently re-ran **`npx vitest run` → 254/254** and **`npx vitest run scripts/setup/` → 104/104** ✅. Coverage: vocab-sync.js 98.88% stmts, validate-memory-schema.js 92.39% stmts (both above CON-03 90% gate) ✅. Distribution verified: pre-commit ordering (vocab-sync BEFORE validator) in both `.husky/pre-commit` and the setup template; marker-first idempotency intact (discover.js first-line check); `scriptsToSync` is the real mechanism and includes the script; npm `files` covers `scripts/` + vocab ✅. Write format 2-space + trailing newline ✅. Findings: **🟡 M1 — validator normalization mismatch**: vocab-sync normalizes (kebab/lowercase) but the validator compares raw frontmatter tags exactly, so mixed-case tags still warn after sync (chicken-and-egg fix incomplete for non-normalized tags); **🟡 M2 — doc inaccuracy**: "Add a one-line comment in the JSON" is impossible in strict JSON (both T8 and T9 wording; following it literally would corrupt the vocab). 🔵 minors: char-iteration in `buildKnownTags` for malformed tags-as-array; first-write reformatting removes blank separator lines (not byte-for-byte); `sync.test.js` fixture omits `vocab-sync.js` (regression not caught); memory-bank files introduce tags (`feature-vocab-sync`, `pre-commit`, `vocabulary`) not yet in vocabulary (self-healing via hook at next commit). No 🔴 critical. Recommendation: approve after landing the 2 cheap majors.
+
+### 2026-08-03: Unit Tester — INDEPENDENT VALIDATION of the vocab-sync feature (Pipeline 5, Step 3)
+
+Independently validated `plan/feature-vocab-sync-1.md` TEST-01..07 (all 10 tasks marked Completed) by running the suite and exercising the real scripts — no coder claims taken on faith.
+
+- **Full suite:** `npx vitest run` → **254/254 across 12 files, 0 failures** ✅ (matches coder's 254).
+- **Coverage gate (CON-03 ≥ 90%):** targeted coverage on the two changed files: `scripts/vocab-sync.js` → **98.88% stmts / 92.15% branch / 100% funcs / 100% lines**; `scripts/validate-memory-schema.js` → **92.39% stmts / 92.85% branch / 100% funcs / 92.13% lines** — both comfortably above the 90% threshold.
+- **Non-vacuity (real temp mutations, restored byte-exact from `/var/folders/.../opencode/vocab-sync-mutation/` backups):** (a) removing the `entity_patterns` merge in `validate-memory-schema.js` fails validator TEST-01 (npm known → no warn) + TEST-04 (mixed); (b) disabling the `...newTags` append in `syncVocabulary()` fails 14 vocab-sync tests including the plan's new-tag-append TEST-01. The regression guards are genuine.
+- **TEST-05 pre-commit smoke (scratch temp git repo at `/var/folders/.../opencode/vocab-sync-smoke/`):** staged `memory-bank/activeContext.md` with `tags: [existing-tag, brand-new-tag, npm]` + a minimal `.vocabulary.json`. `node scripts/vocab-sync.js` → `[vocab-sync] Added 1 tag(s) ... [brand-new-tag]`, `topic` sorted `['brand-new-tag','existing-tag']`, vocab re-staged. `node scripts/validate-memory-schema.js` → `✓ 1 memory file(s) validated` exit 0, **no unknown-tag warning** (`npm` correctly recognized as entity_patterns key → chicken-and-egg eliminated). Second vocab-sync run → silent, vocab md5 + staged set unchanged → **idempotent**.
+- **TEST-06 consumer setup:** `npx vitest run scripts/setup/` → **104/104 across 6 files**; introspection of `TEMPLATE_HOOKS['pre-commit'].content` → first line === `HOOK_MARKER`, contains `node scripts/vocab-sync.js`, ordered before `validate-memory-schema.js` (T4 ordering rationale holds).
+- **TEST-07 consumer distribution:** `scriptsToSync` includes `'vocab-sync.js'` adjacent to `'validate-memory-schema.js'` (11 entries); package.json `files` includes `scripts/` and `memory-bank/.vocabulary.json` — consumer copy + npm tarball both covered.
+- **Wiring/docs:** `.husky/pre-commit` contains the vocab-sync line with executable bit `100755` intact; T8 "Maintaining the Vocabulary" section (line 67) and T9 reviewer hygiene bullet (line 41) present; `node --check` clean on both scripts and both test files.
+- **Outcome:** NO production bugs found. No test files created/modified (this was verify-only validation). Memory-bank files updated to record the independent validation; workspace confirmed intact after mutation cleanup (`git status` shows only the expected coder changes).
+
+### 2026-08-03: Coder — Vocab-Sync T10: `scripts/validate-memory-schema.test.js` + validator export seam (Pipeline 5, Batch B)
+
+Implemented task T10 of `plan/feature-vocab-sync-1.md` — created `scripts/validate-memory-schema.test.js` (15 tests) and added the T10 testability seam to `scripts/validate-memory-schema.js`.
+
+- **Testability seam (Option A):** converted the unconditional `main()` call to the project's `isDirectRun` guard (`process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)`; added the `node:url` `fileURLToPath` import) and added `export { validateFile, main }` at the bottom — matching `scripts/vocab-sync.js` / `scripts/mcp-knowledgebase-server.js` convention. Importing the module triggers no side effects (verified via `node -e` import smoke test — exports `main`, `validateFile`, main NOT auto-run).
+- **Plan T10 scenarios (TEST-01..05) — all covered:** entity_patterns key (`npm`) → no "Unknown tags" warning; `tags.topic` member (`mcp`) → no warning; genuinely unknown tag (`some-random-tag`) → warns; mixed (`npm`, `vitest`, `some-random-tag`) → warns ONLY for the unknown tags; vocab with no `entity_patterns` key AND completely empty `{}` → graceful, no crash.
+- **Exit-code contract (REQ-05 / CON-02):** `main()` with unknown-tag warnings → `process.exit(0)` (warn-don't-block); no staged memory-bank files → `process.exit(0)`; validation errors (id/filename mismatch) → `process.exit(1)`.
+- **Error branches:** unreadable file → "Cannot read file" error; missing frontmatter; missing required fields; id mismatch; invalid updated date; invalid category.
+- **Approach:** hermetic module-level `vi.mock` of `node:fs` (`readFileSync`/`existsSync`) + `node:child_process` (`execSync`) — same pattern as `mcp-knowledgebase-server.test.js`; `validateFile` invoked directly with parsed vocab fixtures; `process.exit` spied + silenced for `main()` tests.
+- **Verification:** `node --check` ✅; `npx vitest run scripts/validate-memory-schema.test.js` → **15/15** ✅; full suite `npx vitest run` → **200/200 across 11 files, 0 failures** ✅; direct CLI `node scripts/validate-memory-schema.js` (no staged memory files) → exit 0 ✅; temp-git-repo e2e — staged file with `tags: [npm, mcp, some-random-tag]` → warns ONLY `some-random-tag`, exit 0 ✅; import smoke test (no auto-run) ✅.
+- **Files modified:** `scripts/validate-memory-schema.js` (import + guard + exports), `scripts/validate-memory-schema.test.js` (new), `plan/feature-vocab-sync-1.md` (T10 Completed → 2026-08-03 + verification note in T10 section), `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
+
+### 2026-08-03: Coder — Vocab-Sync T7: `scripts/setup/hooks.test.js` verification (Pipeline 5, Batch B)
+
+Completed task T7 of `plan/feature-vocab-sync-1.md` — **verify-only, no production/test code modified**.
+
+- **Suite green after T4:** `npx vitest run scripts/setup/` → **104/104 passed across 6 files** (hooks.test.js 16/16, discover 21, prepare 27, index 27, sync-phase, knowledgebase, utils as applicable).
+- **No test edits needed — CONFIRMED (plan impact analysis correct):** `hooks.test.js` `expectedContent()` helper (lines 77-79) returns `TEMPLATE_HOOKS[hookName].content` directly, so every content-comparison assertion (Cases A/B/C/D/E, flags.force, partial existingHooks, empty-dir, dry-run) auto-derives from the updated template. Grep across `scripts/**/*.test.js` found zero hardcoded `bump-version`/`validate-memory-schema`/`vocab-sync` string literals (only `sync.test.js` references the array, which is T6 scope).
+- **Installed-hook idempotency verified:** `discover.js` (lines 111-112) computes `isManaged` by comparing ONLY the first line of an existing hook against `HOOK_MARKER`. Node introspection confirmed the new pre-commit template content still starts with `# Managed by @abarcenas/ai-workflow-template setup` (the added `vocab-sync.js` line is mid-content), so Case C idempotent overwrite detection still works. This repo's `.husky/pre-commit` (T5 output) also matches the marker-first invariant.
+- **Only files modified:** `plan/feature-vocab-sync-1.md` (T7 row Completed → 2026-08-03 + verification note in the T7 section), `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
+
+### 2026-08-03: Coder — Vocab-Sync T1: `scripts/vocab-sync.js` creation (Pipeline 5, Batch A)
+
+Implemented task T1 of `plan/feature-vocab-sync-1.md`: created `scripts/vocab-sync.js` — the pre-commit hook script that auto-syncs `memory-bank/.vocabulary.json` with frontmatter tags from staged memory-bank files.
+
+- **Staged scan:** `git diff --cached --name-only --diff-filter=ACM`, filtered to `memory-bank/*.md` excluding `/.index/` (reuses the validator's exact detection logic).
+- **Frontmatter parsing:** self-contained copy of `validate-memory-schema.js`'s `parseFrontmatter()` (per CON-01 — no shared module extraction).
+- **Known-tag set:** BOTH `tags.*` group values AND `entity_patterns` keys (normalized for case/underscore/space robustness) — so `npm`, `vitest`, etc. are never re-added.
+- **Normalization:** lowercase → kebab-case (spaces/underscores → hyphens), trims, drops empty/whitespace-only candidates, dedupes.
+- **Write:** appends genuinely-new tags to `vocab.tags.topic` (default catch-all group per ALT-03), re-normalizes existing topic entries, sorts alphabetically, writes back with 2-space indent + trailing newline (matches existing format byte-for-byte).
+- **Staging:** `git add memory-bank/.vocabulary.json` wrapped in try/catch — failure warns and never blocks the commit (RISK-01 mitigation).
+- **Exit contract (CON-02):** warn-only — prints `[vocab-sync] Added X tag(s) to memory-bank/.vocabulary.json: [...]` via `console.warn`, exits 0 in every graceful path (no staged files → silent; missing/malformed vocab → warn + skip); unhandled errors caught in the direct-run wrapper → stderr + exit 1.
+- **Testability (DEP-05):** exports `loadVocabulary`, `getStagedMemoryFiles`, `parseFrontmatter`, `normalizeTag`, `buildKnownTags`, `collectNewTags`, `syncVocabulary`, `main` behind an `isDirectRun` guard (project convention — importing triggers no side effects). Stable API for T2's unit tests.
+
+**Verification:**
+- `node --check scripts/vocab-sync.js` → SYNTAX_OK.
+- Dry-run (no staged memory files): silent, exit 0.
+- Temp-git-repo e2e: RUN 1 added `graphify`, `my-new-tag` (from `"My New Tag"`), `my-other-tag` (from `my_other_tag`) to `topic` sorted alphabetically; deduped existing `mcp`; skipped `npm` (entity_patterns key); dropped `"   "` whitespace-only; staged the vocab alongside the source file. RUN 2 → idempotent silent no-op. RUN 3 (no staged memory files) → silent. Missing vocab → warn + exit 0. Malformed vocab → warn + exit 0. Written format verified (2-space indent, `}\n` trailing newline).
+- Module import smoke test: 8 exports present, no auto-run on import.
+
+Only file created: `scripts/vocab-sync.js`. No other files touched (T3–T6, T8, T9 handled by parallel agents; Batch B T2/T7/T10 depends on Batch A). Plan `feature-vocab-sync-1.md` T1 row marked Completed `2026-08-03`.
+
+### 2026-08-03: Coder — Vocab-Sync T9: reviewer memory-bank hygiene checklist (Pipeline 5, Batch A)
+
+Implemented task T9 of `plan/feature-vocab-sync-1.md`: added a "Memory-bank hygiene" checklist bullet to `.opencode/agents/reviewer.agent.md` (Guidelines section, line 41 — the final bullet in the list).
+
+- The bullet instructs the reviewer (which has `edit: allow`) to verify frontmatter tags in any diff touching `memory-bank/**/*.md` are known to `memory-bank/.vocabulary.json` (checking BOTH `tags.*` groups and `entity_patterns` keys).
+- If unknown tags exist, the reviewer must update the vocabulary file — add to the appropriate `tags.*` group (default: `topic`) with a one-line rationale, or add to `entity_patterns` if the tag is a tool/component name — and flag the change in the review report.
+- Unaddressed unknown tags are reported as 🔵 minor findings.
+- Placed at the end of the existing Guidelines bullet list, matching the file's structure. No other section changed (Core Responsibilities / Approach / Output Expectations untouched).
+
+**Verification:**
+- `npx markdownlint-cli2 .opencode/agents/reviewer.agent.md` → no new structural errors; only pre-existing MD013 line-length (the bullet is one long line, matching the file-wide stylistic default) plus pre-existing MD032/MD029 at untouched lines.
+- `.opencode/agents/reviewer.agent.md` NOT touched by any other task (T1/T3/T4/T5/T6/T8 handled by parallel agents).
+- Plan file: T9 row Completed → 2026-08-03.
+
+### 2026-08-03: Coder — Vocab-Sync T4: `scripts/setup/constants.js` pre-commit template (Pipeline 5, Batch A)
+
+Implemented task T4 of `plan/feature-vocab-sync-1.md`: added the `node scripts/vocab-sync.js` line to the pre-commit hook template that the setup tool writes for consumer projects (`TEMPLATE_HOOKS['pre-commit'].content` in `scripts/setup/constants.js`).
+
+- The `content` array now reads: `bump-version.js` → `vocab-sync.js` → `validate-memory-schema.js`. Per the plan's authoritative "resulting content" block and ordering rationale, `vocab-sync.js` runs BEFORE the validator so first-time tags are appended to `memory-bank/.vocabulary.json` before the unknown-tag check (eliminates the chicken-and-egg false positive for consumers).
+- Also updated the pre-commit hook `description` to `'Auto-bump version + sync vocabulary + validate memory-bank schema before commits'` so setup output stays accurate.
+- Consumers who run `npx ai-workflow-setup` will now get the vocab-sync line in their managed pre-commit hook (requires the T6 `scriptsToSync` entry so `vocab-sync.js` is actually present in the consumer's `scripts/`).
+- `.husky/pre-commit` NOT touched (T5 is handled by a parallel agent).
+
+**Verification:**
+- `node --check scripts/setup/constants.js` → SYNTAX_OK.
+- `npx vitest run scripts/setup/hooks.test.js scripts/setup/index.test.js` → **43/43** passed (hooks 16 + index 27).
+- Full setup suite `npx vitest run scripts/setup/` → **104/104** passed across 6 files.
+- `hooks.test.js` asserts via `expectedContent()` which auto-derives from `TEMPLATE_HOOKS[...].content` — no test assertion edits needed (T7 handles the verify pass).
+
+Plan `feature-vocab-sync-1.md` T4 row marked Completed `2026-08-03`. Memory bank files (`activeContext.md`, `progress.md`, `tasks/_index.md`) updated.
+
+### 2026-08-03: Coder — Vocab-Sync T5: `.husky/pre-commit` hook line (Pipeline 5, Batch A)
+
+Implemented task T5 of `plan/feature-vocab-sync-1.md`: added `node scripts/vocab-sync.js` to this repo's `.husky/pre-commit`. Per the plan's T5 spec and the approved T4 ordering rationale (vocab-sync runs BEFORE validate-memory-schema so first-time tags are appended to `memory-bank/.vocabulary.json` before the validator's unknown-tag check), the hook now reads:
+
+```
+# Managed by @abarcenas/ai-workflow-template setup
+
+node scripts/bump-version.js
+node scripts/vocab-sync.js
+node scripts/validate-memory-schema.js
+```
+
+- The `# Managed by @abarcenas/ai-workflow-template setup` marker comment and the original line ordering are preserved.
+- Executable bit verified intact after edit: `ls -l` → `-rwxr-xr-x`; git mode `100755` unchanged.
+- `git diff -- .husky/pre-commit` confirms exactly one line added (no other changes).
+- No other files modified (T1/T3/T4/T6/T8/T9 are handled by parallel agents in Batch A; T2/T7/T10 in Batch B).
+
+**Verification:** `cat .husky/pre-commit` output matches the plan's T5 expected content byte-for-byte. Plan `feature-vocab-sync-1.md` T5 row marked Completed `2026-08-03`. Memory bank files (`activeContext.md`, `progress.md`, `tasks/_index.md`) updated.
+
+### 2026-08-03: Tracker — Pipeline 4 (README trim + instructions-on-top) fully documented
+
+Recorded the complete Pipeline 4 record — the README.md rewrite (469→289 lines, −38%) with Install + Git Hook Setup moved to the very top, 4 accuracy corrections, reviewer APPROVED, and the one-line graphify nit:
+
+- **`docs/tracker-log.md`** — appended full Pipeline 4 entry: execution steps table (coder rewrite → reviewer APPROVED → coder nit → tracker), files produced/modified, key decisions, verification results (README 289 lines; skills 29; orchestrator path exists; `--knowledgebase` real; markdownlint 0 structural errors), and follow-up notes.
+- **`memory-bank/progress.md`** — this tracker summary (the coder/reviewer/1b entries for the same pipeline are directly below).
+- **`.agents/instructions/learned-knowledge.instructions.md`** — appended Session 2026-08-03 with 6 reusable knowledge items + 4 agent tuning notes (README accuracy-audit pattern, first-screen instructions, fluff-cut criterion, global-vs-package skill trap, markdownlint gate, reviewer verify-before-trust loop) and re-indexed into the PG knowledgebase.
+- **`docs/TRACKER-INDEX.md`** — added Pipeline 4 row + learned-knowledge session row; entry location added; index frontmatter updated.
+
+**Outcome:** README trimmed 469→289 lines (−38%), instructions on the first screen (Install line 5, Git Hook Setup line 13), all 4 accuracy corrections independently verified by the reviewer, markdownlint 0 structural errors (only pre-existing MD013 line-length), reviewer APPROVED. Documentation-only pipeline — no code/tests changed.
+
+### 2026-08-03: Coder — README.md graphify Featured-Skills nit fix (orchestrator follow-up, Pipeline 4)
+
+Applied the reviewer's one-line 🔵 informational nit from the README rewrite review. In `README.md`'s Featured Skills / Workflow Automation bullet (line 225), qualified the `graphify` entry as a global skill and listed the shipped sibling alongside it: `` `graphify` (global skill), `graphify-framework-aware` ``. Verified the facts first: `~/.config/opencode/skills/graphify` exists (global skill), `.agents/skills/graphify-framework-aware` exists (shipped in package), `.agents/skills/graphify` does NOT exist. This makes the Featured Skills list accurate and consistent with the Knowledge Graph section, which already treats graphify as a globally installed dependency. **Verification:** `npx markdownlint-cli2 README.md` → 39 MD013 line-length findings only (pre-existing stylistic default — the reviewer documented the same count before this change); re-check with MD013 disabled → **0 issues / 0 structural errors**. README still 289 lines. Nothing else changed.
+
+### 2026-08-03: Reviewer — README.md rewrite review (orchestrator REVIEW phase, Pipeline 4) — VERDICT: ✅ APPROVED
+
+Independently reviewed the README rewrite (469 → 289 lines). No critical, no major findings.
+
+**Scope verification:**
+1. **Instructions at top ✅** — `## Install` (line 5) + `## Git Hook Setup` (line 13) appear within the first ~30 lines, immediately after the title + one-line description — the "very top of the page" requirement is met.
+2. **Fluff cut ✅ without actionable-content loss** — diff against `HEAD` confirms every required item survives: install commands; setup options (incl. newly added `--knowledgebase`); sync commands; orchestrator usage examples; **agent table 11 rows** (all 11 file paths verified via `ls .opencode/agents/`); TDD pipeline table (6 rows); memory bank MCP tools (5 tools); file structure; versioning; publish flow + NPM_TOKEN; local dev commands (all verified against `package.json` scripts); testing table; update steps; important notes; hook merging rules; MCP tooling table. Dropped content is genuinely non-actionable (emoji decorations, salesy intro prose, verbose orchestrator step walkthrough condensed to 2 bullets, YAML example condensed to 1 sentence, stale structure-tree entries).
+3. **Coder accuracy claims — ALL 4 CONFIRMED:** (a) `ls .agents/skills/*/SKILL.md | wc -l` = **29** ✅; (b) `.opencode/agents/orchestrator/orchestrator.agent.md` exists ✅; (c) `--knowledgebase` is a real flag (`node bin/setup.js --help` → "Run ONLY the knowledgebase registration phase") ✅; (d) `.agents/compress/` and `.agents/agents/` do NOT exist ✅.
+4. **Markdown quality ✅** — heading hierarchy H1→H2→H3 with no skips; all tables use `| --- |` separators; all fenced blocks declare languages (`bash`/`text`); the only external link (GitHub) is valid; relative references verified to exist (`docs/playwright-mcp-configuration.md`, `memory-bank/.vocabulary.json`, `docs/.architecture-context.md`, `.agents/instructions/security-owasp.instructions.md`). `npx markdownlint-cli README.md` → **0 structural errors** — only MD013 line-length remains (39 in new vs 42 in old README; stylistic default, no repo config). All structural rules the old README failed (MD001/032/040/058/060/031) are now clean — the rewrite is strictly a quality improvement.
+
+**🔵 Minor (informational, non-blocking, no follow-up required):**
+1. Featured Skills lists `graphify` in "Workflow automation", but the actual `graphify` skill is NOT shipped in `.agents/skills/` — only `graphify-framework-aware` is; `graphify` lives at `~/.config/opencode/skills/` (global skill). Pre-existing wording (old README listed it too); harmless because the Knowledge Graph section already documents graphify as an installable global dependency. Optional: qualify as "graphify (global skill)".
+
+**Files reviewed:** `README.md`, `package.json` (scripts), `bin/setup.js` (`--help`), `.agents/skills/` (29 entries), `.opencode/agents/` (11 agent files), `docs/playwright-mcp-configuration.md`, `docs/.architecture-context.md`, `memory-bank/.vocabulary.json`, git diff `HEAD` for README. Files modified: `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
+
+### 2026-08-03: Coder — README.md rewritten (trim fluff, instructions to top)
+
+Rewrote `README.md` from 469 lines → 289 lines. Install + Git Hook Setup now appear immediately after the one-line title/description (first-screen usage), followed by a condensed capability list and compact reference sections. Removed emoji-prefixed decoration, salesy intro prose, the verbose orchestrator step list (condensed to 2 bullets), the YAML frontmatter example (condensed to 1 sentence), and the stale/inaccurate structure tree. **Accuracy fixes:** skills count 27+ → 29 (verified), removed non-existent `.agents/compress/` + `.agents/agents/` dirs from the tree, corrected Orchestrator path to `.opencode/agents/orchestrator/orchestrator.agent.md`, verified all `npm run *` commands against `package.json` and all setup flags against `node bin/setup.js --help`. **Verification:** `npx markdownlint-cli2 README.md` → 0 structural errors (only default MD013 line-length remains — no repo config; not a structural issue); content-preservation grep confirms all commands/tables/options survive. No other files touched.
+
+### 2026-08-02: Reviewer — Final sign-off review of the 3 minor-hygiene fixes (plan §12) — APPROVED
+
+Final focused review of the 3 🔵 minor-hygiene fixes the coder applied to `scripts/mcp-knowledgebase-server.js` (search projectId trim, `limit ?? 5`, query/fragment redaction) — **VERDICT: ✅ APPROVED** (no critical, no major findings).
+
+**Independent verification:**
+- **Full suite re-run:** `npx vitest run` → **185/185 across 10 files, 0 failures** ✅ (matches coder and unit-tester counts exactly).
+- **Search-filter design decision confirmed sound:** whitespace-only `projectId` → match-all (`undefined`), not error — consistent with the project's graceful-degradation pattern (search is a read-only optional filter; the INDEX handler hard-errors because `projectId` is a required write-target). The asymmetry is deliberate and documented in the code comment (lines 187-189), so it is not a surprising inconsistency; trimmed values flow to the engine, which only applies the filter when truthy.
+- **`args.limit ?? 5` correct:** explicit `limit: 0` honored (`LIMIT 0`), consistent with the earlier `threshold ?? 0.1` fix.
+- **Query/fragment redaction still fail-closed by construction:** pure regex `([^?#\s]*)([?#][^\s]*)?` + callback; no URL parse → nothing to fail open. Empirically probed 12 cases on the exact helper — **ALL PASS** (unix-socket, `?host=`, `?password=hunter2`, `#fragment`, multi-token, `@`-in-password, non-URL messages, socket-only/host-only, uppercase scheme). Host/path preserved; TEST-15/16 readability intact; TEST-17/19 userinfo guarantees intact.
+- **Test quality verified:** TEST-20 (whitespace-only → `project_id: undefined`), TEST-20b (trimmed → `project_id: 'test-project'`), TEST-21 (`limit: 0` → `limit: 0`), TEST-22 (`?password=hunter2` redacted, no `hunter2`/`password=`), updated TEST-18 (`postgresql://***@/tmp?***`, no `host=/tmp`) — all meaningful and non-vacuous (each fails when its corresponding fix is reverted), following repo conventions (vi.mock, real-handler error path, hermetic isolation).
+
+**🔵 Minor (informational, non-blocking, no follow-up required):**
+1. Search tool schema `limit` description still says "(1–50)" while `?? 5` now honors an explicit `0` — documentation nit.
+2. Engine `search()` does not clamp negative/float `limit` — pre-existing known issue from the original knowledgebase feature review (not introduced by these changes; PG error degrades to "No results found").
+3. Test file header comment does not enumerate TEST-20b separately (cosmetic).
+
+**Files reviewed:** `scripts/mcp-knowledgebase-server.js`, `scripts/mcp-knowledgebase-server.test.js`, `scripts/knowledgebase-index.js` (search reference), `plan/fix-kb-registerproject-1.md` §12. Files modified: `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
+
+### 2026-08-02: Unit Tester — Independent validation of the final minor-hygiene fixes (plan §12)
+
+Independently validated the 3 🔵 minor-hygiene fixes applied by the coder to `scripts/mcp-knowledgebase-server.js` (search projectId trim, `limit ?? 5`, query-string redaction):
+
+- **Counts confirmed:** `npx vitest run scripts/mcp-knowledgebase-server.test.js` → **25/25** ✅; full `npx vitest run` → **185/185 across 10 files, 0 failures** ✅ (both match coder's report exactly).
+- **Source inspection:** all 3 fixes present at the expected lines (191 `project_id: args.projectId?.trim() || undefined`, 193 `limit: args.limit ?? 5`, 163-167 query/fragment-redacting regex). `node --check` clean.
+- **Non-vacuity via actual temp mutation** (`scripts/.tmp-mutation/`, copied server + test + real `knowledgebase-index.js`, deleted after): `?? 5` → `|| 5` fails **TEST-21** (limit: 0 coerced to 5); `?.trim() || undefined` → `|| undefined` fails **TEST-20 + TEST-20b** (whitespace/untrimmed passes through); pre-fix regex (no query capture) fails **TEST-18 + TEST-22** (`?host=/tmp` / `?password=hunter2` survive → query leakage).
+- **registerProject regression guard re-confirmed non-vacuous:** removing `await registerProject(pid, pid)` fails **TEST-01 + TEST-06c + TEST-16**; TEST-01's `invocationCallOrder` order assertion (lines 181-183) is present. Earlier fail-closed guarantees hold — TEST-17/19 (userinfo redaction) pass in every mutation run.
+- **No issues found.** Workspace verified intact after mutation cleanup (`git status` shows only expected coder changes). Plan §12.6 added; memory-bank updated.
+
+### 2026-08-02: Coder — Final minor-hygiene fixes for the knowledgebase MCP server
+
+Applied the 3 🔵 minors flagged in the final sign-off review of the registerProject/redaction work, all in `scripts/mcp-knowledgebase-server.js` (plus tests):
+
+1. **`knowledgebase_search` projectId trim/validate (parity):** `project_id: args.projectId || undefined` → `project_id: args.projectId?.trim() || undefined`. Whitespace-only filters are silently dropped to match-all (`undefined`) — graceful degradation for a read-only optional filter; the INDEX handler still hard-errors because its `projectId` is a required write-target. Trimmed values flow to the engine (which only applies the filter when truthy).
+2. **`args.limit || 5` → `args.limit ?? 5`:** explicit `limit: 0` now honored (`LIMIT 0`) instead of silently becoming 5 — consistent with the earlier `threshold` `??` fix.
+3. **Query-string redaction in `redactConnectionString` (belt-and-braces):** regex extended from `/(postgres(?:ql)?:\/\/)([^/\s]+)@/gi` → `'$1***@'` to `/(postgres(?:ql)?:\/\/)([^/\s]+)@([^?#\s]*)([?#][^\s]*)?/gi` with a callback replacing query/fragment with `?***`/`#***`. `postgres://user:secret@host:5432/kb?password=hunter2` → `postgres://***@host:5432/kb?***`. Still fail-closed by construction (pure regex, no URL parse), host/path preserved, non-URL messages unchanged (TEST-15/16 intact), all tokens redacted, `@`-in-password handled. JSDoc updated.
+
+**Tests (21 → 25)** in `scripts/mcp-knowledgebase-server.test.js`: TEST-20 (whitespace-only search projectId → `project_id: undefined`), TEST-20b (trimmed search projectId → `project_id: 'test-project'`), TEST-21 (`limit: 0` → `limit: 0`), TEST-22 (query-string redaction — no `hunter2`/`password=`); TEST-18 expectation updated to `postgresql://***@/tmp?***`.
+
+**Verification:** `node --check` ✅; `npx vitest run scripts/mcp-knowledgebase-server.test.js` → **25/25** ✅; full `npx vitest run` → **185/185 across 10 files, 0 failures** ✅; `node -e` spot checks (query-string, unix-socket, `?host=`, plain URL, multi-token, non-URL) all correct ✅.
+
+**Scope discipline:** registerProject fix (import + call placement) untouched; INDEX handler whitespace trim untouched; core userinfo redaction unchanged; `knowledgebase-index.js` and `knowledgebase-cli.js` NOT modified. Plan §12 documents the change.
+
+### 2026-08-02: Reviewer — Final sign-off review of hardened `redactConnectionString` (APPROVED)
+
+Final focused review of the coder's regex-only fail-closed rewrite of `redactConnectionString` (server lines 160-163) that resolves the prior 🟡 Major. **Verdict: ✅ APPROVED — the blocker is resolved; no critical/major findings.**
+
+**Independent verification:**
+- **Fail-closed confirmed empirically** (exact helper regex replayed in node): `postgres://user:secret@/var/run/postgresql` → `postgres://***@/var/run/postgresql`; `postgresql://user:secret@/tmp?host=/tmp` → `postgresql://***@/tmp?host=/tmp`; multi-token messages → every token redacted; password-with-`@` (`postgres://user:pa@ss@host/db`) → `postgres://***@host/db` (fully redacted, no `ss` leak).
+- **`[^/\s]+` sound, no over-matching:** socket-only (`postgres:///var/run/postgresql`), host-only (`postgres://10.0.0.5:5432/db`), and non-URL messages (`Unknown tool: ...`, `DB connection failed`) all unchanged — TEST-15/TEST-16 readability intact. `[^/\s]+` is strictly stronger than the suggested `[^@\s]+` for `@`-in-password.
+- **Non-vacuousness verified by replay:** ran the OLD helper (from git diff — URL-parse-with-catch) against the TEST-17/18/19 scenarios → all three fail (TEST-17 leaks `user:secret`; TEST-18 exact output mismatches + leaks; TEST-19 leaks second token `u2:p2`) → all 3 new tests are genuinely meaningful.
+- **Full suite independently re-run:** `npx vitest run` → **181/181 across 10 files, 0 failures** ✅.
+- registerProject fix intact (`await registerProject(pid, pid)` at line 271 between empty-chunks guard and `upsertChunks`); plan §11 documentation accurate.
+
+**🔵 Minor (non-blocking, pre-existing / out of scope):** `knowledgebase_search` does not trim `projectId` (1-line consistency follow-up optional); `args.limit || 5` uses `||` while threshold uses `??`; regex preserves query strings so a hypothetical `?password=` query param would not be redacted (pg error messages do not echo passwords — not a practical leak vector; the engine helper incidentally drops the query).
+
+**Files reviewed:** `scripts/mcp-knowledgebase-server.js`, `scripts/mcp-knowledgebase-server.test.js`, `scripts/knowledgebase-index.js` (reference), `plan/fix-kb-registerproject-1.md`. Files modified: `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
+
+### 2026-08-02: Coder — Redaction hardening for Knowledgebase registerProject (fail-closed `redactConnectionString`)
+
+Resolved the reviewer's 🟡 Major finding (CHANGES REQUESTED): the local `redactConnectionString` helper in `scripts/mcp-knowledgebase-server.js` failed OPEN on unix-socket-style connection strings. **Bug (reproduced before fix):** `postgres://user:secret@/var/run/postgresql` and `postgresql://user:secret@/tmp?host=/tmp` make `new URL()` throw → the old catch returned the message unchanged → credentials leaked into MCP error responses (engine helper fails closed `'***'`).
+
+**Fix (server lines 160-163):** replaced the URL-parse-with-catch logic with a single global regex `message.replace(/(postgres(?:ql)?:\/\/)([^/\s]+)@/gi, '$1***@')`. No URL parsing → nothing to fail, so every unparseable token is redacted by construction (fail-closed). Global flag redacts ALL tokens; host/path preserved verbatim (no stray `host:` colon when port absent); non-URL messages unchanged (TEST-15/TEST-16 stay readable). Used `[^/\s]+` instead of the reviewer-suggested `[^@\s]+` so passwords containing `@` are fully redacted (e.g. `postgres://user:p@ss@host` → `postgres://***@host`).
+
+**Tests (18 → 21)** in `scripts/mcp-knowledgebase-server.test.js` — the helper is intentionally NOT exported, so the new tests exercise the real outer-catch path by rejecting `upsertChunks` with URL-bearing error messages: TEST-17 (`postgres://user:secret@/var/run/postgresql` → `postgres://***@/var/run/postgresql`, no `user:secret`), TEST-18 (`postgresql://user:secret@/tmp?host=/tmp` → `postgresql://***@/tmp?host=/tmp`), TEST-19 (two `postgres://` tokens both redacted).
+
+**Verification:** `node --check` ✅; `npx vitest run scripts/mcp-knowledgebase-server.test.js` → **21/21** ✅; full `npx vitest run` → **181/181 across 10 files, 0 failures** ✅; `node -e` spot checks (function extracted from the actual file) confirm unix-socket, `?host=`, multi-token, no-port, and non-URL behaviors. `knowledgebase-index.js` (engine, unchanged, not exported) and `knowledgebase-cli.js` NOT modified; registerProject fix untouched. Plan §11 added to `plan/fix-kb-registerproject-1.md`.
+
+### 2026-08-02: Reviewer — Nit-fix re-review for Knowledgebase registerProject (CHANGES REQUESTED, narrowly scoped)
+
+Independently re-reviewed the 4 nit fixes on `plan/fix-kb-registerproject-1.md` (§9-10) plus the TEST-12 smoke evidence. **Verdict: ⚠️ CHANGES REQUESTED — the registerProject fix and tests are approved; the redaction helper needs one security fallback before final merge.**
+
+**Verification performed (independent):**
+- `npx vitest run` → **178/178 across 10 files, 0 failures** (matches coder/unit-tester); MCP server test file **18/18**.
+- **Redaction helper empirical probe** (exact helper code copied into node): normal URLs redact identically to the engine (`postgres://user:secret@host:5432/kb` → `postgres://***@host:5432/kb`); generic messages unchanged (TEST-15/16 stay readable); **but unix-socket bare-authority URLs LEAK**: `postgres://user:secret@/var/run/postgresql` and `postgresql://user:secret@/tmp?host=/tmp` make `new URL()` throw "Invalid URL" → catch returns the raw message with credentials. The engine helper (`knowledgebase-index.js:62-70`) fails CLOSED (`'***'`) for the same input — so the local helper weakens security vs. the engine for this input class.
+- TEST-06b/06c non-vacuous (both fail on the pre-nit guard); mutation test claim (3 tests fail without `registerProject(pid, pid)`) consistent with test contents.
+
+**🟡 Major (must fix before final merge):** add a regex fallback in the `redactConnectionString` catch so an unparseable `postgres://` token is still credential-stripped (e.g. replace `//userinfo@` → `//***@`) instead of returning the message unchanged.
+
+**🔵 Minor (consider):** only the first URL token is redacted (`message.replace(match[1], ...)`); cosmetic `host:` when port absent; `knowledgebase_search` does not trim `projectId` (pre-existing; N-3 was scoped to `knowledgebase_index`).
+
+**Verified clean:** N-1 (schema default 0.1 == handler `?? 0.1`, TEST-07 asserts 0.1); N-3 (no untrimmed `projectId` leaks in the index handler; `pid` at chunkLearnedKnowledge/registerProject/response; guard crash-safe for non-string args; no double-trim); N-4 (TEST-05 redundant `toContain` removed; exact `toBe` authoritative); TEST-15/TEST-16 pass; TEST-12 evidence credible (fresh `smoke-test-1785682647097`, "Indexed 1 chunks, updated 0, skipped 0", cleanup verified 0 residue, timestamp ≈ 2026-08-02, `.env` DATABASE_URL present non-empty — verified without printing; cannot re-run live without a DB write, accepted as documented evidence).
+
+**Files reviewed:** `scripts/mcp-knowledgebase-server.js`, `scripts/mcp-knowledgebase-server.test.js`, `scripts/knowledgebase-index.js` (reference), `plan/fix-kb-registerproject-1.md`. Files modified: `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md`.
+
+### 2026-08-02: Coder — Reviewer nit fixes for Knowledgebase registerProject fix
+
+Applied all 4 reviewer nits from the APPROVED WITH NITS verdict on `plan/fix-kb-registerproject-1.md`. Changes in `scripts/mcp-knowledgebase-server.js`:
+
+1. **Search schema default alignment** — `threshold` inputSchema `default: 0.6` → `0.1` (line 77), matching the handler's `args.threshold ?? 0.1` (line 154/183).
+2. **Redact raw `err.message` in error responses** — outer catch now uses `redactConnectionString(err.message)`. Added a local helper (lines 135-162) mirroring `knowledgebase-index.js:62` but applied to messages: it redacts credentials from any `postgres://`/`postgresql://` URL token in the message and returns non-URL messages unchanged (the engine helper returns `'***'` for non-URLs, which would have broken TEST-15/TEST-16 and hidden generic errors). Importing the engine helper was impossible without violating the "do not modify `knowledgebase-index.js`" constraint — it is not exported.
+3. **Whitespace-only projectId validation** — guard changed from `if (!projectId)` to `if (!projectId?.trim())`; trimmed `const pid = projectId.trim()` flows to `chunkLearnedKnowledge(content, pid)`, `registerProject(pid, pid)`, and response messages.
+4. **TEST-05 redundant assertion** — removed the `toContain('Indexed 3 chunks, updated 2, skipped 1')` line after the exact `toBe`.
+
+Tests (`scripts/mcp-knowledgebase-server.test.js`): 16 → 18. Added TEST-06b (whitespace-only `projectId` rejected — no engine calls) and TEST-06c (surrounding whitespace trimmed before `chunkLearnedKnowledge`/`registerProject`/response). Header comment updated.
+
+**Verification:** `node --check` ✅; `npx vitest run scripts/mcp-knowledgebase-server.test.js` → **18/18** ✅; full suite `npx vitest run` → **178/178 across 10 files, 0 failures** ✅ (176 + 2 new). Redaction behavior manually verified (URL credentials → `***@host:port/path`; generic messages unchanged).
+
+**Scope discipline:** registerProject fix untouched (import + call placement preserved); `knowledgebase-index.js` and `knowledgebase-cli.js` NOT modified.
+
+### 2026-08-02: Unit Tester — Re-validation after nits + TEST-12 live-spawn smoke test
+
+Re-validated `plan/fix-kb-registerproject-1.md` after the reviewer nit fixes, and executed the final open item (plan TEST-12 — the live-spawn smoke test for the direct-run stdio bootstrap):
+
+**Full suite re-validation:**
+- `node --check scripts/mcp-knowledgebase-server.js` → ✅ Syntax OK
+- `npx vitest run scripts/mcp-knowledgebase-server.test.js` → **18/18 passed** ✅
+- `npx vitest run` → **178/178 passed across 10 test files, 0 failures** ✅ (matches coder's reported count)
+- `DATABASE_URL`: absent in process env (`printenv`), but `.env` present with a non-empty `DATABASE_URL` key (value not printed) — server loads it via `import 'dotenv/config'`, so the DB was reachable for the smoke test.
+
+**TEST-12 — live-spawn smoke test: ✅ PASS** (was previously SKIPPED/manual-only):
+- Spawned the real server over stdio; MCP `initialize` handshake returned `protocolVersion`/`capabilities`/`serverInfo`.
+- Called `tools/call knowledgebase_index` with fresh `projectId: "smoke-test-<timestamp>"` → response text **`"Indexed 1 chunks, updated 0, skipped 0 for project \"smoke-test-1785682647097\"."`** — NOT "skipped 1" → proves `registerProject()` ran before `upsertChunks()` (no FK 23503, no silent skip).
+- Cleanup: deleted the test chunk + project row via direct pool query; post-cleanup `SELECT count(*)` for `LIKE 'smoke-test-%'` → **0 projects, 0 chunks** (no residue). Server SIGTERM handled cleanly.
+- Evidence: closes the last coverage gap flagged at T4 — the direct-run bootstrap (`main()`, `isDirectRun`, SIGTERM, server lines 365-391) now proven working live end-to-end.
+
+**Regression guard sanity (post-nit):** Re-ran the mutation test (temp copy, removed `await registerProject(pid, pid);`) → **3 tests FAILED** (15 passed): TEST-01 `toHaveBeenCalledTimes(1)` got 0, TEST-16 got 0, and TEST-06c `toHaveBeenCalledWith('test-project','test-project')` got 0. The whitespace-projectId validation did NOT weaken the guard — TEST-06c actually makes the guard strictly stronger (it also fails if the call is missing). Workspace files confirmed intact; temp dir cleaned up.
+
+**Files modified:** `plan/fix-kb-registerproject-1.md` (TEST-12 row + new §10), `memory-bank/progress.md`, `memory-bank/activeContext.md`, `memory-bank/tasks/_index.md`.
+
+**Status:** All plan tasks AND the reviewer's final follow-up (TEST-12) are complete. Plan: **Completed**.
+
+### 2026-08-02: Reviewer — Knowledgebase registerProject Bug Fix review (APPROVED WITH NITS)
+
+Independently reviewed the registerProject fix for the PG knowledgebase write bug (orchestrator REVIEW phase for `plan/fix-kb-registerproject-1.md`):
+
+**Files reviewed:** `scripts/mcp-knowledgebase-server.js` (diff: registerProject import line 33, call line 240, `handleToolCall` export, `isDirectRun` stdio guard), `scripts/mcp-knowledgebase-server.test.js` (new, 16 tests), `scripts/knowledgebase-index.js` (registerProject/getPool/closePool — reference, unchanged), `scripts/knowledgebase-cli.js` (call site consistency), `plan/fix-kb-registerproject-1.md`.
+
+**Verdict: ✅ APPROVED WITH NITS** — no 🔴 critical, no 🟡 major findings. Rework not required.
+
+**Verification performed (independent):**
+- `node --check` on both changed files → syntax OK
+- `npx vitest run` → **176/176 across 10 files, 0 failures** (matches plan claim)
+- **Mutation test** (temp copy under `scripts/.mutation-check/`, removed the registerProject call, ran the suite, cleaned up): **2 tests FAILED** (TEST-01 `toHaveBeenCalledTimes(1)` got 0; TEST-16 same) — regression guard proven non-vacuous; workspace confirmed clean after cleanup
+
+**Correctness:** Placement correct (after empty-chunks guard, before `upsertChunks()`); `(projectId, projectId)` matches `registerProject(projectId, name)` signature and CLI convention; idempotent `INSERT … ON CONFLICT DO UPDATE` safe for re-indexing; missing projectId handled by the required-arg guard; pool-unavailable path degrades gracefully (registerProject returns `{id, first_indexed_at: null}` without throwing → upsertChunks returns zeros).
+
+**Security:** Parameterized SQL only; no user-controlled paths (default file path is hardcoded); `isDirectRun` guard is safe on module import (truthy short-circuit prevents `resolve(undefined)`; no transport/pool opened when imported); error responses include raw `err.message` (pre-existing pattern).
+
+**Test quality:** 16 hermetic tests with clean isolation (`vi.resetModules()` + `vi.clearAllMocks()` per test); order asserted via `mock.invocationCallOrder`; TEST-11 smoke-checks real engine exports via `vi.importActual`; no brittle assertions (stringContaining used where cwd varies).
+
+**Nits (non-blocking, mostly pre-existing):**
+1. Search tool schema still declares `default: 0.6` (line 77) while handler uses `args.threshold ?? 0.1` (line 154) — doc/code mismatch from the earlier threshold fix.
+2. Raw `err.message` in error responses — potential info leakage (pre-existing; engine has `redactConnectionString` unused here).
+3. Whitespace-only projectId (e.g. `"  "`) passes the required-arg guard (pre-existing, same in CLI).
+4. TEST-05 asserts exact full message with `toBe` then repeats a `toContain` — redundant.
+5. Plan T2 doc said "follow the file's semicolon-free convention" but the server file uses semicolons; the code correctly matched the file's real style.
+6. `isDirectRun` uses `resolve()` which does not dereference symlinks — a symlinked entry path would not start the server (theoretical; opencode config uses a direct path).
+
+**Recommended follow-ups (not blocking):** align the search tool schema `default` with the code's 0.1; run the plan TEST-12 live-spawn smoke test (spawn server, `tools/call knowledgebase_index` with a fresh projectId → expect "Indexed 1 chunks, updated 0, skipped 0" not "skipped 1") to close the remaining coverage gap on the direct-run bootstrap.
+
+### 2026-08-02: Unit Tester — T4 from `plan/fix-kb-registerproject-1.md` (Batch C — full suite validation)
+
+Independently validated the registerProject fix and the complete test suite (Task T4, final batch of the fix plan):
+
+**Full suite result:** `npx vitest run` → **176 passed (176) across 10 test files, 0 failures** (171 from T3 + 5 coverage tests added during this T4 validation).
+
+**Coverage (`npx vitest run --coverage`):**
+- **Overall:** 40.93% stmts / 39.76% branches / 38.94% funcs / 41.54% lines. The 90% global gate in `vitest.config.ts` is NOT met — **pre-existing** (baseline ~38-41% before this plan) and out of plan scope. Flagged, not a blocker.
+- **`scripts/mcp-knowledgebase-server.js`:** **79.66% stmts / 88.37% branches / 37.5% funcs / 81.03% lines** — improved from T3's 64.4% / 65.11% / 25% / 65.51%. Remaining gaps are the `ListToolsRequestSchema` tools builder (lines 55-133, not exported) and the direct-run bootstrap (`main()`, `isDirectRun`, SIGTERM — lines 335-359) — these require production seams or a manual live-spawn test (plan TEST-12), out of scope for unit tests per agent constraints.
+
+**Regression guard verified NON-VACUOUS (mutation test):** Copied `scripts/mcp-knowledgebase-server.js` + `.test.js` + `knowledgebase-index.js` to a temp dir, removed the `await registerProject(projectId, projectId)` line, ran the suite → **1 test FAILED** with `AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times` at `expect(kb.registerProject).toHaveBeenCalledTimes(1)` (TEST-01, line 157). This proves the suite genuinely fails if the fix is reverted. The workspace file was restored and confirmed intact (`grep` confirms the call at line 240); temp dir cleaned up.
+
+**Tests added (strengthening, 11 → 16):**
+1. `knowledgebase_search: returns "No results found" when pool IS available` — covers the previously-uncovered empty-kb branch (results empty + pool non-null).
+2. `knowledgebase_stats: returns not-available message when zero counts AND no pool` — covers the stats zero-count branch.
+3. `knowledgebase_list: formats indexed projects with chunk counts` — covers the formatted-projects path incl. `name || project_id` and `last_indexed || 'Never'` fallbacks.
+4. `unknown tool: returns a caught error response (default branch)` — covers the `default:` throw + outer try/catch.
+5. `knowledgebase_index: returns error response when upsertChunks fails` — covers the index error path while confirming registerProject still ran first.
+
+All unit tests on the existing `handleToolCall` seam — **zero production code changes** (per unit-tester constraint). All 8 plan scenarios (TEST-01..08) verified present one-to-one (tests 1-8).
+
+**Files modified:** `scripts/mcp-knowledgebase-server.test.js` (11 → 16 tests), `plan/fix-kb-registerproject-1.md` (T4 + Phase 3 completed, plan status → Completed), `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md` (fix entry moved to Completed).
+
+**Plan status:** `plan/fix-kb-registerproject-1.md` — ALL 5 TASKS / 3 BATCHES COMPLETE. **Completed.**
+
+### 2026-08-02: Coder — T1+T2 from `plan/fix-kb-registerproject-1.md` (Batch A — code fix)
+
+Implemented the registerProject fix in `scripts/mcp-knowledgebase-server.js` (2 changes, 1 file):
+
+**T1 (line 33)** — Added `registerProject` to the named import from `./knowledgebase-index.js`, placed between `listProjects` and `getPool` per the plan spec. `registerProject` is exported at `knowledgebase-index.js:782` and takes `(projectId, name)`.
+
+**T2 (lines 229-230)** — Inserted `await registerProject(projectId, projectId);` between the `chunks.length === 0` guard and the `const result = await upsertChunks(chunks);` call — matching the CLI convention at `knowledgebase-cli.js:122` and REQ-03 (after the guard to avoid unnecessary DB calls for empty input). The `knowledgebase_index` handler now registers the project row (idempotent `INSERT … ON CONFLICT DO UPDATE`) before inserting chunks, eliminating the PostgreSQL FK violation 23503 that was silently caught by `upsertChunks()`'s catch-all and counted as `skipped` for non-bootstrap-registered projects.
+
+**Style note**: The plan's T2 snippet showed the call without a semicolon and mentioned a "semicolon-free convention," but `mcp-knowledgebase-server.js` actually uses semicolons throughout (matching the surrounding code and `knowledgebase-cli.js:122`). Used a semicolon for consistency with the file's actual style.
+
+**Verification**:
+- `import 'dotenv/config'` present at line 25 ✅ (confirmed, not part of this fix)
+- `registerProject(projectId, projectId)` passes `projectId` as both args, matching CLI pattern ✅
+- `node --check scripts/mcp-knowledgebase-server.js` → syntax OK ✅
+- Module loads — stdio server starts successfully ✅
+- `npx vitest run scripts/knowledgebase-cli.test.js scripts/knowledgebase-index.test.js` → 49/49 pass ✅
+- `npx vitest run` → **160 passed (160) across 9 files, 0 failures** ✅ (no regressions)
+
+**Scope discipline**: Only `scripts/mcp-knowledgebase-server.js` modified (+2 lines). No test files created — T3 (new `scripts/mcp-knowledgebase-server.test.js`) is a sibling Batch B task. Plan file T1/T2 rows marked completed 2026-08-02.
+
+### 2026-08-02: Coder — T5 from `plan/fix-kb-registerproject-1.md` (Batch A — memory-bank updates)
+
+Completed the memory-bank documentation task for the registerProject bug fix pipeline (T5 of Batch A — run in parallel with sibling coders on T1/T2):
+
+**What was updated:**
+- `memory-bank/activeContext.md` — Added a Current Focus entry describing the fix (bug: non-bootstrap projects can't write to the PG knowledgebase via MCP because the `knowledgebase_index` handler never calls `registerProject()` → FK violation 23503 silently counted as `skipped`; fix: call `registerProject(projectId, projectId)` before `upsertChunks()` in `scripts/mcp-knowledgebase-server.js`). Added a Recent Changes entry for this task.
+- `memory-bank/progress.md` — Added this Recently Completed entry; updated the What's Left entry for the fix pipeline (Batch A: T5 done, T1/T2 pending).
+- `memory-bank/tasks/_index.md` — Updated the `[fix-kb-registerproject]` entry to reflect T5 complete / Batch A in progress.
+- `plan/fix-kb-registerproject-1.md` — T5 row marked completed 2026-08-02. Phase 1 status NOT touched (T1/T2 still in flight by sibling coders).
+
+**Current fix state verified at edit time:** `scripts/mcp-knowledgebase-server.js` import block (lines 27-35) does NOT yet include `registerProject`; handler (lines 216-228) does NOT yet call it — T1/T2 pending. `registerProject()` is idempotent (`knowledgebase-index.js:341-360`, exported line 782) so no regression risk once applied. All 160 existing tests pass.
+
+### 2026-08-02: Implementer — Knowledgebase registerProject Bug Fix Plan
+
+Investigated and confirmed the `registerProject` bug in this repo's MCP knowledgebase server. Produced plan `plan/fix-kb-registerproject-1.md`:
+
+**Bug verdict: CONFIRMED PRESENT.** The `knowledgebase_index` MCP handler in `scripts/mcp-knowledgebase-server.js` (lines 216-228) calls `chunkLearnedKnowledge()` → `upsertChunks()` without ever calling `registerProject()`. The `knowledge_chunks.project_id` has a FOREIGN KEY to `projects(id)`, so inserts fail with error 23503 — silently caught and counted as "skipped" by `upsertChunks()`'s generic catch-all. Only projects pre-registered during bootstrap can be indexed via MCP.
+
+**What works correctly (confirmed):**
+- `scripts/mcp-knowledgebase-server.js` — `import 'dotenv/config'` present at line 25 ✅
+- `opencode.json` knowledgebase MCP entry — `env: { DATABASE_URL: $DATABASE_URL }` present ✅
+- `scripts/knowledgebase-cli.js` — `registerProject()` called at line 122 before `upsertChunks()` ✅
+- `scripts/knowledgebase-index.js` — `registerProject()` function (lines 341-360) idempotent, exported at line 782 ✅
+- Default search threshold — already fixed (`??` 0.1) ✅
+
+**Fix required (2 lines, 1 file):**
+1. Add `registerProject` to import in `scripts/mcp-knowledgebase-server.js` (line 28)
+2. Add `await registerProject(projectId, projectId)` between empty-chunks guard (line 226) and `upsertChunks()` (line 228)
+
+**Plan:** 5 tasks across 3 batches — Batch A (T1+T2 fix + T5 memory bank), Batch B (T3 new MCP tests), Batch C (T4 full suite validation). No regression risk — `registerProject()` is idempotent and all 160 existing tests pass.
+
+**New test file needed:** `scripts/mcp-knowledgebase-server.test.js` — zero tests currently exist for the MCP server.
+
+### 2026-08-02: Implementer — Bootstrap verification (orchestrator invocation)
+
+Verified all project scaffolding as the Implementer agent invoked through an orchestrator:
+
+| Check | Status | Details |
+|-------|--------|---------|
+| `docs/.architecture-context.md` | ✅ Exists | 85 lines, real content — agent-based workflow distribution, 6 layers, key abstractions |
+| `memory-bank/` core files | ✅ All 6 | projectbrief (31L), productContext (34L), systemPatterns (54L), techContext (59L), activeContext (~700L), progress (~1000L) |
+| `memory-bank/tasks/_index.md` | ✅ Exists | 45 lines, 40+ tasks tracked |
+| package metadata | ✅ Valid | `@abarcenas/ai-workflow-template` v1.40.0, not private, npm-publishable |
+| `bin` entry point | ✅ `ai-workflow-setup` → `bin/setup.js` |
+| `files` field | ✅ 15 entries for npm distribution |
+| Scripts layer | ✅ 16 files | knowledgebase engine + CLI + MCP + tests, setup modules, sync, memory tools |
+| Detected tech stack | Node.js ESM, Playwright ^1.59.1, Vitest ^4.1.8, Husky ^9.0.0, graphify, OpenCode |
+| Architectural pattern | Agent-based workflow distribution (Instructions → Skills → Agents → Orchestrators) |
+
+**Result**: No bootstrapping required. All infrastructure fully initialized and operational. Architecture context accurate and current. Memory bank populated with comprehensive project context.
+
+**Known gap (pre-existing)**: `"main": "index.js"` in `package.json` points to a non-existent file.
 
 ### 2026-08-02: Coder — Fixed knowledgebase MCP search default threshold (0.6 → 0.1)
 
@@ -1399,3 +1850,42 @@ Completed all tracker documentation for the "empty knowledgebase search results 
 - **Appended Session entry to `.agents/instructions/learned-knowledge.instructions.md`** — 4 knowledge items (empty result ≠ empty index — check threshold vs embedding score range; `||` vs `??` falsy-coercion; MCP server code changes require a server/opencode restart; CLI + fresh-handshake verification workflow) + agent tuning notes (researcher CLI-threshold diagnostics, coder sibling-call-site scan, tracker restart gotcha)
 - **Appended follow-up entry to `docs/tracker-log.md`** and updated `docs/TRACKER-INDEX.md` with the pipeline row + learned-knowledge session row
 - **Central knowledge status after restart**: `knowledgebase_search` operational (5 results, top sim 0.396), stats 1 project / 9 chunks. The new lesson is indexed and searchable.
+
+### 2026-08-02: Tracker — PG Knowledgebase Write Bug Fix Documented (registerProject upstream)
+
+Completed all tracker documentation for the "Fix PG knowledgebase write bug for non-bootstrap projects" pipeline:
+
+- **Pipeline**: implementer (bootstrap) → implementer (planning) → coder (Batch A: T1+T2 combined, T5) → coder (Batch B: T3) → unit-tester (T4) → reviewer → tracker (this entry)
+- **Root cause**: `knowledgebase_index` MCP handler in `scripts/mcp-knowledgebase-server.js` called `upsertChunks()` without ever calling `registerProject()` → PostgreSQL FK violation 23503 for non-bootstrap-registered projects → silently caught by `upsertChunks()`'s catch-all and counted as `skipped` (misleading "indexed 0, updated 0, skipped N").
+- **Fix**: added `await registerProject(projectId, projectId)` (idempotent upsert) between the empty-chunks guard and `upsertChunks()` (line 240), matching `knowledgebase-cli.js:122`. `registerProject` added to import (line 33). `handleToolCall` exported + stdio bootstrap guarded by `isDirectRun` for testability.
+- **Tests**: NEW `scripts/mcp-knowledgebase-server.test.js` — 16 tests (8 plan scenarios TEST-01..08 + 8 degradation/integrity/coverage tests). Full suite **176/176 across 10 files, 0 failures**. MCP server coverage 79.66% stmts / 81.03% lines. Mutation test proved the regression guard non-vacuous (TEST-01 + TEST-16 fail without the fix).
+- **Review**: APPROVED WITH NITS — no critical/major; 6 minor nits (search schema `default: 0.6` vs `?? 0.1`, raw `err.message`, whitespace projectId, TEST-05 redundant assert, plan wording, isDirectRun symlink theoretical).
+- **Appended pipeline entry to `docs/tracker-log.md`** (full 6-step record), appended Session entry to `.agents/instructions/learned-knowledge.instructions.md` (root cause pattern + agent tuning), updated `docs/TRACKER-INDEX.md`.
+- **Follow-ups**: TEST-12 live-spawn smoke test; align search tool schema default 0.6 → 0.1; optional hardening (raw err.message redaction, whitespace projectId trim).
+
+### 2026-08-02: Tracker — Follow-up Pipeline Documented (nits + TEST-12 + redaction hardening)
+
+Completed all tracker documentation for the follow-up pipeline that closed out the registerProject fix's open items:
+
+- **Pipeline**: coder (nits) → unit-tester (TEST-12 live-spawn) → reviewer (⚠️ CHANGES REQUESTED) → coder (redaction hardening) → reviewer (✅ APPROVED) → tracker (this entry)
+- **Nits applied (coder)**: search schema `threshold` default `0.6`→`0.1`; local `redactConnectionString(message)` helper applied to outer catch (engine helper not exported, so a local message-level rewrite keeps generic errors readable); whitespace-only `projectId` rejected via `!projectId?.trim()` and trimmed `pid` flows to `chunkLearnedKnowledge`/`registerProject`/responses; TEST-05 redundant `toContain` removed. Tests 16→18, full suite **178/178**.
+- **TEST-12 live-spawn smoke test (unit-tester)**: ✅ PASS — spawned the real server over stdio against the live DB (`DATABASE_URL` in `.env`, absent from process env); `initialize` handshake OK; `knowledgebase_index` with fresh `smoke-test-1785682647097` returned **"Indexed 1 chunks, updated 0, skipped 0"** (NOT "skipped 1") → proves `registerProject()` ran before `upsertChunks()`. Cleanup verified (0 projects, 0 chunks residue); SIGTERM path exercised. Mutation re-test: **3 tests now fail** without the fix (TEST-01, TEST-16, TEST-06c) — strictly stronger guard.
+- **Reviewer re-review**: ⚠️ CHANGES REQUESTED — the local redaction helper FAILED OPEN on unix-socket authorities (`postgres://user:secret@/var/run/postgresql` makes `new URL()` throw → catch returned message unchanged → credential leak). Required regex credential-strip fallback.
+- **Redaction hardening (coder)**: helper rewritten regex-only fail-closed by construction — `message.replace(/(postgres(?:ql)?:\/\/)([^/\s]+)@/gi, '$1***@')`. No URL parsing to fail; global flag redacts EVERY token; `[^/\s]+` (not `[^@\s]+`) handles passwords containing `@`; host/path preserved (no stray port colon); non-URL messages unchanged. Helper NOT exported; new tests exercise the outer-catch path. Tests 18→21 (TEST-17 unix-socket, TEST-18 `?host=`, TEST-19 multi-token). Full suite **181/181**.
+- **Reviewer final**: ✅ **APPROVED** — fail-closed by construction verified; `[^/\s]+` strictly stronger; 3 new tests non-vacuous (replayed OLD helper → all fail); 181/181 independently re-run.
+- **Appended Pipeline 2 entry to `docs/tracker-log.md`**, Session entry to `.agents/instructions/learned-knowledge.instructions.md`, updated `docs/TRACKER-INDEX.md`.
+- **Remaining known minors (pre-existing / out of scope)**: `knowledgebase_search` projectId trim; `args.limit || 5` vs `??`; query-string params in URL tokens not redacted (not a practical leak — pg errors don't echo passwords).
+
+### 2026-08-02: Tracker — Final Minor-Hygiene Pass Documented (Pipeline 3)
+
+Completed all tracker documentation for the final minor-hygiene pass that closed out the last three 🔵 minors from the registerProject/redaction follow-up:
+
+- **Pipeline**: coder (3 minors) → unit-tester (independent validation) → reviewer (final sign-off) → tracker (this entry)
+- **Fix 1 (search projectId trim/validate, parity)**: `project_id: args.projectId?.trim() || undefined` — whitespace-only search filters degrade to match-all (`undefined`) via graceful degradation; deliberately asymmetric with the INDEX handler (read-only optional filter degrades, required write-target errors), documented in the code comment (lines 187-189). Trimmed values flow to the engine, which only applies the filter when truthy.
+- **Fix 2 (`args.limit ?? 5`)**: explicit `limit: 0` now honored (`LIMIT 0`) instead of `||` silently coercing 0 → 5 — same falsy-coercion class already fixed for `threshold ?? 0.1`.
+- **Fix 3 (query-string redaction, belt-and-braces)**: redaction regex extended to `/(postgres(?:ql)?:\/\/)([^/\s]+)@([^?#\s]*)([?#][^\s]*)?/gi` with a callback replacing query/fragment with `?***`/`#***` — `postgres://user:secret@host:5432/kb?password=hunter2` → `postgres://***@host:5432/kb?***`. Still fail-closed by construction (pure regex, no URL parse), host/path preserved, non-URL messages unchanged, `@`-in-password handled.
+- **Tests (21 → 25)**: TEST-20 (whitespace-only → `project_id: undefined`), TEST-20b (trimmed → `'test-project'`), TEST-21 (`limit: 0` → `limit: 0`), TEST-22 (query-string redaction — no `hunter2`/`password=`); TEST-18 updated to `postgresql://***@/tmp?***`.
+- **Validation (coder + unit-tester + reviewer all independent)**: full suite **185/185 across 10 files, 0 failures**; MCP file **25/25**. Non-vacuity via real temp mutations: `?? 5`→`|| 5` fails TEST-21; trim removed fails TEST-20+20b; old regex fails TEST-18+22; registerProject removed fails TEST-01/06c/16. Reviewer ran a 12-case empirical regex probe (all pass) and confirmed git diff scope discipline. Earlier fail-closed guarantees (TEST-17/19) intact; TEST-15/16 readability intact.
+- **Reviewer verdict**: ✅ **APPROVED** — only informational minors (search schema `limit` description "(1–50)"; pre-existing engine negative-limit clamp; cosmetic header comment). No follow-ups required.
+- **Appended Pipeline 3 entry to `docs/tracker-log.md`**, Session entry to `.agents/instructions/learned-knowledge.instructions.md`, updated `docs/TRACKER-INDEX.md`.
+- **Final state**: registerProject bug fully fixed + hardened; all nits/minors closed; full suite 185/185; reviewer APPROVED. Known out-of-scope gap for future parity: `knowledgebase-cli.js` still uses `topK || 5` and an untrimmed `--project`.

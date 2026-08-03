@@ -15,6 +15,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const MEMORY_BANK_DIR = resolve(process.cwd(), 'memory-bank');
 const VOCAB_PATH = resolve(MEMORY_BANK_DIR, '.vocabulary.json');
@@ -128,8 +129,21 @@ function validateFile(filePath, vocab) {
 
   // tags must be from vocabulary (warn only — don't block for new user-defined tags)
   if (fm.tags && Array.isArray(fm.tags) && vocab?.tags) {
-    const allTags = Object.values(vocab.tags).flat();
-    const unknown = fm.tags.filter(t => !allTags.includes(t));
+    // Known tags = all tags.* group values PLUS entity_patterns keys (e.g. npm, vitest, playwright)
+    const allTags = [
+      ...Object.values(vocab.tags).flat(),
+      ...Object.keys(vocab.entity_patterns || {}),
+    ];
+    // Normalize BOTH sides before the unknown-tag filter for parity with
+    // vocab-sync.js (which lowercases/kebab-cases tags before comparing and
+    // appending). Without this, a staged `My Tag` still warns "Unknown tags:
+    // [My Tag]" on every commit even after vocab-sync appends `my-tag`.
+    const normalizeTag = (tag) => String(tag).toLowerCase().trim().replace(/[\s_]+/g, '-');
+    const knownTags = new Set(allTags.map(normalizeTag).filter(Boolean));
+    const unknown = fm.tags.filter((t) => {
+      const normalized = normalizeTag(t);
+      return normalized && !knownTags.has(normalized);
+    });
     if (unknown.length > 0) {
       console.warn(
         `[validate-memory] ⚠ ${filePath}: Unknown tags: [${unknown.join(', ')}]. ` +
@@ -187,4 +201,15 @@ function main() {
   process.exit(0);
 }
 
-main();
+// Only run when executed directly (node scripts/validate-memory-schema.js).
+// When the module is imported — e.g. by unit tests exercising validateFile —
+// no side effects are triggered (main() calls process.exit(), which would
+// terminate the test runner).
+const isDirectRun =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main();
+}
+
+export { validateFile, main };

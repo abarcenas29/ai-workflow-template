@@ -180,6 +180,7 @@ const scriptsToSync = [
   'memory-index.js',
   'bump-version.js',
   'validate-memory-schema.js',
+  'vocab-sync.js',
   'mcp-memory-server.js',
   'mcp/playwright-mcp-launcher.js',
   // Knowledgebase scripts

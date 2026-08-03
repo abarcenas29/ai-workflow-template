@@ -46,11 +46,12 @@ export const TEMPLATE_HOOKS = {
       '#!/bin/sh',
       '',
       'node scripts/bump-version.js',
+      'node scripts/vocab-sync.js',
       'node scripts/validate-memory-schema.js',
       '',
     ].join('\n'),
     description:
-      'Auto-bump version + validate memory-bank schema before commits',
+      'Auto-bump version + sync vocabulary + validate memory-bank schema before commits',
   },
   'post-merge': {
     source: '.husky/post-merge',

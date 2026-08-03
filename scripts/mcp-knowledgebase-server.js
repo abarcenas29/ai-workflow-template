@@ -30,11 +30,13 @@ import {
   chunkLearnedKnowledge,
   getStats,
   listProjects,
+  registerProject,
   getPool,
   closePool,
 } from './knowledgebase-index.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const server = new Server(
   {
@@ -72,7 +74,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           threshold: {
             type: 'number',
-            default: 0.6,
+            default: 0.1,
             description: 'Minimum similarity threshold (0.0–1.0). Higher values return fewer but more relevant results.',
           },
           limit: {
@@ -130,18 +132,65 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   ],
 }));
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Redact connection-string credentials from an error message.
+ *
+ * Every postgres:// or postgresql:// URL token in the message has its
+ * userinfo credentials replaced with *** and its query string (or fragment)
+ * replaced with ?*** / #***, while the host and path are preserved verbatim
+ * (e.g. postgres://user:secret@host:5432/kb?password=hunter2 →
+ * postgres://***@host:5432/kb?***). Messages without a URL token are returned
+ * unchanged so generic errors (e.g. "Unknown tool: ...") stay readable — the
+ * engine helper returns '***' for non-URLs, which would hide every error
+ * message.
+ *
+ * Unlike the engine helper (knowledgebase-index.js:62) — which fails closed
+ * by returning '***' when `new URL()` throws — this helper FAILS CLOSED on
+ * unparseable tokens by using a pure regex instead of URL parsing: libpq
+ * unix-socket authorities such as postgres://user:secret@/var/run/postgresql
+ * (or postgresql://user:secret@/tmp?host=/tmp) make `new URL()` throw, so a
+ * parse-based helper would return the message unchanged and leak the
+ * credentials. The regex strips the userinfo and the query/fragment from
+ * EVERY token and preserves the host/path even when the URL cannot be parsed.
+ *
+ * @param {string} message
+ * @returns {string}
+ */
+function redactConnectionString(message) {
+  if (typeof message !== 'string' || message.length === 0) return message;
+  return message.replace(
+    /(postgres(?:ql)?:\/\/)([^/\s]+)@([^?#\s]*)([?#][^\s]*)?/gi,
+    (match, scheme, userinfo, hostAndPath, queryOrFragment) =>
+      `${scheme}***@${hostAndPath}${queryOrFragment ? queryOrFragment[0] + '***' : ''}`
+  );
+}
+
 // ── Handle tool calls ────────────────────────────────────────────────
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+/**
+ * Handle an MCP tool call.
+ *
+ * Exported for testability — the stdio bootstrap (main) is guarded to
+ * direct-run only, so tests can import this handler without opening a
+ * stdio transport or a database connection.
+ * @param {{ params: { name: string, arguments: Record<string, any> } }} request
+ * @returns {Promise<{ content: Array<{ type: string, text: string }>, isError?: boolean }>}
+ */
+export async function handleToolCall(request) {
   const { name, arguments: args } = request.params;
 
   try {
     switch (name) {
       case 'knowledgebase_search': {
+        // projectId is an optional filter — a whitespace-only value is dropped
+        // to match-all (graceful degradation, mirroring the INDEX handler's
+        // trim/validate parity) and the trimmed value is passed to the engine.
         const results = await search(args.query, {
-          project_id: args.projectId || undefined,
+          project_id: args.projectId?.trim() || undefined,
           threshold: args.threshold ?? 0.1,
-          limit: args.limit || 5,
+          limit: args.limit ?? 5,
         });
 
         if (results.length === 0) {
@@ -180,7 +229,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'knowledgebase_index': {
         const projectId = args.projectId;
-        if (!projectId) {
+        if (!projectId?.trim()) {
           return {
             content: [{
               type: 'text',
@@ -189,6 +238,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             isError: true,
           };
         }
+        const pid = projectId.trim();
 
         let content = args.content;
         if (!content) {
@@ -213,17 +263,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const chunks = chunkLearnedKnowledge(content, projectId);
+        const chunks = chunkLearnedKnowledge(content, pid);
         if (chunks.length === 0) {
           return {
             content: [{
               type: 'text',
-              text: `No valid knowledge chunks found for project "${projectId}". ` +
+              text: `No valid knowledge chunks found for project "${pid}". ` +
                 'Ensure the content contains "## Session:" headers with ' +
                 '"**New knowledge:**" sections.',
             }],
           };
         }
+
+        // Register/update the project in the projects table (idempotent upsert)
+        await registerProject(pid, pid);
 
         const result = await upsertChunks(chunks);
         return {
@@ -231,7 +284,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             type: 'text',
             text:
               `Indexed ${result.inserted} chunks, updated ${result.updated}, ` +
-              `skipped ${result.skipped} for project "${projectId}".`,
+              `skipped ${result.skipped} for project "${pid}".`,
           }],
         };
       }
@@ -307,12 +360,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return {
       content: [{
         type: 'text',
-        text: `Error: ${err.message}`,
+        text: `Error: ${redactConnectionString(err.message)}`,
       }],
       isError: true,
     };
   }
-});
+}
+
+server.setRequestHandler(CallToolRequestSchema, handleToolCall);
 
 // ── Start server ─────────────────────────────────────────────────────
 
@@ -322,13 +377,24 @@ async function main() {
   console.error('[knowledgebase-mcp] Server started via stdio transport');
 }
 
-process.on('SIGTERM', () => {
-  console.error('[knowledgebase-mcp] SIGTERM received, closing pool');
-  closePool().catch(() => {});
-  process.exit(0);
-});
+/**
+ * Only start the stdio server when this file is executed directly
+ * (node scripts/mcp-knowledgebase-server.js). When the module is imported
+ * — e.g. by tests exercising the exported handleToolCall — no stdio
+ * transport is opened and the process can exit cleanly.
+ */
+const isDirectRun =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
-main().catch((err) => {
-  console.error('[knowledgebase-mcp] Fatal error:', err);
-  process.exit(1);
-});
+if (isDirectRun) {
+  process.on('SIGTERM', () => {
+    console.error('[knowledgebase-mcp] SIGTERM received, closing pool');
+    closePool().catch(() => {});
+    process.exit(0);
+  });
+
+  main().catch((err) => {
+    console.error('[knowledgebase-mcp] Fatal error:', err);
+    process.exit(1);
+  });
+}
