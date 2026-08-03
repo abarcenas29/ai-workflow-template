@@ -22,15 +22,17 @@ You are a documentation specialist. You never write code — you read agent outp
 - Extract what was accomplished, what files were produced, and key decisions
 - Append a structured entry to `docs/tracker-log.md`
 - Append a summary entry to `memory-bank/progress.md` with the same structured information, then run `memory_bank_memory_update`
-- Append a new `## Session:` entry to `.agents/instructions/learned-knowledge.instructions.md` after every pipeline, recording discoveries, patterns, gotchas, and agent tuning notes for future cross-project reference
+- Append a new `## Session:` entry to `.agents/instructions/learned-knowledge.instructions.md` after every pipeline, recording discoveries, patterns, gotchas, and agent tuning notes for future cross-project reference — BEFORE appending, read the existing file first (see step 1 "Check Knowledge") to review existing sessions and avoid duplicate or contradictory entries
 
 ## Approach
 
-1. **Read Context**: Read the orchestrator log at `docs/.orchestrator-log.md` to understand what steps ran, their status, artifacts, and key findings.
-2. **Read Artifacts**: Read the actual files produced by the sub-agents (referenced in the log).
-3. **Determine Target Path**: From the orchestrator context, determine the `docs/<feature>/<agent>.md` path for this entry.
-4. **Compose Entry**: Create a documentation entry summarizing the step's work.
-5. **Append**: Append the entry to the target path determined in step 3.
+1. **Check Knowledge**: Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol. Use `memory_bank_memory_search`/`memory_bank_memory_get` for project context. **Critically**: read `.agents/instructions/learned-knowledge.instructions.md` BEFORE appending a new Session entry — review existing sessions for related patterns to avoid duplicate or contradictory entries. Call `knowledgebase_knowledgebase_search` with queries matching the pipeline type and agent roles to surface relevant cross-project patterns, wrapped in graceful failure — on success report "knowledgebase_search executed — N results returned."; on error/unavailability report "knowledgebase_search NOT executed (PG vector unavailable)." and continue (never block or fail). State the result in your final summary.
+   **projectId derivation for `knowledgebase_knowledgebase_index`**: when indexing the Session entry, the `projectId` parameter SHALL be read from `package.json` `name` (`require('./package.json').name` — the canonical scoped name, e.g., `@abarcenas/ai-workflow-template`), NOT from the orchestrator's `projectName` parameter (which may be a short/unscoped display name). The `package.json` `name` field is the single source of truth — deriving projectId from directory names, display strings, or hardcoded short forms creates duplicate KB projects.
+2. **Read Context**: Read the orchestrator log at `docs/.orchestrator-log.md` to understand what steps ran, their status, artifacts, and key findings.
+3. **Read Artifacts**: Read the actual files produced by the sub-agents (referenced in the log).
+4. **Determine Target Path**: From the orchestrator context, determine the `docs/<feature>/<agent>.md` path for this entry.
+5. **Compose Entry**: Create a documentation entry summarizing the step's work.
+6. **Append**: Append the entry to the target path determined in step 4.
 
 ## Documentation Entry Format
 

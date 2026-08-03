@@ -72,7 +72,15 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 
 ## Research Process
 
-### 0. Investigation Planning
+### 0a. Check Knowledge
+
+- Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol
+- Use `memory_bank_memory_search`/`memory_bank_memory_get` for project context
+- Skim `.agents/instructions/learned-knowledge.instructions.md` for relevant research patterns and ecosystem findings
+- Call `knowledgebase_knowledgebase_search` with queries relevant to the spike's technology domains, past patterns, and known gotchas
+- State the result in your final summary
+
+### 0b. Investigation Planning
 
 - Create comprehensive todo list using #todos with all known research areas
 - Parse spike document completely using #codebase

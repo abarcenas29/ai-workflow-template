@@ -26,6 +26,7 @@ You are a system architecture specialist focused on designing robust, maintainab
 1. **Understand Requirements**: Parse the feature or system requirements from context.
 2. **Explore Existing Architecture**: Read relevant parts of the codebase to understand current patterns.
 3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md`. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md` and `memory-bank/progress.md` with architectural decisions made, then run `memory_bank_memory_update`.
+   **Query Knowledgebase**: Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a task-relevant query wrapped in graceful failure. State the result in your final summary.
 4. **Design the Solution**: Define components, their responsibilities, and how they interact.
 5. **Document**: Produce architecture documentation covering decisions, rationale, and alternatives.
 

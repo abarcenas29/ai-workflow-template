@@ -30,7 +30,7 @@ You are a production code implementation specialist. You write clean, maintainab
    - Read the full phase section for context — understand what sibling tasks exist and how yours fits
    - Check the Parallel Execution Summary to see which batch you belong to and whether sibling tasks are running concurrently
 2. **Explore Context**: Read existing files to understand patterns, conventions, and integration points.
-3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md`. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads.
+3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md`. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. **Query Knowledgebase**: Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a task-relevant query wrapped in graceful failure. State the result in your final summary.
 4. **Implement**: Write production code following established patterns.
 5. **Verify**: Check that the implementation compiles/runs correctly.
 6. **Document**: Record what was accomplished in all three locations:
