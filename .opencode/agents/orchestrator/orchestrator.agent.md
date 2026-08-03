@@ -22,7 +22,7 @@ You are a master orchestration agent that coordinates specialized sub-agents to 
 
 ## Dynamic Parameters
 
-- **projectName**: The project or component being worked on (extracted from user request)
+- **projectName**: The project or component being worked on (extracted from user request (prefer package.json "name" for the canonical scoped projectId))
 - **basePath**: Root directory for the work (defaults to current workspace)
 - **logFile**: Path to the orchestration log (defaults to `docs/.orchestrator-log.md`)
 - **autoConfirm**: If `true`, execute all pipeline steps without pausing. If `false`, ask the user before each delegation. (Default: `false`)
@@ -121,6 +121,8 @@ IMPORTANT:
 - Perform the necessary reads/writes under this base path.
 - Previous step context: {previous_step_summary}
 - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
+- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a task-relevant query (graceful failure — report whether executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
+- Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Return a clear summary (actions taken + files produced/modified + issues).
 ```
 
@@ -153,6 +155,8 @@ When the pipeline reaches the "coder" step and the implementer's summary include
       - Perform the necessary reads/writes under this base path.
       - Previous step context: {previous_step_summary}
       - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
+      - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a task-relevant query (graceful failure — report whether executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
+      - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
       - Return a clear summary (actions taken + files produced/modified + issues).
       ```
    d. **Wait for all tasks in this batch to complete** (fan-in). Capture each response summary.

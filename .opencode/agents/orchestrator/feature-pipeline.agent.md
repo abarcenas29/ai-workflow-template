@@ -17,7 +17,7 @@ You are a lightweight orchestration agent that runs a fixed sequential pipeline:
 
 ## Dynamic Parameters
 
-- **projectName**: The project or component being worked on (extracted from user request)
+- **projectName**: The project or component being worked on (extracted from user request (prefer package.json "name" for the canonical scoped projectId))
 - **basePath**: Root directory for the work (defaults to current workspace)
 - **logFile**: Path to the orchestration log (defaults to `docs/.orchestrator-log.md`)
 - **autoConfirm**: If `true`, execute all pipeline steps without pausing. If `false`, ask the user before each delegation. (Default: `false`)
@@ -103,6 +103,7 @@ IMPORTANT:
 - Previous step context: {previous_step_summary}
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Learned knowledge: read .agents/instructions/learned-knowledge.instructions.md for patterns and conventions.
+- Knowledgebase: call `knowledgebase_knowledgebase_search` with a task-relevant query using the graceful-failure protocol defined in `.agents/instructions/knowledge-retrieval.instructions.md`. Report whether executed or skipped in your final summary.
 - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
 - Return a clear summary (actions taken + files produced/modified + issues).
 ```
@@ -136,7 +137,10 @@ When the pipeline reaches the "coder" step and the latest implementer plan has p
       - Work on "Implement task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
       - Perform the necessary reads/writes under this base path.
       - Previous step context: {previous_step_summary}
-- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
+      - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
+      - Learned knowledge: read .agents/instructions/learned-knowledge.instructions.md for patterns and conventions.
+      - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
+      - Knowledgebase: call `knowledgebase_knowledgebase_search` with a task-relevant query using the graceful-failure protocol defined in `.agents/instructions/knowledge-retrieval.instructions.md`. Report whether executed or skipped in your final summary.
       - Return a clear summary (actions taken + files produced/modified + issues).
       ```
    d. **Wait for all tasks in this batch to complete** (fan-in). Capture each response summary.

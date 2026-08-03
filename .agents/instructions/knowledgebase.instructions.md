@@ -8,11 +8,13 @@ You have access to a centralized knowledgebase containing learned knowledge from
 pipeline sessions across all projects that have been indexed. The knowledgebase is
 powered by PostgreSQL + pgvector with semantic (cosine similarity) search.
 
-**MANDATORY REQUIREMENT — NOT BEST EFFORT:** You MUST query the knowledgebase before
-planning any task, when encountering errors, and when starting work on a known area.
-This is not optional — it is a core part of your decision-making process. Skipping
-knowledgebase queries in these scenarios will result in missed context and degraded
-output quality.
+**MANDATORY TO ATTEMPT, GRACEFUL TO FAIL:** You MUST attempt to query the knowledgebase
+before planning any task, when encountering errors, and when starting work on a known
+area. The attempt is mandatory — but the outcome is graceful: if the knowledgebase is
+unavailable or the search errors, explicitly note the skip and continue. Never block or
+fail the task because the knowledgebase is unavailable. See
+`.agents/instructions/knowledge-retrieval.instructions.md` for the full protocol
+including the required explicit reporting.
 
 ## MCP Tools
 
@@ -22,7 +24,7 @@ The knowledgebase is accessed via the `knowledgebase` MCP server configured in
 | Tool | Purpose | Parameters |
 |------|---------|------------|
 | `knowledgebase_search` | Semantic search across learned knowledge from all indexed projects | `query` (required), `topK` (default 5), `projectId` (optional) |
-| `knowledgebase_index` | Index or re-index a project's learned-knowledge.instructions.md | `projectId` (optional) |
+| `knowledgebase_index` | Index or re-index a project's learned-knowledge.instructions.md | `projectId` (required — from `package.json` `name` field) |
 | `knowledgebase_stats` | Get knowledgebase statistics (total projects, chunks, DB size) | None |
 | `knowledgebase_list` | List all projects currently indexed in the knowledgebase | None |
 
@@ -30,11 +32,14 @@ The knowledgebase is accessed via the `knowledgebase` MCP server configured in
 
 - **`knowledgebase_search`** — Use for finding relevant patterns, past decisions, and solutions.
   Returns results ranked by cosine similarity with metadata (project, date, pipeline, content).
-  Results are OpenAI-compatible tool call responses with structured text content.
+  Results are OpenAI-compatible tool call responses with structured text content. Restart
+  OpenCode after code changes to pick up updates.
 
 - **`knowledgebase_index`** — Use to manually trigger re-indexing of a project's learned knowledge
   file. Idempotent: unchanged sessions are skipped. Typically used when the post-commit hook
-  did not fire or you want to index changes before committing.
+  did not fire or you want to index changes before committing. The `projectId` MUST be the scoped
+  package name (e.g., `@abarcenas/ai-workflow-template`), read from `package.json` `name`. This
+  ensures a single canonical project per repository.
 
 - **`knowledgebase_stats`** — Use to check whether the knowledgebase has data and how much.
   Useful for diagnosing empty results or confirming indexing worked.
@@ -160,21 +165,37 @@ Each result includes these fields:
 your question, you do not need to examine lower-ranked results. If all results are below
 0.70, refine your query with more specific terminology before proceeding.
 
-## Graceful Degradation
+## Graceful Degradation (Mandatory to Attempt, Graceful to Fail)
 
-The knowledgebase is **optional** — it requires a PostgreSQL database with pgvector
-extension. If the MCP server is unavailable or `DATABASE_URL` is not configured:
+Querying the knowledgebase is **mandatory to attempt** but **graceful to fail** — it
+requires a PostgreSQL database with pgvector extension. If the MCP server is
+unavailable, `DATABASE_URL` is not configured, or the search call errors:
 
 1. **Do NOT block or fail** — Proceed with your task without the knowledgebase.
-2. **Make a note** — Record in your reasoning that the knowledgebase was unavailable.
+2. **Explicitly report the skip** — Note in your reasoning and final summary:
+   "knowledgebase_search NOT executed (PG vector unavailable)."
 3. **Fall back to memory-bank** — Use `memory_search` and `memory_get` for local context.
 4. **Proceed normally** — The knowledgebase is an enhancement, not a dependency.
+
+On a **successful** search, explicitly report the outcome in your reasoning and final
+summary: "knowledgebase_search executed — N results returned." (N = number of results returned.)
+
+This explicit-report protocol is the canonical graceful-failure contract defined in
+`.agents/instructions/knowledge-retrieval.instructions.md`.
 
 The MCP tools return descriptive messages when the database is unavailable:
 - `knowledgebase_search` → "Knowledgebase not available: DATABASE_URL is not configured."
 - `knowledgebase_index` → "Knowledgebase not available: DATABASE_URL is not configured."
 - `knowledgebase_stats` → Returns zero counts (not an error).
 - `knowledgebase_list` → Returns empty list (not an error).
+
+### MCP Server Restart After Configuration Changes
+
+When `mcp-knowledgebase-server.js` is updated (e.g., a threshold fix or handler change), the
+MCP server process spawned by OpenCode may hold a stale copy. **After any code change to the
+knowledgebase server or scripts, restart OpenCode** (or reload MCP servers) to pick up the
+latest version. Common gotcha: `knowledgebase_search` returns 0 results despite chunks in the
+DB because the MCP process is using an old threshold default. Restart resolves this.
 
 ## When NOT to Query
 
@@ -194,7 +215,7 @@ Do NOT use the knowledgebase for:
 
 The knowledgebase and memory bank serve complementary but distinct roles:
 
-| Aspect | Knowledgebase (Layer 3) | Memory Bank (Layer 2) |
+| Aspect | Knowledgebase (storage Tier 3) | Memory Bank (storage Tier 2) |
 |--------|------------------------|----------------------|
 | **Scope** | Cross-project — all indexed projects | Per-project — current project only |
 | **Content** | Learned patterns, conventions, gotchas | Current state, tasks, architecture |
@@ -206,19 +227,19 @@ The knowledgebase and memory bank serve complementary but distinct roles:
 **Think of the knowledgebase as "what we've learned across all projects" and the memory
 bank as "what's happening right now in this project."**
 
-The full three-layer knowledge architecture is:
+The storage hierarchy is a **storage-tier** taxonomy (Tier 1 → Tier 3), distinct from the
+**retrieval-layer** numbering (L1 → L3) used in
+`.agents/instructions/knowledge-retrieval.instructions.md`:
 
 ```
-Layer 3: Knowledgebase → Cross-project learned patterns (PostgreSQL + pgvector)
-Layer 2: Memory Bank  → Per-project current state (SQLite + sqlite-vec)
-Layer 1: Markdown     → Git-committed source of truth (filesystem)
+Tier 3: Knowledgebase → Cross-project learned patterns (PostgreSQL + pgvector)
+Tier 2: Memory Bank  → Per-project current state (SQLite + sqlite-vec)
+Tier 1: Markdown     → Git-committed source of truth (filesystem)
 ```
 
-When you start a session, follow this order:
-1. Load memory bank context (`memory_search`)
-2. Query the knowledgebase for relevant past patterns (`knowledgebase_search`)
-3. Read specific project files as needed
-4. Proceed with the task
+When you start a session, follow the protocol in
+`.agents/instructions/knowledge-retrieval.instructions.md` for the complete 3-layer
+retrieval order (memory-bank → learned-knowledge → knowledgebase_search → project files).
 
 ## Closed-Loop Workflow
 

@@ -17,7 +17,7 @@ You are a Test-Driven Development orchestration agent that enforces a strict RED
 
 ## Dynamic Parameters
 
-- **projectName**: The project or component being worked on (extracted from user request)
+- **projectName**: The project or component being worked on (extracted from user request (prefer package.json "name" for the canonical scoped projectId))
 - **basePath**: Root directory for the work (defaults to current workspace)
 - **logFile**: Path to the orchestration log (defaults to `docs/.orchestrator-log.md`)
 - **autoConfirm**: If `true`, execute all pipeline steps without pausing. If `false`, ask the user before each delegation. (Default: `false`)
@@ -132,6 +132,7 @@ IMPORTANT:
 - The batches within each table must respect dependency order (Batch A has no deps, Batch B depends on Batch A completing, etc.).
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Learned knowledge: read .agents/instructions/learned-knowledge.instructions.md for patterns and conventions.
+- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
 - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads.
 - After completing the plan, update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then run `memory_bank_memory_update`.
 - Return a clear summary including: plan file path, number of test tasks, number of implementation tasks, batch breakdown per table.
@@ -158,6 +159,7 @@ IMPORTANT:
    IMPORTANT:
    - Read and apply the entire .agent.md spec (tools, constraints, quality standards).
    - TDD CONTEXT: This is the RED phase. You are writing tests that define expected behavior BEFORE any implementation code exists. These tests SHOULD fail when run — that is correct and expected in TDD.
+   - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
    - Work on "Write tests for task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
    - Read the plan file to understand the full spec, interfaces, and expected behaviors.
    - Write comprehensive tests covering: happy path, error cases, edge cases, boundary values.
@@ -201,6 +203,7 @@ IMPORTANT:
    IMPORTANT:
    - Read and apply the entire .agent.md spec (tools, constraints, quality standards).
    - TDD CONTEXT: This is the GREEN phase. Write the MINIMAL production code necessary to pass all existing tests. Do NOT add features beyond what the tests specify. The tests were written first and define the contract you must fulfill.
+   - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
    - Work on "Implement task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
    - Read the plan file for full context and the corresponding test file(s) for the exact expected behavior.
    - Write production code that makes ALL related tests pass.
@@ -243,6 +246,7 @@ IMPORTANT:
   - Passed: {count}
   - Failed: {count} (with details for each failure)
   - Code coverage percentage (statement, branch, function, line — whichever the project's coverage tool reports)
+- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
 - The minimum coverage threshold is {minCoverage}%. Report whether this threshold is met.
 - If any tests FAIL: provide the failure details (file, line, error message, expected vs actual).
 - If coverage is BELOW {minCoverage}%: identify which files/modules have the lowest coverage and suggest additional test cases.
@@ -283,6 +287,7 @@ IMPORTANT:
   - Test and implementation code follow project conventions.
   - No security vulnerabilities were introduced.
   - Error handling is adequate and tested.
+- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
 - Base path: "{basePath}".
 - Read the plan file for context on what was supposed to be built.
 - Previous step context: All tests passed with {coverage}% coverage (threshold: {minCoverage}%).
@@ -307,6 +312,7 @@ IMPORTANT:
 - Base path: "{basePath}".
 - Read the orchestrator log at "docs/.orchestrator-log.md" for the full pipeline record.
 - Read any artifact files referenced in the log.
+- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
 - Append documentation entries to "docs/tracker-log.md".
 
 Pipeline summary:

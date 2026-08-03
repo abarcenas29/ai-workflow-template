@@ -1155,3 +1155,165 @@ Implemented an automatic vocabulary-sync workflow: the pre-commit hook now runs 
 - **Informational (no action required):** `plan/feature-vocab-sync-1.md:221` retains the superseded "one-line comment in the JSON" wording (historical planning artifact); `normalizeTag` is duplicated across the two scripts — CON-01 inherent, a future edit to one could silently re-introduce the M1 parity gap; memory-bank files introduce tags (`feature-vocab-sync`, `pre-commit`, `vocabulary`) that self-heal into the vocabulary at the next commit by design.
 - **Known limitation:** consumers running an older template version won't have `vocab-sync.js` until they run `npm update @abarcenas/ai-workflow-template` + `npx ai-workflow-setup` — the validator's warnings still work, just not auto-fixed (RISK-02).
 - The tracker Step 5 also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-08-03 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Pipeline 7: Close Knowledge-Vector Gaps with Graceful-Failure KB Access
+
+**Date:** 2026-08-03
+**Status:** ✅ SUCCESS — full suite 14 files / 273 tests, 0 failures; 14/14 new spec-wiring tests; reviewer APPROVED (after one ⚠️ CHANGES REQUESTED cycle fully resolved)
+**Pipeline:** implementer (planning) → coder (Batch A: 2 parallel) → coder (Batch B: 10 parallel) → coder (Batch C: 3 parallel) → coder (Batch D: 3 parallel) → unit-tester (independent validation) → reviewer (⚠️ CHANGES REQUESTED) → coder (fix pass M1+M2+B1-B4) → reviewer (✅ APPROVED) → tracker (this entry)
+
+### Summary
+
+Closed the knowledge-vector underutilization gaps identified by the Pipeline 6 researcher audit. A new shared protocol file (`.agents/instructions/knowledge-retrieval.instructions.md`) is now the single source of truth for the 3-layer retrieval order (memory-bank → learned-knowledge → knowledgebase_search → project files) with a **graceful-failure contract**: the PG knowledgebase is mandatory to ATTEMPT but graceful to fail, and every agent's final summary must explicitly state whether `knowledgebase_search` was executed or skipped (exact report phrases defined). All 10 pipeline agent specs reference the protocol (the 5 previously knowledge-less agents — deployer, e2e-tester, researcher, reviewer, unit-tester — gained NEW "Check Knowledge" steps), and all 3 orchestrator delegation templates were made symmetric (main standard+parallel-coder, feature-pipeline standard+parallel-coder, TDD all 6 phases including the reviewer phase that previously had zero injection). `knowledgebase.instructions.md` was reconciled from "MANDATORY REQUIREMENT — NOT BEST EFFORT" to "MANDATORY TO ATTEMPT, GRACEFUL TO FAIL". Two new grep-based spec-integrity test files (14 tests) guard the wiring, including occurrence-count guards that catch duplicate/missing injections. The reviewer's APPROVE-WITH-CHANGES verdict (2 majors + 4 minors, all doc-only) was fully resolved in a fix pass and re-approved with no findings. **0 production code changed** (CON-05 — docs/spec wiring only).
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | implementer (planning) | ✅ | `plan/feature-knowledge-vector-gaps-1.md` — 18 tasks / 4 batches (A: T1-T2, B: T3-T12, C: T13-T15, D: T16-T18). Key decisions: shared protocol file over inline duplication (prevents drift); graceful failure as the governing constraint; `plan.agent.md` out of scope (ALT-01); tracker gets a pre-append read requirement (REQ-06). 1 new file + 2 new test files + 14 modified (0 production code). Confirmation gate PASSED. |
+| 2 | coder (Batch A — 2 parallel) | ✅ | **T1**: `.agents/instructions/knowledge-retrieval.instructions.md` created (57L, byte-matches plan FILE-01) — 3-layer protocol, graceful-failure wrapper, explicit-report disclosure non-optional, exact phrases. **T2**: `knowledgebase.instructions.md` reconciled (+36/−15) — "MANDATORY TO ATTEMPT, GRACEFUL TO FAIL", explicit-report contract, 3 cross-refs to the protocol. |
+| 2 | coder (Batch B — 10 parallel) | ✅ | All 10 agent specs now reference the protocol. NEW "Check Knowledge"/"Query Knowledgebase" steps: deployer (T5), designer (T6), e2e-tester (T7), researcher (T9, 0a), reviewer (T10, step 0), tracker (T11, step 1 incl. pre-append read), unit-tester (T12, step 1); extended in place: architect (T3), coder (T4), implementer (T8). Coders followed the plan's authoritative FILE mapping (differed from the orchestrator's initial guess). All YAML frontmatter intact, steps sequentially numbered. |
+| 2 | coder (Batch C — 3 parallel) | ✅ | Orchestrator templates symmetric: **T13** main orchestrator (+3: knowledge-retrieval + architecture-context in standard; knowledge-retrieval in parallel-coder); **T14** feature-pipeline (+4: knowledgebase in standard; learned-knowledge + architecture-context + knowledgebase in parallel-coder); **T15** TDD (+6/0: identical knowledge-retrieval line in all 6 Phase delegations — Phase 5 reviewer zero-injection gap FIXED). |
+| 2 | coder (Batch D — 3 parallel) | ✅ | **T16**: `tests/spec-knowledge-retrieval.test.js` (6 tests); `vitest.config.ts` include extended to `tests/**/*.test.{js,ts}` (required for collection). **T17**: `tests/spec-orchestrator-parity.test.js` (8 tests, robust fenced-block extraction + occurrence-count guards). **T18**: manual graceful-failure self-consistency verification — PASS, no hard-dependency language, explicit-report in shared file + all 3 orchestrators, tracker pre-append read present. Plan marked Completed (18/18). |
+| 3 | unit-tester (independent validation) | ✅ | Full suite **14 files / 273 tests, 0 failures** independently re-run (matches coder claim); new spec-wiring tests **14/14**; independent spot-checks (reviewer:28, unit-tester:28, deployer:31 "Check Knowledge"; all 10 specs reference protocol; orchestrator injections INSIDE fenced blocks; TDD 6 phases; shared protocol phrases at :8/:25/:29/:30 + explicit-report :48-49; knowledgebase.instructions.md reconciled 0 hits "NOT BEST EFFORT"; tracker pre-append read :25/:29; all 13 modified agent files YAML-parse). Coverage: global 48.12% (pre-existing; no production code changed). |
+| 4 | reviewer | ⚠️ CHANGES REQUESTED | ✅ APPROVED overall but flagged 🟡 M1 (tracker.agent.md:34 stale "step 3" cross-ref after renumbering) + 🟡 M2 (layer-numbering drift — retrieval L1=Memory Bank vs storage L1=Markdown) + 🔵 B1 (phrase drift "N results." vs "N results returned.") + 🔵 B2 (e2e-tester step order vs plan T7) + 🔵 B3 (feature-pipeline parallel-coder fence bullets at column 0) + 🔵 B4 (main orchestrator parallel-coder lacked arch-context). Graceful-failure requirement confirmed FULLY MET (no hard-dependency language; explicit-report non-optional; exact phrases). Tests sound + non-vacuous. Reviewer also added 3 vocab tags (`knowledge-vector-gaps`, `graceful-failure`, `agents`). |
+| 4b | coder (fix pass) | ✅ | All 6 findings fixed (doc-only): M1 step 3→4; M2 storage taxonomy relabeled to "Tier N" with tiers-vs-layers disambiguation; B1 canonical "N results returned."; B2 e2e-tester Check Knowledge now step 2 before Open Page; B3 fence bullets re-indented to 6 spaces; B4 parallel-coder architecture-context added. Shared protocol NOT touched. Verification: targeted 14/14, full suite 14 files/273/0, occurrence-count invariants unchanged. |
+| 3b | reviewer (final sign-off) | ✅ APPROVED | No findings (0 critical / 0 major / 0 minor). All 6 fixes independently verified; graceful-failure contract intact (0 diff in shared protocol, hard-dependency scan 0 hits, "MANDATORY TO ATTEMPT, GRACEFUL TO FAIL" retained). Targeted 14/14 + full suite 14 files/273/0 re-run. Memory-bank hygiene clean (validator exit 0). Recommendation: APPROVE — ready to merge. |
+| 5 | tracker | ✅ | This entry — full pipeline record, progress summary, learned-knowledge Session 2026-08-03, TRACKER-INDEX update, memory-bank re-index. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/instructions/knowledge-retrieval.instructions.md` | **NEW (T1)** — Shared 3-layer knowledge-retrieval protocol (57L, `applyTo: "**"`): Layer 1 memory-bank, Layer 2 learned-knowledge, Layer 3 knowledgebase with graceful-failure wrapper + explicit-report disclosure ("This disclosure is not optional"). Single source of truth referenced by all specs/orchestrators. |
+| `.agents/instructions/knowledgebase.instructions.md` | **MODIFIED (T2, M2, B1)** — "MANDATORY REQUIREMENT — NOT BEST EFFORT" → "MANDATORY TO ATTEMPT, GRACEFUL TO FAIL"; storage taxonomy relabeled "Layer N" → "Tier N" (Tier 1 Markdown / Tier 2 Memory Bank / Tier 3 Knowledgebase) with explicit tiers-vs-layers disambiguation; success phrase canonicalized to "N results returned." |
+| `.opencode/agents/deployer.agent.md` | **MODIFIED (T5)** — NEW step 3 "Check Knowledge" (3-layer; deployment-relevant query); steps renumbered. |
+| `.opencode/agents/e2e-tester.agent.md` | **MODIFIED (T7, B2)** — NEW step 2 "Check Knowledge" (3-layer; debugging/exploration query) BEFORE Open Page (now step 3); steps renumbered. |
+| `.opencode/agents/researcher.agent.md` | **MODIFIED (T9)** — NEW "### 0a. Check Knowledge" before Investigation Planning (renumbered 0b); spike-domain queries. |
+| `.opencode/agents/reviewer.agent.md` | **MODIFIED (T10)** — NEW step 0 "Check Knowledge" (review patterns, known bug classes, security gotchas). |
+| `.opencode/agents/tracker.agent.md` | **MODIFIED (T11, M1)** — NEW step 1 "Check Knowledge" with pre-append learned-knowledge read requirement; core-responsibility bullet updated; step cross-ref fixed "step 3"→"step 4" (line 34). |
+| `.opencode/agents/unit-tester.agent.md` | **MODIFIED (T12)** — NEW step 1 "Check Knowledge" (test patterns, mock strategies, coverage approaches). |
+| `.opencode/agents/architect.agent.md` | **MODIFIED (T3)** — Step 3 "Check Memory Bank" extended with "**Query Knowledgebase**" continuation line. |
+| `.opencode/agents/coder.agent.md` | **MODIFIED (T4)** — Step 3 "Check Memory Bank" extended with "**Query Knowledgebase**" continuation line. |
+| `.opencode/agents/designer.agent.md` | **MODIFIED (T6)** — NEW step 4 "Query Knowledgebase" (design/UI-relevant query); steps renumbered 1-7. |
+| `.opencode/agents/implementer.agent.md` | **MODIFIED (T8)** — Step 3 "Check Memory Bank" extended with "**Query Knowledgebase**" continuation line. |
+| `.opencode/agents/orchestrator/orchestrator.agent.md` | **MODIFIED (T13, B4)** — Standard delegation + knowledge-retrieval + architecture-context; parallel-coder delegation + knowledge-retrieval + architecture-context (parity with feature-pipeline). |
+| `.opencode/agents/orchestrator/feature-pipeline.agent.md` | **MODIFIED (T14, B3)** — Standard delegation + Knowledgebase line; parallel-coder delegation + learned-knowledge + architecture-context + knowledgebase (was asymmetric — only memory-bank); fence bullets re-indented to 6 spaces. |
+| `.opencode/agents/orchestrator/tdd-orchestrator.agent.md` | **MODIFIED (T15)** — Identical knowledge-retrieval line injected into ALL 6 Phase delegation templates (Phase 5 reviewer previously had ZERO injection). |
+| `tests/spec-knowledge-retrieval.test.js` | **NEW (T16)** — 6 grep-based spec-integrity tests (TEST-01..06): all 10 agent specs reference protocol; learned-knowledge refs; 3 orchestrators ref protocol; shared file exists + graceful + explicitly note (case-insensitive); "NOT BEST EFFORT" gone; plan.agent.md excluded. |
+| `tests/spec-orchestrator-parity.test.js` | **NEW (T17)** — 8 tests (TEST-07..10): robust fenced-block extraction + marker classification; main orchestrator standard + parallel-coder refs; feature-pipeline both delegations carry learned-knowledge + architecture-context + knowledgebase; TDD all 6 phases; occurrence-count guards (2×/2×/6×). |
+| `vitest.config.ts` | **MODIFIED (T16)** — include extended to `['scripts/**/*.test.{js,ts}', 'tests/**/*.test.{js,ts}']` so the new `tests/` spec tests are collected (does not affect Playwright `.spec.ts`). |
+| `plan/feature-knowledge-vector-gaps-1.md` | **NEW** — 18 tasks / 4 batches, status **Completed**; completion notes for T17/T18 and the reviewer fix pass. |
+| `memory-bank/.vocabulary.json` | **MODIFIED (reviewer)** — 3 tags added (`knowledge-vector-gaps`, `graceful-failure`, `agents`) for memory-bank hygiene. |
+
+### Key Decisions
+
+- **Shared protocol file over inline duplication** — the 3-layer protocol lives once in `.agents/instructions/knowledge-retrieval.instructions.md`; agent specs and orchestrators only REFERENCE it (one line each). Duplication drift is a proven risk (the "Check Memory Bank" step already drifted between agents); 14 files × ~8 lines of inline text would have made the graceful-failure wording a maintenance nightmare (ALT-02).
+- **Graceful failure as the governing constraint** — the PG knowledgebase is **mandatory to ATTEMPT** but **graceful to fail**: on error/unavailability, the agent explicitly notes "knowledgebase_search NOT executed (PG vector unavailable)." and continues — never blocks, fails, or retries. On success it notes "knowledgebase_search executed — N results returned." The final-summary disclosure is **non-optional** (REQ-03/REQ-04, user requirement).
+- **`plan.agent.md` out of scope** — it is a standalone pre-pipeline conversational agent with a different structure; adding the numbered-step protocol would be inconsistent (ALT-01, CON-04).
+- **Explicit references over auto-loading** — the protocol file uses `applyTo: "**"` but agents reference it explicitly for clarity and self-documentation; auto-loading would silently inject it everywhere regardless of host behavior (ALT-05).
+- **Plan-authoritative FILE mapping for parallel delegation** — the plan's FILE-xx table is the source of truth for which coder touches which file (T3→architect, T4→coder, T8→implementer — NOT the orchestrator's initial guess); coders verified against the plan, preventing same-file collisions.
+- **Grep-based spec tests with occurrence-count guards** — the new tests read the REAL files from disk (no mocks) and count exact occurrences (`knowledge-retrieval.instructions.md` = 2 in main orchestrator, `knowledgebase_knowledgebase_search` = 2 in feature-pipeline, `knowledge-retrieval.instructions.md` = 6 in TDD) so duplicate OR missing injections fail the suite.
+- **Storage tiers ≠ retrieval layers** — M2 disambiguation: retrieval layers (L1/L2/L3) are the ORDER of lookup in the protocol; storage tiers (Tier 1/2/3) are the persistence taxonomy. Renaming the storage taxonomy to "Tier N" eliminated the L1 collision between the two instruction files.
+- **Orchestrator symmetry as a review check** — delegation templates must be identical in knowledge injection across (a) standard vs parallel-coder types and (b) all TDD phases; the reviewer's B4 catch (main orchestrator parallel-coder missing arch-context) shows symmetry is a first-class review dimension.
+- **0 production code changed** — CON-05: this is docs/spec wiring only; the 273-test suite is unchanged in production surface (global coverage 48.12% pre-existing).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run tests/spec-knowledge-retrieval.test.js tests/spec-orchestrator-parity.test.js` | ✅ 14/14 passed |
+| `npx vitest run` (full suite) | ✅ 14 files / 273 tests, 0 failures (259 pre-existing + 6 T16 + 8 T17; coder, unit-tester, reviewer all independently confirmed) |
+| Hard-dependency language grep (`must succeed\|required to function\|MANDATORY REQUIREMENT\|NOT BEST EFFORT`) | ✅ 0 hits across changed files; only correct negation at `knowledge-retrieval.instructions.md:8` |
+| Explicit-report requirement | ✅ Shared protocol :48-49 + ALL 3 orchestrators (orchestrator :124/:158, feature-pipeline :106/:143, TDD :135/:162/:206/:249/:290/:315) |
+| Occurrence-count invariants | ✅ orchestrator `knowledge-retrieval.instructions.md` = 2; feature-pipeline `knowledgebase_knowledgebase_search` = 2; tdd-orchestrator `knowledge-retrieval.instructions.md` = 6 |
+| YAML frontmatter / code fences | ✅ 13/13 modified agent files YAML-parse; fences balanced |
+| Tracker pre-append read | ✅ `tracker.agent.md:25` + `:29` (read learned-knowledge BEFORE appending) |
+| `knowledgebase.instructions.md` reconciliation | ✅ 0 hits "MANDATORY REQUIREMENT"/"NOT BEST EFFORT"; line 11 "MANDATORY TO ATTEMPT, GRACEFUL TO FAIL" |
+| Reviewer final verdict | ✅ APPROVED — no findings after fix pass |
+
+### Notes / Follow-up
+
+- **This pipeline IS the mechanism** — the very feature being closed means every agent (including future pipeline agents) now runs the 3-layer protocol and reports the knowledgebase outcome in its final summary; this tracker entry itself executed the protocol.
+- **User requirement honored**: graceful failure is enforced — the PG vector remains optional; agents explicitly report "executed" or "NOT executed" and never fail the pipeline on KB unavailability.
+- **Follow-up candidates (non-blocking)**: any FUTURE agent spec added to `.opencode/agents/` must reference the shared protocol (TEST-01/02 will fail otherwise — by design); consumer projects need `npm update @abarcenas/ai-workflow-template` + `npx ai-workflow-setup` to receive the updated `.opencode/**` and `.agents/**` files (sync.js distribution).
+- The tracker Step 5 also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-08-03 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Pipeline 9: Consolidate Duplicate KB Projects + Standardize projectId Convention
+
+**Date:** 2026-08-03
+**Status:** ✅ SUCCESS — full suite 15 files / 284 tests, 0 failures; setup suite 104/104; store consolidated to 4 projects / 37 chunks; reviewer APPROVED (no critical/blocking)
+**Pipeline:** implementer (planning) → coder (Batch A: 6 parallel — T1, T3, T4, T5, T6, T7) → coder (T2 sequential) → coder (Batch B: 2 parallel — T8, T9) → coder (T10 sequential) → unit-tester (independent validation) → reviewer (✅ APPROVED) → tracker (this entry)
+
+### Summary
+
+Consolidated the PostgreSQL knowledgebase's duplicate project split (`@abarcenas/ai-workflow-template` 15 chunks from Pipelines 2–5 vs `ai-workflow-template` 16 chunks from Pipeline 7) into the single canonical scoped project, and standardized the `projectId` convention so every future `knowledgebase_index` call derives it from `require('./package.json').name`. The data consolidation used a fail-safe **re-index-from-source then delete** ordering (T1 re-indexed the canonical project idempotently → T2 deleted the duplicate project row via transactional parameterized SQL with `ON DELETE CASCADE`, zero data loss — the `learned-knowledge.instructions.md` file is the source of truth and all 16 sessions survived). Standardization was wired across 5 touchpoints (tracker spec, retrieval protocol, knowledgebase instructions, all 3 orchestrator templates) and is now enforced by a new 11-assertion spec-wiring test. This pipeline was a docs + DB operation only — **0 production code changed**.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | implementer (planning) | ✅ | `plan/process-kb-consolidation-1.md` — 4 phases / 10 tasks / 4 batches (A: 6 parallel; T2 sequential; B: 2 parallel; T10 sequential). Consolidation approach: **RE-INDEX FROM SOURCE → DELETE UNScoped** (learned-knowledge file is source of truth; `knowledgebase_index` under the scoped projectId is idempotent/guaranteed correct; delete never reached if re-index fails). Alternatives rejected: UPDATE-in-place (violates `uq_knowledge_chunk` unique constraint — 15 of 16 chunks share `(session_date, content_hash)`), content-level merge (complex, zero benefit), delete-first (data-loss risk). Standardization points: tracker.agent.md:29, protocol file, knowledgebase.instructions.md:27, 3 orchestrator templates. Already-correct: knowledgebase-cli.js `resolveProjectId()` reads package.json name; MCP server projectId-agnostic. Canonical rule: `projectId` SHALL = `require('./package.json').name`. Tests: TEST-01/02 store state, TEST-03 suite, TEST-04-09 spec-wiring. Confirmation gate PASSED. |
+| 2 | coder (Batch A — 6 parallel) | ✅ | **T1**: `knowledgebase_index` MCP with canonical `@abarcenas/ai-workflow-template` → "Indexed 1 chunks, updated 15, skipped 0" (idempotent upsert; canonical now 16 chunks; unscoped duplicate left intact for T2). **T3**: tracker.agent.md +line 30 — projectId SHALL = `require('./package.json').name`, NOT from projectName. **T4**: knowledge-retrieval.instructions.md +12L "### Canonical projectId". **T5**: knowledgebase.instructions.md — `knowledgebase_index` projectId optional→required (from package.json name); +lines 192-198 "### MCP Server Restart After Configuration Changes" (absorbed plan T7 restart-note content — same file). **T6**: orchestrator.agent.md:25 projectName → "(extracted from user request (prefer package.json "name" for the canonical scoped projectId))". **T7**: feature-pipeline.agent.md:20 + tdd-orchestrator.agent.md:20 same wording (string-identical across all 3). Verified: 14/14 spec-wiring tests pass; full suite 273/273; YAML/fences intact. |
+| 2 | coder (T2, sequential after T1) | ✅ | Pre-delete guards passed (canonical ≥ 16 chunks; unscoped exists with exactly 16; no other project shares id). CLI has no delete command → used transactional parameterized SQL (temp script in OS temp dir, NOT in repo): BEGIN → verify → `DELETE FROM projects WHERE id='ai-workflow-template'` (rowCount 1; `ON DELETE CASCADE` removed 16 chunks) → verify 0 chunks remain + totals (4 projects / 37 chunks) → COMMIT. Post-delete: `ai-workflow-template` ABSENT, canonical still 16, math 16+12+3+6=37. Zero data loss. |
+| 2 | coder (Batch B — 2 parallel) | ✅ | **T8**: full Vitest suite 14 files / 273 / 0 (exact match) + setup sub-suite 6 files / 104 / 0. Noted: package.json `test` script is actually Playwright — correct Vitest command is `npx vitest run`. **T9**: `tests/spec-kb-consolidation.test.js` created (164L, 11 `it()` blocks — TEST-05 tracker projectId derivation, TEST-06 canonical heading, TEST-07 index projectId required row-scoped, TEST-08 all 3 orchestrators, TEST-09 restart note + graceful-failure regression guard). Windowed/row-scoped matching avoids false failures. Targeted 11/11; full suite now 15 files / 284 / 0. |
+| 2 | coder (T10, sequential) | ✅ | Plan frontmatter status → Completed + intro badge + Phase 4 header; memory-bank activeContext/progress/tasks/_index consolidated; `memory_update` ran (1985 vectors). KB verified: 4 projects / 37 chunks, duplicate absent, canonical 16. Plan fully complete (10/10 tasks, 4 phases). |
+| 3 | unit-tester (independent validation) | ✅ | New spec test 11/11; spec-wiring trio **25/25** (6+8+11); full suite **15 files / 284 / 0** exact match. Independent spot-checks: store state (4 projects / 37 chunks; `ai-workflow-template` ABSENT; canonical 16; math 16+12+3+6=37); standardization grep-verified (tracker.agent.md:30, protocol :51, knowledgebase.instructions.md:27 required + :192 restart note, all 3 orchestrators mention package.json); graceful-failure contract intact. Coverage global 48.12% — bit-for-bit identical to baseline (docs-only pipeline, 0 scripts changed). No issues. |
+| 4 | reviewer | ✅ APPROVED | No critical, no blocking major. Independent checks: live KB state 4 projects / 37 chunks, duplicate absent, canonical 16; source-of-truth parity (16 `## Session:` entries = 16 chunks, zero data loss); spec test 11/11 + full suite 15 files / 284 / 0; `scripts/` zero diff; no hardcoded unscoped projectId (grep 0 hits); no hard-dependency language. Deletion safety positive (temp script parameterized/transactional/guarded, outside repo). 🟡 Major (**PRE-EXISTING**, not from this pipeline): `.env` tracked in git with live DATABASE_URL credential — remediation documented in learned-knowledge (rotate + `git rm --cached .env` + gitignore + purge history); track as follow-up, not shipped in this commit. 🔵 Minors: TEST-05 lacks negative assertion against hardcoded `projectId: 'ai-workflow-template'` (recommended hardening); orchestrator-log line-count inaccuracy (164L vs actual 226L); standardization changes uncommitted (commit after review); TEST-05 700-char window mildly brittle (optional). |
+| 5 | tracker | ✅ | This entry — full pipeline record in `docs/tracker-log.md`, progress summary, learned-knowledge Session 2026-08-03, TRACKER-INDEX update, memory bank + PG knowledgebase re-index. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `plan/process-kb-consolidation-1.md` | **NEW** — 4 phases / 10 tasks / 4 batches, status **Completed**; documents consolidation approach, rejected alternatives (ALT-01..04), standardization points, risks/guards, and the T6/T7 re-batch note. |
+| `.opencode/agents/tracker.agent.md` | **MODIFIED (T3)** — Check Knowledge step +line 30: `knowledgebase_index` `projectId` SHALL = `require('./package.json').name` (canonical scoped name), NOT orchestrator `projectName`; package.json name = single source of truth. |
+| `.agents/instructions/knowledge-retrieval.instructions.md` | **MODIFIED (T4)** — +12L "### Canonical projectId" subsection: index MUST use package.json name; search optional/match-all with same derivation if passed. |
+| `.agents/instructions/knowledgebase.instructions.md` | **MODIFIED (T5 + plan T7)** — `knowledgebase_index` row `projectId` (optional) → "(required — from `package.json` `name` field)"; tool-detail sentence (scoped package name, single canonical project per repository); +"### MCP Server Restart After Configuration Changes" section (lines 192-198) + "Restart OpenCode after code changes" cross-ref in search tool description. |
+| `.opencode/agents/orchestrator/orchestrator.agent.md` | **MODIFIED (T6)** — line 25 `projectName` description → "(extracted from user request (prefer package.json "name" for the canonical scoped projectId))". |
+| `.opencode/agents/orchestrator/feature-pipeline.agent.md` | **MODIFIED (T7)** — line 20 `projectName` description → same package.json-preferring wording. |
+| `.opencode/agents/orchestrator/tdd-orchestrator.agent.md` | **MODIFIED (T7)** — line 20 `projectName` description → same package.json-preferring wording (string-identical across all 3). |
+| `tests/spec-kb-consolidation.test.js` | **NEW (T9)** — 164L / 11 `it()` blocks: TEST-05 tracker derivation, TEST-06 canonical heading + package.json, TEST-07 index row required/not-optional (row-scoped) + package.json, TEST-08 all 3 orchestrators mention package.json, TEST-09 restart note + "MANDATORY TO ATTEMPT, GRACEFUL TO FAIL" regression guard. |
+| `memory-bank/activeContext.md` | **MODIFIED (T10)** — KB consolidation + standardization completion note appended. |
+| `memory-bank/progress.md` | **MODIFIED (T10 + tracker)** — What's Left marked ✅ COMPLETED; What Works entries per task; tracker summary added. |
+| `memory-bank/tasks/_index.md` | **MODIFIED (T10)** — `[kb-consolidation-t10]` task entry under Completed. |
+| PostgreSQL knowledgebase | **DATA (T1/T2)** — duplicate `ai-workflow-template` project row deleted (ON DELETE CASCADE removed 16 chunks); canonical `@abarcenas/ai-workflow-template` holds all 16 sessions; store now 4 projects / 37 chunks. |
+
+### Key Decisions
+
+- **Re-index-from-source then delete (T1 → T2) is the fail-safe consolidation pattern** — `learned-knowledge.instructions.md` is the authoritative source of truth; re-indexing under the canonical projectId is idempotent and guaranteed correct; the delete is never reached if re-index fails (SEC-01, DEP-01). UPDATE-in-place was rejected because it violates the `uq_knowledge_chunk (project_id, session_date, content_hash)` unique constraint (15 of 16 chunks collide with existing canonical rows); content-level merge was rejected as high-complexity-for-zero-benefit (ALT-01/02).
+- **`projectId` SHALL equal `require('./package.json').name` — package.json name is the single source of truth** — never derive projectId from directory names, orchestrator context, or display strings (REQ-03). This is the KEY remediation: Pipeline 7's tracker passed the hardcoded unscoped `ai-workflow-template` (from the orchestrator's projectName), which created the duplicate KB project row. The rule is now enforced at the tracker spec, the retrieval protocol, and the knowledgebase instructions.
+- **`knowledgebase_index` projectId is now "required" (not "optional")** — write targets must be explicit and canonical; `knowledgebase_search` projectId stays "(optional)" because it's a read-only filter that may degrade to match-all (preserves the documented search-filter vs write-target asymmetry).
+- **Deletion via transactional parameterized SQL in a temp script (outside the repo)** — the CLI has no delete/cleanup command (sync/search/list/stats only), so T2 used a `pg`-based temp Node script: `BEGIN` → verify project row exists + chunk count = exactly 16 (RISK-02) + canonical ≥ 16 (DEP-01) → `DELETE` (rowCount 1, cascade) → verify 0 chunks remain + totals → `COMMIT` (ROLLBACK on any guard failure). No repo artifacts left behind.
+- **`ON DELETE CASCADE` makes project-level cleanup safe and complete** — deleting the `projects` row cascades to all 16 `knowledge_chunks` rows (the FK that caused the registerProject bug is the same FK that makes cleanup trivial).
+- **3 orchestrator `projectName` descriptions now prefer package.json name** — doc-only expectation-setting: "extracted from user request (prefer package.json "name" for the canonical scoped projectId)" — the orchestrator doesn't inject projectId, but the guidance reduces the "project name from user" vs "canonical package name" gap that created the duplicate.
+- **MCP restart requirement is now documented in the instructions** — the threshold-fix restart gotcha (from the 2026-08-02 housekeeping session) is codified as `### MCP Server Restart After Configuration Changes` + a search-tool cross-ref, so future agents know a stale MCP process can return 0 results despite data in the DB.
+- **0 production code changed** — CON-01 respected; `knowledgebase-cli.js` (already correct), `mcp-knowledgebase-server.js`, and `knowledgebase-index.js` untouched; global coverage 48.12% bit-identical to baseline.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `knowledgebase_list` / `knowledgebase_stats` | ✅ 4 projects / 37 chunks; `ai-workflow-template` ABSENT; canonical `@abarcenas/ai-workflow-template` = 16 chunks; math 16+12+3+6=37 |
+| Source-of-truth parity | ✅ 16 `## Session:` entries in learned-knowledge = 16 canonical chunks — zero data loss |
+| `npx vitest run tests/spec-kb-consolidation.test.js` | ✅ 11/11 passed |
+| Spec-wiring trio (spec-knowledge-retrieval + spec-orchestrator-parity + spec-kb-consolidation) | ✅ 25/25 passed (6+8+11) |
+| `npx vitest run` (full suite) | ✅ 15 files / 284 tests, 0 failures (was 14 files / 273; +11 from T9) |
+| `npx vitest run scripts/setup/` | ✅ 104/104 across 6 files |
+| Standardization grep | ✅ tracker.agent.md:30 `require('./package.json').name` + "single source of truth"; protocol :51 `### Canonical projectId`; knowledgebase.instructions.md:27 required + :192 restart note; all 3 orchestrators mention package.json |
+| Hardcoded unscoped projectId grep | ✅ 0 hits |
+| Hard-dependency language grep | ✅ 0 hits in `.opencode/agents/`; graceful-failure contract intact ("MANDATORY TO ATTEMPT, GRACEFUL TO FAIL") |
+| Coverage | ✅ Global 48.12% — bit-identical to pre-pipeline baseline (docs-only pipeline, 0 scripts changed) |
+| Reviewer final verdict | ✅ APPROVED — no critical, no blocking major |
+
+### Notes / Follow-up
+
+- **PRE-EXISTING SECURITY ISSUE (not from this pipeline, follow-up required)**: `.env` is tracked in git with a live 32-char `DATABASE_URL` credential (added `d788f68`, no `.gitignore`). Remediation documented in learned-knowledge: rotate the credential, `git rm --cached .env`, add `.env` to `.gitignore`, purge history. **Do not ship this commit until addressed.**
+- **Minor hardening (non-blocking, recommended)**: add a negative assertion to TEST-05 that a hardcoded `projectId: 'ai-workflow-template'` fails the tracker-guidance check; the orchestrator-log's T9 line-count note is slightly inaccurate (test file is 226L, not 164L); the standardization changes are uncommitted — commit after review.
+- **Operational note**: the threshold fix (`?? 0.1` at `mcp-knowledgebase-server.js:192`) was already in code but requires an MCP server / OpenCode restart to take effect — now documented in `knowledgebase.instructions.md`.
+- **Convention going forward**: any future `knowledgebase_index` call (tracker, orchestrator, CLI, hook) must use the scoped `package.json` `name`; the new spec test will fail if a doc regresses to an unscoped projectId.
+- The tracker Step 5 also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-08-03 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
