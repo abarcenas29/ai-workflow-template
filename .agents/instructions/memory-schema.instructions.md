@@ -64,6 +64,28 @@ When `scripts/normalize-memory.js` runs (postinstall or manual), it:
 - Does NOT overwrite existing frontmatter fields
 - Logs all auto-applied suggestions
 
+## Maintaining the Vocabulary
+
+When adding a new tag to a memory-bank file's frontmatter:
+
+1. **Check if it already exists** in `memory-bank/.vocabulary.json`:
+   - Search `tags.*` groups (all values across `agent_roles`, `workflow`, `memory_ops`, `topic`)
+   - Search `entity_patterns` keys (component/tool names like `npm`, `vitest`, `playwright`)
+2. **If it's a tool, framework, or component:** add it to `entity_patterns` as a new key with at least one regex pattern.
+3. **If it's a concept or topic:** add it to the appropriate `tags.*` group:
+   - `topic` — general concepts, technologies, domains (default catch-all)
+   - `workflow` — processes, pipelines, ceremonies
+   - `memory_ops` — memory-bank operations
+   - `agent_roles` — agent role identifiers
+4. **Tag format rules:**
+   - Lowercase only
+   - Kebab-case (hyphens for spaces, no underscores)
+   - Maximum 5 tags per file
+   - No whitespace-only or empty tags
+5. **Rationale:** Record why the tag exists in the commit message or PR description, or in the existing `categories` description strings. Strict JSON supports no comments — do NOT add comment syntax to `.vocabulary.json` (it would corrupt the file).
+
+The pre-commit hook (`vocab-sync.js`) auto-appends genuinely new tags to the `topic` group as a safety net, but manual categorization is preferred for accuracy.
+
 ## Pre-Commit Validation
 
 The husky pre-commit hook (`scripts/validate-memory-schema.js`) rejects commits where:

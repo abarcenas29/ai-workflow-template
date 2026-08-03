@@ -53,6 +53,7 @@ describe('__scripts__ sync behavior', () => {
     'memory-index.js',
     'bump-version.js',
     'validate-memory-schema.js',
+    'vocab-sync.js',
     'mcp-memory-server.js',
     'mcp/playwright-mcp-launcher.js',
   ]
@@ -75,7 +76,7 @@ describe('__scripts__ sync behavior', () => {
     const result = runSync(tempDir)
     expect(result.status).toBe(0)
 
-    // Verify all 6 script files were created in the consumer's scripts/ dir
+    // Verify all 7 script files were created in the consumer's scripts/ dir
     for (const script of scriptsToSync) {
       const targetFile = join(tempDir, 'scripts', script)
       expect(
@@ -137,7 +138,7 @@ describe('__scripts__ sync behavior', () => {
     const result = runSync(tempDir, ['--force'])
     expect(result.status).toBe(0)
 
-    // Verify all 6 files were overwritten with source content
+    // Verify all 7 files were overwritten with source content
     for (const script of scriptsToSync) {
       const targetFile = join(tempDir, 'scripts', script)
       const sourceFile = join(sourceScriptsDir, script)
@@ -178,7 +179,7 @@ describe('__scripts__ sync behavior', () => {
       readFileSync(join(tempDir, '.agents-sync-manifest.json'), 'utf8'),
     )
 
-    // Verify all 6 __scripts__ entries are tracked with valid SHA-256 hashes
+    // Verify all 7 __scripts__ entries are tracked with valid SHA-256 hashes
     for (const script of scriptsToSync) {
       const key = `__scripts__/${script}`
       expect(updatedManifest.files[key]).toBeDefined()

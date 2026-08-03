@@ -26,6 +26,7 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Bug-fix Pipeline 2 | Follow-up: registerProject nits + TEST-12 smoke test + redaction hardening | 2026-08-02 | ✅ Complete (181/181 tests; TEST-12 live-spawn PASS; fail-closed redaction; reviewer APPROVED) |
 | Bug-fix Pipeline 3 | Final minor-hygiene: search projectId trim + `limit ?? 5` + query-string redaction | 2026-08-02 | ✅ Complete (185/185 tests; all 4 new tests non-vacuous; reviewer APPROVED, no follow-ups) |
 | Documentation Pipeline 4 | README.md trim + instructions-on-top | 2026-08-03 | ✅ Complete (README 469→289 lines; 4 accuracy fixes verified; 0 markdownlint structural errors; reviewer APPROVED) |
+| Feature Pipeline 5 | Auto-update vocabulary JSON (vocab-sync) + agent instructions | 2026-08-03 | ✅ Complete (259/259 tests + setup 104/104; coverage ≥90% on both scripts; chicken-and-egg eliminated; reviewer APPROVED after 1 CHANGES REQUESTED cycle) |
 
 ## Entry Locations
 
@@ -45,6 +46,7 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | RegisterProject Follow-up (nits + TEST-12 + redaction) | `docs/tracker-log.md`, `plan/fix-kb-registerproject-1.md` (§9-§11), `scripts/mcp-knowledgebase-server.js`, `scripts/mcp-knowledgebase-server.test.js` |
 | RegisterProject Final Minor-Hygiene (search trim + limit `??` + query redaction) | `docs/tracker-log.md`, `plan/fix-kb-registerproject-1.md` (§12), `scripts/mcp-knowledgebase-server.js`, `scripts/mcp-knowledgebase-server.test.js` |
 | README Trim + Instructions-on-Top | `docs/tracker-log.md`, `README.md` |
+| Vocab-Sync Auto-Update + Agent Instructions | `docs/tracker-log.md`, `plan/feature-vocab-sync-1.md`, `scripts/vocab-sync.js`, `scripts/validate-memory-schema.js`, `.agents/instructions/memory-schema.instructions.md`, `.opencode/agents/reviewer.agent.md` |
 
 ### Learned Knowledge Sessions
 
@@ -62,3 +64,4 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | 2026-08-02 | RegisterProject Follow-up (fail-closed regex redaction, `[^/\s]+` vs `[^@\s]+`, live-spawn smoke test, whitespace-trim strengthening) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-08-02 | RegisterProject Final Minor-Hygiene (search-filter vs write-target trim asymmetry, `?? 5` explicit-zero honoring, extended-regex query/fragment redaction, mutation-matrix non-vacuity) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-08-03 | README Trim + Instructions-on-Top (accuracy-audit pattern, first-screen instructions, fluff-cut criterion, global-vs-package skill trap, markdownlint gate) | `.agents/instructions/learned-knowledge.instructions.md` |
+| 2026-08-03 | Vocab-Sync Auto-Update (staged-files-only auto-sync, sync-before-validate ordering, entity_patterns-as-known-tags, normalization parity, strict-JSON doc rule, consumer-distribution layering) | `.agents/instructions/learned-knowledge.instructions.md` |

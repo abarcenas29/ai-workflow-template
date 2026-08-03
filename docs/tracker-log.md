@@ -1075,3 +1075,83 @@ Rewrote `README.md` per the direct user request ("cut down the fluff. and put th
 - Documentation-only pipeline — no code, tests, or configuration changed; the 185/185 test suite is unaffected.
 - The reviewer's diff audit confirmed no actionable content was lost: only genuinely non-actionable material was dropped.
 - README remains at 289 lines after the graphify nit (the one-line edit was in-place, not additive in line count).
+
+---
+
+## Pipeline 5: Auto-Update Vocabulary JSON (vocab-sync) + Agent Instructions
+
+**Date:** 2026-08-03
+**Status:** ✅ SUCCESS — 259/259 tests passing (12 files), setup suite 104/104, 0 failures; reviewer APPROVED (after one ⚠️ CHANGES REQUESTED cycle)
+**Pipeline:** implementer (bootstrap) → implementer (planning) → coder (Batch A: 7 parallel) → coder (Batch B: 3 parallel) → unit-tester (independent validation) → reviewer (⚠️ CHANGES REQUESTED) → coder (review fixes) → reviewer (✅ APPROVED) → tracker (this entry)
+
+### Summary
+
+Implemented an automatic vocabulary-sync workflow: the pre-commit hook now runs a new `scripts/vocab-sync.js` that scans **staged** memory-bank files for frontmatter tags and appends any genuinely-new tags to `memory-bank/.vocabulary.json` under the `topic` group (warn-not-block, idempotent, `entity_patterns`-aware, stages the vocab so it commits with the same change). The validator (`validate-memory-schema.js`) was fixed to count `entity_patterns` keys as known tags (eliminating the `npm`-style false-positive warnings that triggered this work) and to normalize tags on both sides for parity with vocab-sync. Agent instructions (`memory-schema.instructions.md` + `reviewer.agent.md`) were updated, and the feature is wired into consumer distribution via the setup tool's hook template (`constants.js`) and `sync.js`'s `scriptsToSync`. The reviewer requested changes twice in one cycle — M1 (normalization parity) and M2 (JSON-comment instruction impossible in strict JSON) plus two minors — all fixed by the coder and APPROVED on re-review. Final feature outcome: first-time tags no longer warn (chicken-and-egg eliminated), unknown tags self-heal into the vocabulary at commit time.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 0 | implementer (bootstrap) | ✅ | Architecture context + memory bank verified; **graphify graph regenerated** (was missing: 2879 nodes, 3140 edges, 265 communities); memory vector index synced (2963 vectors). |
+| 1 | implementer (planning) | ✅ | `plan/feature-vocab-sync-1.md` — 10 tasks / 2 batches (A: 7 parallel, B: 3 parallel). Distribution mechanism mapped: scripts via npm tarball + `scriptsToSync`, hook content via setup `TEMPLATE_HOOKS`, `.opencode/**` + `.agents/**` via sync.js. Confirmation gate PASSED by user. |
+| 2 | coder (Batch A — 7 parallel) | ✅ | T1 `scripts/vocab-sync.js` (212L, 8 exports + `isDirectRun` seam); T3 validator `entity_patterns` awareness; T4 setup `constants.js` hook template (+ vocab-sync line, description updated); T5 `.husky/pre-commit` line (executable bit 100755 preserved); T6 `sync.js` `scriptsToSync` + `'vocab-sync.js'`; T8 memory-schema instructions +22L "Maintaining the Vocabulary"; T9 reviewer agent hygiene bullet. All files disjoint — no clobbering. |
+| 2 | coder (Batch B — 3 parallel) | ✅ | T2 `scripts/vocab-sync.test.js` — 54 tests via real temp-git-repo fixtures (chdir + resetModules + dynamic import), spawnSync CLI exit-code suite, `isDirectRun` branch in-process; vocab-sync coverage 98.88% stmts. T7 setup hooks verify — **no test changes needed** (`expectedContent()` auto-derives); setup suite 104/104. T10 `scripts/validate-memory-schema.test.js` — 15 tests; `isDirectRun` guard + `validateFile`/`main` export seam added to validator. |
+| 3 | unit-tester (independent validation) | ✅ | Full suite **254/254** (12 files, 0 failures); coverage vocab-sync 98.88% stmts / 92.15% branch, validator 92.39% stmts / 92.85% branch (both ≥ 90% gate). Non-vacuity via real temp mutations (entity_patterns merge removal → TEST-01/04 fail; append disabled → 14 fail). Scratch-repo pre-commit smoke: `brand-new-tag` appended → validator clean (no unknown-tag warning) → 2nd run no-op (idempotent). |
+| 4 | reviewer | ⚠️ CHANGES REQUESTED | No critical. 254/254 + 104/104 re-verified; coverage ≥ 90%; ordering/marker-idempotency/scriptsToSync/npm files/command-injection all confirmed. **M1 (major):** validator compares RAW tags while vocab-sync normalizes → `My Tag` still warns after `my-tag` appended (chicken-and-egg only fixed for normalized tags; zero tests cover this). **M2 (major):** "add a one-line comment in JSON" is impossible in strict JSON — following it literally corrupts the vocab. Minors: `buildKnownTags` char-iterates if `vocab.tags` is an array; first-write reformats blank lines (informational); `sync.test.js` fixture omits vocab-sync.js; memory files introduce unknown tags (self-healing by design). |
+| 2b | coder (review fixes) | ✅ | **M1:** `validateFile()` normalizes BOTH sides (identical `normalizeTag`: lowercase/trim/underscore+space→hyphen/drop-empty) before unknown-tag filter; +3 M1 tests. **M2:** T8 step 5 + T9 bullet reworded — rationale in commit message/PR or `categories` description strings, explicit strict-JSON no-comment warning. **Minor 1:** `Array.isArray(group)` guard in `buildKnownTags` + 2 malformed-shape tests. **Minor 3:** `'vocab-sync.js'` added to sync.test.js fixture (7 entries). `.vocabulary.json` untouched. Full suite **259/259** (12 files); coverage validator 92.7/93.1, vocab-sync 98.91/92.15. |
+| 3b | reviewer (final sign-off) | ✅ APPROVED | M1 verified (normalization parity at validator lines 131-146, +3 tests, empirical scratch-repo chicken-and-egg re-check: `My Tag` → `my-tag` appended → NO warning exit 0). M2 verified (grep confirms "one-line comment in the JSON" gone). Minor 1 guard before iteration; Minor 3 fixture matches real array. Independently re-ran 259/259 + 104/104. Only informational minors (stale plan wording line 221, `normalizeTag` duplication drift risk inherent to CON-01). Recommendation: APPROVE, no further changes. |
+| 5 | tracker | ✅ | This entry — full pipeline record in `docs/tracker-log.md`, progress summary, learned-knowledge session, TRACKER-INDEX update, memory bank + PG knowledgebase re-index. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/vocab-sync.js` | **NEW** — Pre-commit hook script (216L): scans staged memory-bank `.md` files (`git diff --cached --name-only --diff-filter=ACM`, excludes `/.index/`), parses frontmatter tags (self-contained `parseFrontmatter` copy per CON-01), known-tag set = `tags.*` values + `entity_patterns` keys, normalizes candidates (lowercase kebab-case, drop empty, dedupe), appends genuinely-new tags to `topic` (sorted, idempotent), writes 2-space indent + trailing newline, `git add` in try/catch (never blocks), warn-only exit 0. 8 exports + `isDirectRun` guard. |
+| `scripts/vocab-sync.test.js` | **NEW** — 54 tests covering TEST-01..14 via real temp-git-repo fixtures, spawnSync CLI exit-code suite, in-process `isDirectRun` branch. vocab-sync coverage 98.91% stmts / 92.15% branch / 100% lines. |
+| `scripts/validate-memory-schema.js` | **MODIFIED** — T3: known-tags set now includes `entity_patterns` keys (kills `npm`/`vitest` false positives; `\|\| {}` guard). T10: `isDirectRun` guard + `export { validateFile, main }` testability seam. M1: `normalizeTag` on both frontmatter tags and vocab `allTags` before unknown-tag filter (normalization parity). |
+| `scripts/validate-memory-schema.test.js` | **NEW** — 15 tests: entity_patterns scenarios (TEST-01..05), main() exit-code contract, validateFile error branches; +3 M1 normalization-parity tests added in Step 2b. |
+| `scripts/setup/constants.js` | **MODIFIED** — `TEMPLATE_HOOKS['pre-commit'].content` now `bump-version.js` → `vocab-sync.js` → `validate-memory-schema.js` (vocab-sync BEFORE validator); description updated to 'Auto-bump version + sync vocabulary + validate memory-bank schema before commits'. |
+| `.husky/pre-commit` | **MODIFIED** — `node scripts/vocab-sync.js` added between bump-version and validate-memory-schema; marker-first header + executable bit (100755) preserved. |
+| `scripts/sync.js` | **MODIFIED** — `'vocab-sync.js'` added to `scriptsToSync` adjacent to `'validate-memory-schema.js'` (consumer distribution via `__scripts__/` sync). |
+| `scripts/sync.test.js` | **MODIFIED** — Minor 3: `'vocab-sync.js'` added to the `scriptsToSync` fixture (7 entries, matches real array). |
+| `.agents/instructions/memory-schema.instructions.md` | **MODIFIED** — +22L "Maintaining the Vocabulary" section (step 5 reworded in Step 2b: rationale in commit message/PR or `categories` descriptions; strict JSON — no comment syntax). |
+| `.opencode/agents/reviewer.agent.md` | **MODIFIED** — "Memory-bank hygiene" checklist bullet added to Guidelines (checks BOTH `tags.*` + `entity_patterns`; unaddressed unknown tags → 🔵 minor findings; reworded in Step 2b). |
+| `plan/feature-vocab-sync-1.md` | **NEW** — Implementation plan: 10 tasks / 2 batches, status **Completed**; §1-§12 document distribution mechanism, alternatives, risks, and post-review fixes. |
+| `memory-bank/activeContext.md` | Updated during pipeline (Current Focus + Recent Changes) |
+| `memory-bank/progress.md` | Updated during pipeline; tracker summary added by this entry |
+| `memory-bank/tasks/_index.md` | Updated during pipeline |
+
+### Key Decisions
+
+- **Staged-files-only scope** — pre-commit only cares about what's being committed; scanning all memory-bank files would produce noisy vocab writes from unrelated files (ALT-02).
+- **vocab-sync runs BEFORE the validator** — new tags are appended to `.vocabulary.json` before the validator's unknown-tag check, eliminating the first-commit chicken-and-egg false positive (ALT-05). Ordering is identical in both this repo's hook and the consumer `TEMPLATE_HOOKS` template.
+- **`entity_patterns` keys count as known tags** — `npm`, `vitest`, `playwright`, etc. are entity names, not vocabulary gaps; the validator's false-positive warnings were the original trigger for this feature.
+- **Normalization parity (M1)** — both `vocab-sync.js` and the validator apply the SAME `normalizeTag` (lowercase/trim/underscore+space→hyphen/drop-empty) so a mixed-case `My Tag` no longer warns after `my-tag` is appended. A shared module was deliberately NOT extracted (CON-01) — the duplication is accepted, with drift risk documented.
+- **Default `topic` group placement** — auto-categorizing tags into `workflow`/`memory_ops`/`agent_roles` is too heuristic-prone for a hook; `topic` is the catch-all and agents recategorize manually later (ALT-03).
+- **Warn-not-block contract (CON-02)** — vocab-sync exits 0 in every graceful path (no staged files → silent; missing/malformed vocab → warn + skip); `git add` is wrapped in try/catch (RISK-01); only unhandled errors exit 1.
+- **Strict JSON — no comment syntax (M2)** — `.vocabulary.json` cannot contain comments; tag rationale belongs in the commit message/PR or existing `categories` description strings. The doc instruction that suggested otherwise was corrected in both instruction files.
+- **Malformed-vocab guard (Minor 1)** — `Array.isArray(group)` before iterating protects against consumer-controlled malformed shapes (e.g., `vocab.tags` being an array → character iteration).
+- **Consumer distribution is layered** — new script ships via npm tarball (`files` includes `scripts/`) AND `sync.js` `scriptsToSync`; hook content ships via setup `TEMPLATE_HOOKS`; `.opencode/**` and `.agents/**` ship via sync.js. Old consumers need `npm update` + re-run `npx ai-workflow-setup` (RISK-02).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` (full suite) | ✅ 259/259 across 12 files, 0 failures (coder, unit-tester, reviewer all independently confirmed; was 185 → 254 → 259) |
+| `npx vitest run scripts/setup/` | ✅ 104/104 across 6 files (hooks 16, discover 21, prepare 27, index 27, + others) |
+| vocab-sync.js coverage | ✅ 98.91% stmts / 92.15% branch / 100% funcs / 100% lines (≥ 90% gate) |
+| validate-memory-schema.js coverage | ✅ 92.7% stmts / 93.1% branch / 100% funcs / 92.47% lines (≥ 90% gate) |
+| Mutation: remove `entity_patterns` merge | ✅ Validator TEST-01 + TEST-04 FAIL — non-vacuous |
+| Mutation: disable new-tag append | ✅ 14 vocab-sync tests fail — non-vacuous |
+| Pre-commit smoke (scratch temp repo) | ✅ `brand-new-tag` appended → validator clean exit 0 (no warning); `npm` recognized as entity_patterns; 2nd run idempotent no-op |
+| M1 chicken-and-egg re-check (scratch repo) | ✅ `My Tag` → `my-tag` appended → validator NO warning exit 0; controls still warn |
+| Consumer setup / distribution | ✅ `TEMPLATE_HOOKS` contains vocab-sync BEFORE validator; `scriptsToSync` includes `'vocab-sync.js'` (11 entries); package.json `files` covers `scripts/` + vocab |
+| `node --check` on all changed JS | ✅ Clean |
+| Reviewer final verdict | ✅ APPROVED — no critical/major; only informational minors (stale plan wording line 221, `normalizeTag` duplication drift risk) |
+
+### Notes / Follow-up
+
+- **Feature outcome:** the pre-commit hook now auto-appends unknown memory-bank frontmatter tags to `memory-bank/.vocabulary.json` (topic group) via `scripts/vocab-sync.js` (runs before the validator, warn-not-block, idempotent, entity_patterns-aware); the validator counts `entity_patterns` keys as known tags and normalizes both sides; agent instructions (memory-schema + reviewer) updated; wired to consumers via the setup tool hook template + `sync.js` scriptsToSync. Final suite: 259/259 + setup 104/104.
+- **Informational (no action required):** `plan/feature-vocab-sync-1.md:221` retains the superseded "one-line comment in the JSON" wording (historical planning artifact); `normalizeTag` is duplicated across the two scripts — CON-01 inherent, a future edit to one could silently re-introduce the M1 parity gap; memory-bank files introduce tags (`feature-vocab-sync`, `pre-commit`, `vocabulary`) that self-heal into the vocabulary at the next commit by design.
+- **Known limitation:** consumers running an older template version won't have `vocab-sync.js` until they run `npm update @abarcenas/ai-workflow-template` + `npx ai-workflow-setup` — the validator's warnings still work, just not auto-fixed (RISK-02).
+- The tracker Step 5 also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-08-03 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
