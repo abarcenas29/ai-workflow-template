@@ -13,3 +13,6 @@ memory-bank/.index/
 models/
 .cache/
 *.onnx
+
+# Environment files (may contain credentials)
+.env
