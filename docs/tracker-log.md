@@ -848,3 +848,230 @@ After the npm E404 / `.env` pipeline, the central knowledgebase MCP search tool 
 ### Notes / Follow-up
 
 Central knowledge is fully operational after restart: `knowledgebase_search` returns 5 results (top similarity 0.396), stats show 1 project / 9 chunks. No further action required.
+
+---
+
+## Pipeline: Fix PG Knowledgebase Write Bug — registerProject Upstream
+
+**Date:** 2026-08-02
+**Status:** ✅ SUCCESS — 176/176 tests passing, 0 failures; reviewer APPROVED WITH NITS
+**Pipeline:** implementer (bootstrap) → implementer (planning) → coder (Batch A: T1+T2+T5) → coder (Batch B: T3) → unit-tester (T4) → reviewer → tracker (this entry)
+
+### Summary
+
+Fixed the root cause of "other projects can't write to the PG knowledgebase": the `knowledgebase_index` MCP handler called `upsertChunks()` without ever calling `registerProject()`, so inserts for non-bootstrap-registered projects hit a PostgreSQL foreign-key violation (23503) that was silently caught and counted as `skipped`. The fix adds `await registerProject(projectId, projectId)` (idempotent upsert) after the empty-chunks guard and before `upsertChunks()`, matching the CLI convention. The fix is protected by a new 16-test MCP server test suite (the MCP server previously had zero tests) and verified non-vacuous via mutation testing.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/mcp-knowledgebase-server.js` | **Modified** — `registerProject` added to import (line 33); `await registerProject(projectId, projectId);` inserted after the empty-chunks guard, before `upsertChunks()` (line 240). Also: `handleToolCall` extracted + exported, stdio bootstrap guarded to direct-run via `isDirectRun` (testability seam). |
+| `scripts/mcp-knowledgebase-server.test.js` | **NEW** — 16 Vitest tests covering registration order, empty-chunks guard, default-file reads, ENOENT, counts, projectId validation, search/stats/list formatting, graceful degradation, empty-KB branch, unknown-tool error, index error path, import integrity |
+| `plan/fix-kb-registerproject-1.md` | Implementation plan — 5 tasks / 3 batches, status **Completed** |
+| `memory-bank/activeContext.md` | Current Focus + Recent Changes updated |
+| `memory-bank/progress.md` | What's Left + Recently Completed updated |
+| `memory-bank/tasks/_index.md` | Fix task entry moved to Completed |
+
+### Key Decisions
+
+- **Root cause**: `knowledgebase_index` never called `registerProject()` before `upsertChunks()` → PG FK violation 23503 for non-bootstrap projects, silently counted as "skipped" by `upsertChunks()`'s catch-all.
+- **Fix placement**: `registerProject()` call placed AFTER the empty-chunks guard (avoids unnecessary DB calls for empty input) and BEFORE `upsertChunks()` — matches `knowledgebase-cli.js:122` convention (REQ-03).
+- **Argument convention**: `registerProject(projectId, projectId)` — project ID == display name, matching the CLI pattern.
+- **Idempotency**: `registerProject()` is an idempotent `INSERT … ON CONFLICT DO UPDATE` — safe for already-registered projects and re-indexing.
+- **Testability seam**: Extracted + exported `handleToolCall` (body unchanged) and guarded stdio bootstrap with `isDirectRun` (`process.argv[1]` check) so tests can import the module without opening a transport. Direct execution behavior unchanged.
+- **T1+T2 merged**: Both edit the same file — combined into a single coder task to avoid read-modify-write clobbering.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` | ✅ 176/176 across 10 files, 0 failures |
+| `mcp-knowledgebase-server.js` coverage | ✅ 79.66% stmts / 81.03% lines (up from 64.4% / 65.51% at T3) |
+| Overall coverage | ⚠️ 40.93% — pre-existing, below 90% gate, flagged not blocker |
+| Mutation test (fix removed) | ✅ TEST-01 + TEST-16 FAIL → regression guard non-vacuous |
+| `node --check scripts/mcp-knowledgebase-server.js` | ✅ Syntax OK |
+| Reviewer verdict | ✅ APPROVED WITH NITS — no critical/major |
+
+### Notes / Follow-up
+
+- **TEST-12 (manual)**: live-spawn smoke test — spawn server, `tools/call knowledgebase_index` with a fresh `projectId`, expect "Indexed 1 chunks, updated 0, skipped 0" not "skipped 1". Closes the remaining direct-run bootstrap coverage gap.
+- **Reviewer nits (non-blocking)**: search tool schema still declares `default: 0.6` while handler uses `?? 0.1` (align schema default); raw `err.message` in error responses (potential info leakage); whitespace-only `projectId` passes the required-arg guard; TEST-05 redundant assert; plan doc wording vs. real file style; `isDirectRun` doesn't dereference symlinks (theoretical).
+- No rework requested by reviewer.
+
+---
+
+## Pipeline 2: Follow-up Nits + TEST-12 Smoke Test + Redaction Hardening
+
+**Date:** 2026-08-02
+**Status:** ✅ SUCCESS — 181/181 tests passing, 0 failures; reviewer APPROVED (after one ⚠️ CHANGES REQUESTED cycle)
+**Pipeline:** coder (nits) → unit-tester (TEST-12 live-spawn) → reviewer (⚠️ CHANGES REQUESTED) → coder (redaction hardening) → reviewer (✅ APPROVED) → tracker (this entry)
+
+### Summary
+
+Closed out all reviewer follow-ups from the registerProject fix pipeline: applied the 4 reviewer nits (search schema default alignment, error-message redaction, whitespace-only projectId validation + trim flow, TEST-05 cleanup), executed the previously-manual TEST-12 live-spawn smoke test against a real database (proving `registerProject()` runs — "Indexed 1 chunks, updated 0, skipped 0", not "skipped 1"), and hardened the redaction helper to fail CLOSED after the re-review found it leaked credentials on unix-socket-style connection strings. Final state: full suite **181/181 across 10 files, 0 failures**, regression guard now covered by 3 non-vacuous tests, and the final reviewer verdict is **APPROVED**.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | coder (nits) | ✅ | Schema `default: 0.6`→`0.1`; local `redactConnectionString` helper applied to outer catch; `!projectId?.trim()` validation + trimmed `pid` flows downstream; TEST-05 redundant assert removed. Tests 16→18. |
+| 2 | unit-tester | ✅ | Full suite 178/178 confirmed. **TEST-12 live-spawn smoke test PASSED** against live DB (DATABASE_URL in `.env`, absent from process env): `initialize` handshake OK, `knowledgebase_index` with fresh projectId → "Indexed 1 chunks, updated 0, skipped 0". Cleanup verified (0 residue); SIGTERM path exercised. Mutation re-test: 3 tests fail without the fix — guard strictly stronger. |
+| 3 | reviewer (re-review) | ⚠️ CHANGES REQUESTED | registerProject fix + tests APPROVED; 178/178 re-verified. Blocking item: local `redactConnectionString` FAILS OPEN on unix-socket authorities (`postgres://user:secret@/var/run/postgresql` → `new URL()` throws → message returned unchanged → credential leak). Required fix: regex credential-strip fallback. |
+| 3b | coder (redaction hardening) | ✅ | Helper rewritten regex-only, fail-closed by construction: `message.replace(/(postgres(?:ql)?:\/\/)([^/\s]+)@/gi, '$1***@')` — no URL parsing to fail, redacts ALL tokens (global flag), no stray port colon, `[^/\s]+` (not reviewer-suggested `[^@\s]+`) handles passwords containing `@`. Tests 18→21. |
+| 3c | reviewer (final) | ✅ APPROVED | Blocker resolved; verified fail-closed by construction, `[^/\s]+` strictly stronger, 3 new tests non-vacuous (replayed OLD helper → all fail), full suite 181/181 independently re-run. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/mcp-knowledgebase-server.js` | **Modified** — search schema `threshold` default `0.6`→`0.1`; local `redactConnectionString(message)` helper (lines 160-163, regex-only fail-closed); whitespace-only `projectId` guard (`!projectId?.trim()`) + trimmed `const pid = projectId.trim()` used in `chunkLearnedKnowledge`/`registerProject`/responses; outer catch returns `Error: ${redactConnectionString(err.message)}` |
+| `scripts/mcp-knowledgebase-server.test.js` | **Modified** — 16→18 tests (whitespace-only reject TEST-06b, trim-flow TEST-06c; TEST-05 redundant assert removed) then 18→21 (TEST-17 unix-socket fail-closed, TEST-18 `?host=` variant, TEST-19 multi-token redaction) |
+| `plan/fix-kb-registerproject-1.md` | **Modified** — §9 (nit fixes), §10 (re-validation + TEST-12 evidence), §11 (redaction hardening design + behavior matrix) |
+| `memory-bank/activeContext.md` | Updated — Current Focus + Recent Changes for the follow-up work |
+| `memory-bank/progress.md` | Updated — Recently Completed entries for each follow-up step |
+| `memory-bank/tasks/_index.md` | Updated — fix task kept in Completed |
+
+### Key Decisions
+
+- **Local `redactConnectionString` helper over importing the engine's** — `knowledgebase-index.js:62` is not exported and CON-01 forbids modifying that file. The local helper rewrites only URL tokens in messages, so generic errors ("Unknown tool: …", "DB connection failed") stay readable (the engine's `'***'` fallback for non-URLs would have broken TEST-15/TEST-16).
+- **Regex-only fail-closed over a "catch fallback"** — the required fix spec was a regex fallback in the catch, but the coder rewrote the whole helper with a single global regex: no URL parsing means nothing to fail, unparseable tokens are redacted by construction, every token is redacted in one pass (satisfies "redact all tokens" without a loop), and host/path are preserved verbatim (no stray `host:` colon).
+- **`[^/\s]+` over the reviewer-suggested `[^@\s]+`** — strictly stronger: passwords containing `@` (e.g. `postgres://user:p@ss@host`) are fully redacted, whereas `[^@\s]+` would stop at the first `@` and leak the rest.
+- **Helper intentionally NOT exported** — no production surface change; the 3 new tests exercise the real outer-catch path by rejecting `upsertChunks` with URL-bearing error messages (non-vacuous: replaying the OLD helper fails all 3).
+- **Whitespace-trimmed `pid` as the single validated ID** — `projectId.trim()` flows to `chunkLearnedKnowledge`, `registerProject(pid, pid)`, and response messages, so validation and use never diverge.
+- **TEST-12 kept as the live-spawn proof for the direct-run bootstrap** — `main()`/`isDirectRun`/SIGTERM are not unit-testable without production seams; a real server spawn against the live DB closes that coverage gap with direct evidence.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `node --check scripts/mcp-knowledgebase-server.js` | ✅ Syntax OK |
+| `npx vitest run scripts/mcp-knowledgebase-server.test.js` | ✅ 21/21 passed |
+| `npx vitest run` (full suite) | ✅ 181/181 across 10 files, 0 failures |
+| TEST-12 live-spawn smoke test (real DB) | ✅ PASS — "Indexed 1 chunks, updated 0, skipped 0" for `smoke-test-1785682647097`; cleanup verified 0 projects/0 chunks; SIGTERM exit 0 |
+| Mutation test (registerProject call removed) | ✅ 3 tests FAIL (TEST-01, TEST-16, TEST-06c) — non-vacuous, strictly stronger than before |
+| Redaction replay test (OLD helper vs NEW) | ✅ OLD helper fails TEST-17/18/19 (leaks); NEW helper passes all |
+| Reviewer final verdict | ✅ APPROVED — no critical/major |
+
+### Notes / Follow-up
+
+- **Remaining known minors (pre-existing / out of scope, optional 1-line follow-ups)**: `knowledgebase_search` does not trim `projectId`; `args.limit || 5` uses `||` while threshold uses `??`; query-string params in a URL token (e.g. a hypothetical `?password=`) are not redacted by the regex (pg error messages do not echo passwords — not a practical leak vector).
+- The registerProject fix itself was untouched throughout the follow-up (`await registerProject(pid, pid)` at line 271, between the empty-chunks guard and `upsertChunks()`); `knowledgebase-index.js` and `knowledgebase-cli.js` were NOT modified.
+- Full pipeline record for the original fix is the entry immediately above; plan §9/§10/§11 contain the detailed nit, smoke-test, and redaction-hardening records.
+
+---
+
+## Pipeline 3: Final Minor-Hygiene Pass — Search projectId Trim, `limit ?? 5`, Query-String Redaction
+
+**Date:** 2026-08-02
+**Status:** ✅ SUCCESS — 185/185 tests passing, 0 failures; reviewer APPROVED (no follow-ups required)
+**Pipeline:** coder (3 minors) → unit-tester (independent validation) → reviewer (final sign-off) → tracker (this entry)
+
+### Summary
+
+Closed out the last three 🔵 minor items flagged by the final sign-off review of the registerProject/redaction work, all confined to `scripts/mcp-knowledgebase-server.js` and its test file: (1) `knowledgebase_search` now trims/validates `projectId` for parity with the index handler (whitespace-only drops to match-all via graceful degradation — a deliberate asymmetry with the index handler's hard error, documented in a code comment), (2) `args.limit || 5` → `args.limit ?? 5` so an explicit `limit: 0` is honored, and (3) the redaction regex now redacts query-string/fragment params (`?***`/`#***`) while preserving host/path — still fail-closed by construction (pure regex, no URL parsing). Tests grew 21 → 25, the full suite passes **185/185 across 10 files**, all 4 new tests were proven non-vacuous via real temp mutations, and the reviewer independently APPROVED with only informational minors noted (no follow-up required). The registerProject bug is now fully fixed, hardened, and all nits/minors are closed.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | coder (3 minors) | ✅ | Fix 1: `project_id: args.projectId?.trim() \|\| undefined` (whitespace-only → match-all, graceful degradation). Fix 2: `args.limit ?? 5` (honors `limit: 0`). Fix 3: redaction regex extended to redact query/fragment (`?***`) keeping host/path + fail-closed-by-construction. Tests 21→25; TEST-18 updated for `?host=`. Full suite 185/185. Plan §12 added. `knowledgebase-cli.js` still uses `topK \|\| 5` + untrimmed projectId — out of scope by constraint. |
+| 2 | unit-tester | ✅ | Full suite 185/185 + MCP file 25/25 confirmed exactly. Non-vacuity via real temp mutations: `?? 5`→`\|\| 5` fails TEST-21; trim→no-trim fails TEST-20+20b; old redaction regex fails TEST-18+22; removing registerProject fails TEST-01/06c/16. Earlier fail-closed guarantees (TEST-17/19) still hold; TEST-15/16 readability intact. Workspace clean. Plan §12.6 added. |
+| 3 | reviewer | ✅ APPROVED | 185/185 independently re-run; 12-case empirical regex probe all pass; git diff scope discipline confirmed (knowledgebase-index/cli untouched). Search-filter design decision (whitespace → match-all, deliberate asymmetry) sound per graceful-degradation pattern. All 4 tests non-vacuous. Only informational minors: search schema `limit` description "(1–50)" now that `?? 5` honors `0`; pre-existing engine negative-limit clamp; cosmetic header comment. No follow-ups required. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/mcp-knowledgebase-server.js` | **Modified** — Fix 1: `knowledgebase_search` options `project_id: args.projectId?.trim() \|\| undefined` (line 191, whitespace-only → match-all with explanatory comment at 187-189). Fix 2: `limit: args.limit ?? 5` (line 193). Fix 3: `redactConnectionString` regex extended to `/(postgres(?:ql)?:\/\/)([^/\s]+)@([^?#\s]*)([?#][^\s]*)?/gi` with a callback replacing query/fragment with `?***`/`#***` (lines 161-168); JSDoc updated to document query-string redaction and fail-closed-by-construction rationale. |
+| `scripts/mcp-knowledgebase-server.test.js` | **Modified** — 21→25 tests: TEST-20 (whitespace-only search projectId → `project_id: undefined`), TEST-20b (trimmed `'  test-project  '` → `'test-project'`), TEST-21 (`limit: 0` → `limit: 0`, not 5), TEST-22 (query-string redaction — `?password=hunter2` → `?***`, no `hunter2`/`password=`); TEST-18 expectation updated to `postgresql://***@/tmp?***` (query redacted) + `not.toContain('host=/tmp')` |
+| `plan/fix-kb-registerproject-1.md` | **Modified** — §12 (final minor-hygiene fixes: design rationale, behavior, tests, validation) and §12.6 (independent unit-tester validation incl. mutation matrix) |
+| `memory-bank/activeContext.md` | Updated — Current Focus + Recent Changes for the minor-hygiene pass |
+| `memory-bank/progress.md` | Updated — Recently Completed entries for coder, unit-tester, reviewer, tracker steps |
+| `memory-bank/tasks/_index.md` | Updated — fix task kept in Completed |
+
+### Key Decisions
+
+- **Search-filter vs write-target asymmetry is deliberate** — `knowledgebase_search.projectId` is an optional, read-only filter, so a whitespace-only value degrades to match-all (`undefined`) instead of erroring; the INDEX handler's `projectId` is a required write-target and still hard-errors on whitespace (TEST-06b). This asymmetry is documented in the code comment (lines 187-189) so it reads as intentional, and matches the established graceful-degradation pattern (search already degrades to "No results found"/"not configured" rather than throwing).
+- **`args.limit ?? 5` over `args.limit || 5`** — nullish coalescing honors an explicit `limit: 0` (`LIMIT 0`) as legitimate caller intent; `||` silently coerces 0 (falsy) to the default 5. This is the same falsy-coercion class already fixed for `threshold ?? 0.1`.
+- **Query/fragment redaction stays fail-closed by construction** — the extended regex `([^?#\s]*)([?#][^\s]*)?` + callback replaces the query or fragment with `?***`/`#***` while preserving host/path. No `new URL()` → nothing to fail open; global flag redacts every token; `@`-in-password still fully redacted; non-URL messages unchanged (TEST-15/16 readability intact).
+- **Non-vacuity proven by real temp mutations, not reasoning** — the unit-tester reverted each fix one at a time in a temp copy and confirmed the matching tests fail (TEST-21 for `??`→`||`; TEST-20+20b for trim removal; TEST-18+22 for old regex). Each new test genuinely catches its fix's regression.
+- **Scope discipline maintained** — the registerProject fix (import + call placement), the INDEX handler whitespace trim, and the core userinfo redaction were untouched; `knowledgebase-index.js` and `knowledgebase-cli.js` NOT modified. `knowledgebase-cli.js` still uses `topK || 5` and untrimmed projectId (out of scope by constraint, noted for future parity).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `node --check scripts/mcp-knowledgebase-server.js` | ✅ Syntax OK |
+| `npx vitest run scripts/mcp-knowledgebase-server.test.js` | ✅ 25/25 passed |
+| `npx vitest run` (full suite) | ✅ 185/185 across 10 files, 0 failures (coder, unit-tester, reviewer all independently confirmed) |
+| Mutation: `?? 5` → `\|\| 5` | ✅ TEST-21 FAILS (limit: 0 coerced to 5) — non-vacuous |
+| Mutation: trim removed | ✅ TEST-20 + TEST-20b FAIL — non-vacuous |
+| Mutation: pre-fix redaction regex | ✅ TEST-18 + TEST-22 FAIL (query leakage) — non-vacuous |
+| Mutation: registerProject call removed | ✅ TEST-01 + TEST-06c + TEST-16 FAIL — guard intact (matches §10.3) |
+| 12-case regex probe (reviewer, exact helper) | ✅ All pass — unix-socket, `?host=`, `?password=hunter2`, `#fragment`, multi-token, `@`-in-password, non-URL, socket/host-only, uppercase scheme |
+| Git diff scope | ✅ Only `mcp-knowledgebase-server.js` + its test file changed by this pass |
+| Reviewer final verdict | ✅ APPROVED — no critical/major; no follow-ups required |
+
+### Notes / Follow-up
+
+- **Informational minors (no follow-up)**: search tool schema `limit` description still says "(1–50)" while `?? 5` now honors an explicit `0` (doc nit); engine `search()` does not clamp negative/float `limit` (pre-existing known issue); test file header comment doesn't enumerate TEST-20b separately (cosmetic).
+- **Known out-of-scope gap for future parity**: `knowledgebase-cli.js` still uses `topK || 5` and an untrimmed `--project` value — the CLI was intentionally not touched in this pass.
+- Final state of the whole registerProject work: bug fully fixed + hardened, all nits and minors closed, full suite 185/185, reviewer APPROVED. Full pipeline records are the three entries above (original fix, follow-up Pipeline 2, this Pipeline 3); plan §9/§10/§11/§12 contain the detailed records.
+
+---
+
+## Pipeline 4: README.md Trim + Instructions-on-Top
+
+**Date:** 2026-08-03
+**Status:** ✅ SUCCESS — README rewritten 469→289 lines (−38%); reviewer APPROVED (one informational nit fixed by coder); markdownlint 0 structural errors
+**Pipeline:** coder (README rewrite) → reviewer (✅ APPROVED) → coder (1-line graphify nit) → tracker (this entry)
+
+### Summary
+
+Rewrote `README.md` per the direct user request ("cut down the fluff. and put the instructions on the very top of the page."): trimmed 469 → 289 lines (−38%) by removing emoji decoration, salesy intro prose, a verbose run-flow list, and a YAML frontmatter example, while moving **Install** and **Git Hook Setup** to the very top (title → one-line description → Install → Git Hook Setup in the first ~30 lines; instructions confirmed at lines 1–51). The rewrite also corrected four factual inaccuracies: skills count 27→29 (verified via `ls`), the orchestrator path corrected to `.opencode/agents/orchestrator/orchestrator.agent.md`, references to non-existent `.agents/compress/` and `.agents/agents/` directories removed, and the real `--knowledgebase` setup flag added. The reviewer APPROVED with one informational nit (graphify listed as a package skill when it is actually a global skill), which the coder fixed with a one-line qualification — `graphify` (global skill) + the actually-shipped `graphify-framework-aware` sibling. Documentation-only pipeline — no code or tests changed.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | coder (README rewrite) | ✅ | README 469→289 lines. New order: title → one-line desc → **Install** → **Git Hook Setup** (first screen) → condensed capabilities → Sync → Core Structure → Orchestrator → TDD → Memory Bank → Knowledge Graph → Featured Skills → Versioning → Publish → Local Dev → Updating → Notes. Fluff removed: emoji decoration, salesy intro, verbose run-flow list, YAML example → 1 sentence. Accuracy fixes: skills 27→29 (verified), removed non-existent `.agents/compress/` + `.agents/agents/`, orchestrator path corrected to `.opencode/agents/orchestrator/orchestrator.agent.md`, added `--knowledgebase` setup option. All commands verified against package.json scripts + `node bin/setup.js --help`. markdownlint 0 structural errors (only default MD013 line-length notices). Instructions confirmed at top (lines 1–51). |
+| 2 | reviewer | ✅ APPROVED | Instructions at top confirmed (Install line 5, Git Hook Setup line 13). Fluff cut without losing actionable content (diff audit). All 4 accuracy spot-checks independently verified (skills 29; orchestrator path exists; `--knowledgebase` real via `--help`; removed dirs don't exist). Markdown quality improved — 0 structural errors (old README failed MD001/032/040/058/060/031). 🔵 informational nit: Featured Skills lists `graphify` as a package skill but it is global (`~/.config/opencode/skills/`); only `graphify-framework-aware` is shipped. No rework required. |
+| 1b | coder (nit) | ✅ | README line 225: `graphify` qualified as `(global skill)` + added the actually-shipped `graphify-framework-aware` sibling. Verified global skill exists, package skill does not. markdownlint 0 structural errors (only pre-existing MD013 line-length). README still 289 lines. |
+| 3 | tracker | ✅ | This entry (full pipeline record, progress summary, learned-knowledge session, TRACKER-INDEX update). |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `README.md` | **Rewritten** — 469→289 lines (−38%); instructions moved to the top (Install line 5, Git Hook Setup line 13); fluff removed; 4 accuracy corrections applied; line 225 graphify qualified as global skill + `graphify-framework-aware` added |
+| `memory-bank/activeContext.md` | Updated by coder/reviewer during the pipeline (Current Focus + Recent Changes) |
+| `memory-bank/progress.md` | Updated by coder/reviewer during the pipeline; tracker summary added by this entry |
+| `memory-bank/tasks/_index.md` | Updated by coder/reviewer during the pipeline |
+
+### Key Decisions
+
+- **Instructions-on-top = first screen, not "near the top"** — Install + Git Hook Setup now sit immediately after the title and one-line description (first ~30 lines; confirmed lines 1–51). The user's "very top of the page" requirement is interpreted as the first visible screen of usage instructions.
+- **Trim only what is non-actionable** — emoji decoration, salesy intro prose, a verbose run-flow list (condensed to 2 bullets), and a YAML frontmatter example (condensed to 1 sentence) were removed; every command, option, path, table row, and external link survived (verified via diff audit + grep content-preservation checks).
+- **Docs must be accurate before they are concise** — the rewrite fixed four factual errors (skills 27→29, orchestrator path, removed dirs, `--knowledgebase` flag). All commands were verified against `package.json` scripts and `--help`; all paths were verified against the filesystem.
+- **Global skills must be labeled as such** — `graphify` lives at `~/.config/opencode/skills/` (global), not in `.agents/skills/`; the Featured Skills list now marks it `(global skill)` and adds the actually-shipped `graphify-framework-aware` sibling so the package's skill inventory is accurate.
+- **markdownlint as the doc-quality gate** — `npx markdownlint-cli2 README.md` reports 0 structural errors; the only remaining finding is MD013 line-length (stylistic default, no repo config), deliberately separated from structural issues.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `README.md` line count | ✅ 469 → 289 (−38%) |
+| Instructions at top | ✅ Install line 5, Git Hook Setup line 13 (first ~30 lines / lines 1–51) |
+| Skills count | ✅ 29 (`ls .agents/skills/*/SKILL.md \| wc -l`) |
+| Orchestrator path | ✅ `.opencode/agents/orchestrator/orchestrator.agent.md` exists |
+| `--knowledgebase` flag | ✅ Real (`node bin/setup.js --help`) |
+| Removed dirs (`.agents/compress/`, `.agents/agents/`) | ✅ Confirmed non-existent |
+| markdownlint (rewrite) | ✅ 0 structural errors (only MD013 line-length: 39 vs 42 before) |
+| markdownlint (after nit) | ✅ 0 structural errors (only pre-existing MD013) |
+| Reviewer verdict | ✅ APPROVED (1 🔵 informational nit fixed by coder; no rework) |
+
+### Notes / Follow-up
+
+- Documentation-only pipeline — no code, tests, or configuration changed; the 185/185 test suite is unaffected.
+- The reviewer's diff audit confirmed no actionable content was lost: only genuinely non-actionable material was dropped.
+- README remains at 289 lines after the graphify nit (the one-line edit was in-place, not additive in line count).
