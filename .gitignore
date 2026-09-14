@@ -6,6 +6,10 @@ node_modules/
 graphify-out/
 coverage/
 
+# Python build artifacts
+__pycache__/
+*.pyc
+
 # Memory vector index (generated, rebuildable)
 memory-bank/.index/
 
