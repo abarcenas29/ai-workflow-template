@@ -6,6 +6,13 @@ import { fileURLToPath } from 'url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkgPath = resolve(__dirname, '../package.json')
 
+// Opt-out: SKIP_BUMP=1 keeps the current version (e.g. when a batch of commits
+// is one logical change set and should yield a single bump).
+if (process.env.SKIP_BUMP) {
+  console.log('SKIP_BUMP set — version bump skipped')
+  process.exit(0)
+}
+
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
 const current = pkg.version
 const [curMajor, curMinor] = current.split('.').map(Number)
