@@ -229,7 +229,7 @@ All memory-bank files use YAML frontmatter (`id`, `title`, `updated`, `tags`, `e
 
 ## Versioning
 
-Husky auto-bumps versions on every commit: minor by default (`1.2.0 → 1.3.0`), patch resets to 0 on each bump, and major changes reset to `<major>.0.0`. No manual version management required.
+Husky auto-bumps versions on every commit: minor by default (`1.2.0 → 1.3.0`), patch resets to 0 on each bump, and major changes reset to `<major>.0.0`. No manual version management required. Set `SKIP_BUMP=1` (e.g. `SKIP_BUMP=1 git commit ...`) to skip the bump for that commit — useful for doc-only changes.
 
 ## Publish Flow
 

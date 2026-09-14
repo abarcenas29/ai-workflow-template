@@ -78,15 +78,22 @@ def call_claude(prompt: str) -> str:
         try:
             import anthropic
 
+            model = os.environ.get("CAVEMAN_MODEL")
+            if not model:
+                raise RuntimeError(
+                    "CAVEMAN_MODEL environment variable is not set. "
+                    "Set it to the model identifier to use for compression "
+                    '(e.g. export CAVEMAN_MODEL="<model-id>").'
+                )
             client = anthropic.Anthropic(api_key=api_key)
             msg = client.messages.create(
-                model=os.environ.get("CAVEMAN_MODEL", "claude-sonnet-4-5"),
+                model=model,
                 max_tokens=8192,
                 messages=[{"role": "user", "content": prompt}],
             )
             return strip_llm_wrapper(msg.content[0].text.strip())
         except ImportError:
-            pass  # anthropic not installed, fall back to CLI
+            pass  # anthropic SDK not installed → fall back to CLI (no CAVEMAN_MODEL needed)
     # Fallback: use claude CLI (handles desktop auth)
     try:
         result = subprocess.run(

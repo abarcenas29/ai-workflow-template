@@ -8,7 +8,6 @@ permission:
   "github/*": allow
   "memory-bank/*": allow
   "knowledgebase/*": allow
-model: deepseek/deepseek-v4-flash
 ---
 
 # Reviewer - Code Quality

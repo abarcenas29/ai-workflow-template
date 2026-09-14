@@ -6,7 +6,6 @@ permission:
   search: "allow"
   "memory-bank/*": allow
   "knowledgebase/*": allow
-model: deepseek/deepseek-v4-flash
 ---
 
 # Designer - UI/UX

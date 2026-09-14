@@ -35,6 +35,10 @@ cd <directory_containing_this_SKILL.md> && python3 -m scripts <absolute_filepath
 
 4. Return result to user
 
+## Configuration
+
+When `ANTHROPIC_API_KEY` is set, the script calls the Anthropic API directly (when the Anthropic SDK is installed) and REQUIRES `CAVEMAN_MODEL` to be exported with the model identifier (e.g. `export CAVEMAN_MODEL=<model-id>`); it fails fast with a clear error if unset. If the Anthropic SDK is not installed, it falls back to the `claude` CLI, which requires no model variable.
+
 ## Compression Rules
 
 ### Remove

@@ -9,7 +9,6 @@ permission:
   write: allow
   "memory-bank/*": allow
   "knowledgebase/*": allow
-model: deepseek/deepseek-v4-flash
 ---
 
 # Tracker - Documentation Recorder
