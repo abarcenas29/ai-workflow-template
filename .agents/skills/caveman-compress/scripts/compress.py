@@ -93,7 +93,7 @@ def call_claude(prompt: str) -> str:
             )
             return strip_llm_wrapper(msg.content[0].text.strip())
         except ImportError:
-            pass  # anthropic not installed, fall back to CLI
+            pass  # anthropic SDK not installed → fall back to CLI (no CAVEMAN_MODEL needed)
     # Fallback: use claude CLI (handles desktop auth)
     try:
         result = subprocess.run(
