@@ -6,13 +6,13 @@ This project includes AI-assisted development configuration distributed through 
 
 - `.agents/instructions/` — Language, framework, and workflow instructions
 - `.agents/skills/` — Reusable skill definitions for task-based workflows
-- `.agents/agents/` — Specialized agent definitions for planning, research, and implementation
+- `.opencode/agents/` — Specialized agent definitions for planning, research, and implementation
 - `.agents/prompts/` — Reusable prompt templates
 
 ## Core Workflow
 
 1. **Understand before acting** — Read relevant instructions from `.agents/instructions/` before working with specific technologies
-2. **Plan before implementing** — Use `.agents/agents/plan.agent.md` or `.agents/agents/implementation-plan.agent.md` patterns for structured work
+2. **Plan before implementing** — Use `.opencode/agents/plan.agent.md` or `.opencode/agents/implementer.agent.md` patterns for structured work
 3. **Track progress** — Update `memory-bank/activeContext.md` and `memory-bank/progress.md` after each task (see `.agents/instructions/task-implementation.instructions.md`)
 4. **Maintain context** — Keep memory bank files updated (see `.agents/instructions/memory-bank.instructions.md`)
 
@@ -81,7 +81,7 @@ Prompts in `.agents/prompts/` can be invoked directly:
 
 ## Available Agent Workflows
 
-These agent workflows (from `.agents/agents/`) define specialized modes of operation. Invoke the relevant workflow at the start of a task by stating which mode you want to activate.
+These agent workflows (from `.opencode/agents/`) define specialized modes of operation. Invoke the relevant workflow at the start of a task by stating which mode you want to activate.
 
 ### Plan Mode — Strategic Planning & Architecture
 

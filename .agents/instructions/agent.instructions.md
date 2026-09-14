@@ -12,7 +12,7 @@ Instructions for creating effective and maintainable custom agent files that pro
 - Target audience: Developers creating custom agents for opencode
 - File format: Markdown with YAML frontmatter
 - File naming convention: lowercase with hyphens (e.g., `test-specialist.agent.md`)
-- Location: `.agents/agents/` directory (repository-level) or `.opencode/agents/` directory
+- Location: `.opencode/agents/` directory (repository-level)
 - Purpose: Define specialized agents with tailored expertise, tools, and instructions for specific tasks
 - Official documentation: [opencode.ai](https://opencode.ai)
 
@@ -191,7 +191,7 @@ Structure each step invocation with:
 ```text
 Step 1: Transform raw input data
 Agent: data-processor
-Spec: .agents/agents/data-processor.agent.md
+Spec: .opencode/agents/data-processor.agent.md
 Context: projectName, basePath
 Input: basePath/raw/
 Output: basePath/processed/
@@ -199,7 +199,7 @@ Expected: write basePath/processed/summary.md
 
 Step 2: Analyze processed data (depends on Step 1 output)
 Agent: data-analyst
-Spec: .agents/agents/data-analyst.agent.md
+Spec: .opencode/agents/data-analyst.agent.md
 Context: projectName, basePath
 Input: basePath/processed/
 Output: basePath/analysis/
@@ -363,7 +363,7 @@ When invoking a sub-agent, pass all context through descriptive instructions in 
 Example (prompt template):
 
 ```text
-This phase must be performed as the agent "documentation-writer" defined in ".agents/agents/documentation-writer.agent.md".
+This phase must be performed as the agent "documentation-writer" defined in ".opencode/agents/documentation-writer.agent.md".
 
 IMPORTANT:
 - Read and apply the entire .agent.md spec.
@@ -394,19 +394,19 @@ Example of a simple orchestrator that validates code through multiple specialize
 ```text
 Step 1: Security Review
 Agent: security-reviewer
-Spec: .agents/agents/security-reviewer.agent.md
+Spec: .opencode/agents/security-reviewer.agent.md
 Context: repository name, PR number, base path
 Output: security-review.md
 
 Step 2: Test Coverage
 Agent: test-coverage
-Spec: .agents/agents/test-coverage.agent.md
+Spec: .opencode/agents/test-coverage.agent.md
 Context: repository name, PR number, base path
 Output: coverage-report.md
 
 Step 3: Aggregate
 Agent: review-aggregator
-Spec: .agents/agents/review-aggregator.agent.md
+Spec: .opencode/agents/review-aggregator.agent.md
 Context: repository name, PR number, base path
 Output: final-review.md
 ```
@@ -456,7 +456,7 @@ Use consistent variable naming conventions:
 
 ### Repository-Level Agents
 
-- Location: `.agents/agents/` or `.opencode/agents/`
+- Location: `.opencode/agents/`
 - Scope: Available only in the specific repository
 - Access: Uses repository-configured MCP servers from `opencode.json`
 
@@ -491,7 +491,7 @@ Use consistent variable naming conventions:
 ### File Structure
 
 - [ ] Filename follows lowercase-with-hyphens convention
-- [ ] File placed in correct directory (`.agents/agents/` or `.opencode/agents/`)
+- [ ] File placed in correct directory (`.opencode/agents/`)
 - [ ] Filename uses only allowed characters
 - [ ] File extension is `.agent.md`
 
@@ -564,7 +564,7 @@ Use consistent variable naming conventions:
 ### Organizational Issues
 
 - ❌ Filename doesn't reflect agent purpose
-- ❌ Wrong directory (using `.github/agents/` instead of `.agents/agents/`)
+- ❌ Wrong directory (using `.github/agents/` instead of `.opencode/agents/`)
 - ❌ Using spaces or special characters in filename
 - ❌ Duplicate agent names causing conflicts
 
