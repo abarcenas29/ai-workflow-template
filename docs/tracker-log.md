@@ -1526,3 +1526,82 @@ Closed the three follow-ups from the Pipeline 11 quick-fix. (1) Documented the n
 - **🔵 Minor (non-blocking) — undocumented fallback nuance:** the "`anthropic` SDK not installed" edge of the auth behavior is not covered in the docs (only the `ANTHROPIC_API_KEY`-set and `claude` CLI paths are described).
 - **No push** — all 5 commits are local to `feat/utilize-pg-vector-db`; no remote/PR action taken.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 ("Pipeline 11 Follow-ups") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Pipeline 11 Final Polish: Doc Nits + Version Settle (1.45.0) + `SKIP_BUMP` Opt-Out
+
+**Date:** 2026-09-14
+**Status:** ✅ SUCCESS — reviewer APPROVED (no critical/major; 5 non-blocking minors); 4 commits on `feat/utilize-pg-vector-db`; working tree clean; `package.json` settled at `1.45.0`
+**Pipeline:** coder → reviewer → deployer → tracker (this entry) — quick-fix follow-up pipeline
+
+### Summary
+
+Closed the last two non-blocking reviewer wording nits from the Pipeline 11 follow-ups, settled the spuriously auto-bumped `package.json` version, and shipped the long-recommended `SKIP_BUMP` opt-out for the version-bump hook. **(1)** Reworded the terse `**Model config:**` line in `.agents/skills/caveman-compress/README.md:84` into clear prose naming both auth paths. **(2)** Documented the "Anthropic SDK not installed" fallback nuance (the three-state auth flow) across the caveman skill docs, plus a comment-only clarification at the `except ImportError:` branch in both byte-identical `compress.py` copies (runtime unchanged). **(3)** Settled `package.json` `"version"` from `1.49.0` → `1.45.0` (one logical batch = one bump over the `1.44.0` base); `package-lock.json` left untouched as pre-existing drift. **(4)** Added an additive `SKIP_BUMP` opt-out guard to `scripts/bump-version.js` and documented it in the root `README.md` Versioning section. The reviewer independently verified all four tasks and returned **APPROVED** with five non-blocking minor leftovers. All work shipped as **4 commits**, every one run with `SKIP_BUMP=1` so the hook did not re-bump the version.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | coder | ✅ | **TASK 1 (docs nit):** `.agents/skills/caveman-compress/README.md:84` reworded from terse caveman phrasing to clear prose naming both paths (`ANTHROPIC_API_KEY` set ⇒ `CAVEMAN_MODEL` required + fail-fast; `claude` CLI fallback ⇒ none). **TASK 2 (fallback nuance):** documented the SDK-missing edge in `.agents/skills/compress/SKILL.md:40`, `.agents/skills/caveman-compress/SKILL.md:40`, and `.agents/skills/caveman-compress/SECURITY.md:23,25`; added a comment-only clarification at `compress.py:96` in both byte-identical copies (`# anthropic SDK not installed → fall back to CLI (no CAVEMAN_MODEL needed)`) — scripts stay byte-identical, runtime behavior unchanged. **TASK 3 (version settle):** `package.json` `1.49.0` → `1.45.0`; base before the batch was `1.44.0` per `git show 267da69^:package.json`; `package-lock.json` left untouched (stale at `1.34.0`, does not mirror package.json). **TASK 4 (`SKIP_BUMP`):** additive guard at `scripts/bump-version.js:9–15` — truthy `SKIP_BUMP` → log `SKIP_BUMP set — version bump skipped` + `exit(0)` before any read/write; default unchanged; documented in root `README.md` (`## Versioning`). |
+| 2 | reviewer | ✅ APPROVED | Independently verified: the documented three-state behavior matches the actual `compress.py` control flow; the `compress.py` change is comment-only and both copies are byte-identical; the version-settle rationale and JSON validity hold; the `SKIP_BUMP` guard is additive, placed before any write, and `node --check` passes. No critical/major findings; 5 non-blocking minor leftovers (M-1..M-5, below). |
+| 3 | deployer | ✅ | Created **4 commits** on `feat/utilize-pg-vector-db` (base `4f84947`), each committed with `SKIP_BUMP=1` so the version was **not** re-bumped (no push, no `--no-verify`). Verified `package.json` version is `1.45.0` at HEAD and was committed exactly once; the hook logged "SKIP_BUMP set — version bump skipped" for every commit; working tree clean. |
+| 4 | tracker | ✅ | This entry — full pipeline record in `docs/tracker-log.md`, summary in `memory-bank/progress.md`, learned-knowledge Session 2026-09-14, `docs/TRACKER-INDEX.md` update, memory-bank re-index + PG knowledgebase index under canonical `@abarcenas/ai-workflow-template`. `knowledgebase_search` executed — 5 results returned. |
+
+### Commits Produced
+
+| Commit | Message | Contents |
+|---|---|---|
+| `c8c1e85` | `docs(skills): clarify CAVEMAN_MODEL requirement and SDK-missing fallback` | `.agents/skills/caveman-compress/README.md`, `.agents/skills/caveman-compress/SECURITY.md`, `.agents/skills/caveman-compress/SKILL.md`, `.agents/skills/caveman-compress/scripts/compress.py`, `.agents/skills/compress/SKILL.md`, `.agents/skills/compress/scripts/compress.py` (6 files, 7 insertions / 7 deletions). |
+| `dbc3b83` | `chore(scripts): add SKIP_BUMP opt-out to version-bump hook` | `scripts/bump-version.js` (+7) + root `README.md` (Versioning note) — 2 files, 8 insertions / 1 deletion. |
+| `d5274c2` | `chore: settle package.json to 1.45.0 after batched auto-bumps` | `package.json` (1 insertion / 1 deletion). |
+| `0345ac2` | `docs: record Pipeline 11 follow-up work` | `.agents/instructions/learned-knowledge.instructions.md` (+20), `docs/TRACKER-INDEX.md` (+3), `docs/tracker-log.md` (+74), `memory-bank/activeContext.md` (+2), `memory-bank/progress.md` (+27) — 5 files, 126 insertions. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/skills/caveman-compress/README.md` | **Modified** — `**Model config:**` line (line 84) reworded to clear prose naming both auth paths (API path requires `CAVEMAN_MODEL` + fail-fast; `claude` CLI fallback needs none). |
+| `.agents/skills/caveman-compress/SKILL.md` | **Modified** — `## Configuration` note (line 40) gained the "(when the Anthropic SDK is installed)" qualifier + explicit SDK-missing fallback sentence. |
+| `.agents/skills/compress/SKILL.md` | **Modified** — identical `## Configuration` clarification (line 40). |
+| `.agents/skills/caveman-compress/SECURITY.md` | **Modified** — `### Auth behavior` (lines 23, 25) now enumerates the three auth states (key + SDK → API; key but no SDK → `claude` CLI; no key → `claude` CLI). |
+| `.agents/skills/caveman-compress/scripts/compress.py` | **Modified (comment-only)** — `except ImportError:` branch comment clarified (line 96); runtime behavior unchanged. |
+| `.agents/skills/compress/scripts/compress.py` | **Modified (comment-only)** — identical comment change; both copies remain byte-identical (`cmp` clean). |
+| `scripts/bump-version.js` | **Modified** — additive `SKIP_BUMP` opt-out guard (lines 9–15): truthy `SKIP_BUMP` → log + `exit(0)` before reading/writing `package.json`; default path unchanged. |
+| `README.md` | **Modified** — `## Versioning` section documents `SKIP_BUMP=1` (e.g. `SKIP_BUMP=1 git commit ...`) for doc-only changes. |
+| `package.json` | **Modified** — `"version"` settled `1.49.0` → `1.45.0` (one logical batch = one bump over the `1.44.0` base). |
+| `package-lock.json` | **Intentionally untouched** — stale at `1.34.0` (last touched `d788f68`); does not mirror `package.json` (pre-existing drift, flagged not fixed). |
+| `docs/tracker-log.md`, `docs/TRACKER-INDEX.md`, `.agents/instructions/learned-knowledge.instructions.md`, `memory-bank/{activeContext,progress}.md` | **Committed in `0345ac2`** — the Pipeline 11 follow-up records; this final-polish tracker entry is appended by the current tracker step. |
+
+### Key Decisions
+
+- **Settle to `1.45.0`, not `1.44.0`** — the 5-commit follow-up batch was one logical change set, so it warrants a single minor bump over the base. The base immediately before the batch was `1.44.0` (`git show 267da69^:package.json`), therefore the settled version is `1.45.0`; this reverts the four extra spurious bumps (`1.46.0`–`1.49.0`) created by the unconditional hook.
+- **Do not touch `package-lock.json`** — it is stale at `1.34.0` and does not mirror `package.json` (the repo's `bump-version.js` convention never syncs it). Keeping it out of scope avoids a large, unrelated lockfile churn; the drift is recorded as a follow-up instead.
+- **`SKIP_BUMP` is additive and opt-in** — the guard runs before any read or write and only activates on a truthy `SKIP_BUMP`; the default (unset) behavior is byte-for-byte unchanged. This is the mitigation recommended since 2026-08-02 and the accepted alternative to `--no-verify` (which also skips memory-schema validation).
+- **Comment-only change in `compress.py`** — the code fix is documentation-in-code; no logic changed, so runtime behavior is identical and the two copies stay byte-identical.
+- **Deployer used `SKIP_BUMP=1` for every commit** — this exercises the new guard in the same pipeline that introduced it and keeps the settled version stable across the 4 commits (verified: `1.45.0` committed exactly once, no re-bump).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| Documented three-state behavior vs actual `compress.py` | ✅ Match (reviewer-verified) |
+| Both `compress.py` copies | ✅ Byte-identical (comment-only change) |
+| `package.json` version | ✅ `1.45.0` at HEAD; committed exactly once |
+| Hook behavior with `SKIP_BUMP=1` | ✅ Logged "SKIP_BUMP set — version bump skipped" on every commit; version not re-bumped |
+| `node --check scripts/bump-version.js` | ✅ Passes |
+| JSON validity (`package.json`) | ✅ Valid |
+| `git log --oneline` (top 4) | ✅ `0345ac2` docs ← `d5274c2` chore ← `dbc3b83` chore(scripts) ← `c8c1e85` docs(skills) on `feat/utilize-pg-vector-db` |
+| `git status --short` | ✅ Clean (post-deployer; tracker re-adds doc entries) |
+| Reviewer verdict | ✅ APPROVED — no critical/major; 5 non-blocking minors |
+| Vitest suite | ✅ Unaffected (docs + comment-only script change + version constant) |
+
+### Notes / Follow-up
+
+- **🔵 M-1 (non-blocking):** `SKIP_BUMP=0` / `SKIP_BUMP=false` are **truthy** strings in JS, so they also skip the bump — broader than the documented "set `SKIP_BUMP=1`" wording. Not fixed (out of scope); consider a stricter parse (e.g. accept only `1`/`true`) if misconfiguration matters.
+- **🔵 M-2 (non-blocking):** `.agents/skills/caveman-compress/README.md` still lacks the "(when the Anthropic SDK is installed)" qualifier that the other three docs now carry — the README gets the two-path message but not the SDK-missing edge.
+- **🔵 M-3 (non-blocking, pre-existing):** `package-lock.json` drift — stale at `1.34.0` plus dependency-classification drift; `npm ci --dry-run` passes, so it is not a build blocker, but the lockfile does not reflect the manifest.
+- **🔵 M-4 (non-blocking, pre-existing):** the `architecture-context` entity is not present in `memory-bank/.vocabulary.json` (pre-existing vocab gap; memory-schema validator tolerates it).
+- **🔵 M-5 (non-blocking, documentation):** the prior tracker entry's "`1.49.0`" narrative now reads stale relative to the settled `1.45.0` — historical record intentionally left frozen; this entry documents the settle.
+- **No push** — all 4 commits are local to `feat/utilize-pg-vector-db`; no remote/PR action taken.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 ("Pipeline 11 Final Polish") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.

@@ -19,6 +19,21 @@ category: "progress"
 
 ## What Works
 
+### 2026-09-14: Tracker — Pipeline 11 Final Polish (doc nits + version settle to 1.45.0 + `SKIP_BUMP` opt-out) fully documented
+
+Recorded the complete Pipeline 11 final-polish run (coder → reviewer → deployer → tracker):
+
+- **Pipeline outcome:** (1) `.agents/skills/caveman-compress/README.md:84` reworded to clear prose naming both auth paths. (2) The "Anthropic SDK not installed" fallback nuance (three-state auth flow) documented in `.agents/skills/compress/SKILL.md:40`, `.agents/skills/caveman-compress/SKILL.md:40`, `.agents/skills/caveman-compress/SECURITY.md:23,25`, plus a comment-only clarification at `compress.py:96` in both byte-identical copies (runtime unchanged). (3) `package.json` version settled `1.49.0` → `1.45.0` (base `1.44.0` at `267da69^`; one logical batch = one bump); `package-lock.json` left untouched (stale `1.34.0`). (4) Additive `SKIP_BUMP` guard added to `scripts/bump-version.js:9–15` (truthy → log + `exit(0)` before any read/write; default unchanged) + root `README.md` Versioning note.
+- **Final state: 4 commits** on `feat/utilize-pg-vector-db` (base `4f84947`), all run with `SKIP_BUMP=1` so the version was NOT re-bumped — `c8c1e85` docs(skills) CAVEMAN_MODEL + SDK-missing fallback, `dbc3b83` chore(scripts) SKIP_BUMP opt-out, `d5274c2` chore settle package.json to 1.45.0, `0345ac2` docs Pipeline 11 record. `package.json` `1.45.0` at HEAD, committed exactly once; hook logged "SKIP_BUMP set — version bump skipped" each commit; working tree clean; no push. Reviewer APPROVED (no critical/major).
+- **`docs/tracker-log.md`** — appended full "Pipeline 11 Final Polish" entry: execution-steps table (coder → reviewer → deployer → tracker), a commits table, files-produced/modified table, key decisions, verification results, and follow-up notes (5 non-blocking minors M-1..M-5).
+- **`memory-bank/progress.md`** — this tracker summary (the coder's per-task entry is in the What Works section below).
+- **`.agents/instructions/learned-knowledge.instructions.md`** — appended Session 2026-09-14 ("Pipeline 11 Final Polish") with reusable knowledge + agent tuning notes (opt-out hook guard additive + self-dogfooded during its own commits; settle target = base-parent version + one bump; JS truthy-string env-var footgun; stale-lockfile drift left out of scope) and re-indexed into the PG knowledgebase with the canonical `projectId` `@abarcenas/ai-workflow-template`.
+- **`docs/TRACKER-INDEX.md`** — added the final-polish pipeline row, entry-location row, and learned-knowledge session row.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` executed — 5 results returned** (surfaced the vocab-sync/distribution and prior Pipeline 11 session patterns as relevant cross-project context). No failure.
+
+**Outcome:** the Pipeline 11 follow-up loop is fully closed — the reviewer's two wording nits are resolved, the spuriously auto-bumped version is settled to `1.45.0`, and the `SKIP_BUMP` opt-out (recommended since 2026-08-02) is implemented and self-exercised. **Non-blocking follow-ups carried forward:** M-1 `SKIP_BUMP=0`/`false` are truthy in JS (also skip); M-2 `.agents/skills/caveman-compress/README.md` lacks the SDK-installed qualifier; M-3 `package-lock.json` stale at `1.34.0` (pre-existing drift); M-4 `architecture-context` entity missing from `.vocabulary.json` (pre-existing); M-5 prior tracker entry's "1.49.0" narrative reads stale vs the settled `1.45.0` (historical record intentionally frozen).
+
 ### 2026-09-14: Coder — Final polish: docs nits + settle package.json to 1.45.0 + SKIP_BUMP guard
 
 Closed the 2 non-blocking reviewer wording minors from the Pipeline 11 follow-ups and added the recommended pre-commit opt-out. Documentation + one script + version settle; **NO commit** (orchestrator/deployer handles staging with `SKIP_BUMP=1`).
