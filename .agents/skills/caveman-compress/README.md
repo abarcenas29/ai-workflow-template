@@ -81,6 +81,8 @@ caveman-compress/
 
 **Requires:** Python 3.10+
 
+**Model config:** If `ANTHROPIC_API_KEY` set, MUST also export `CAVEMAN_MODEL=<model-id>` — script fail fast if unset. Use `claude` CLI fallback? No model variable needed.
+
 ## Usage
 
 ```

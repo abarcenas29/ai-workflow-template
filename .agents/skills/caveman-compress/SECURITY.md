@@ -22,6 +22,8 @@
 
 If `ANTHROPIC_API_KEY` is set, the skill uses the Anthropic Python SDK directly (no subprocess). If not set, it falls back to the `claude` CLI, which uses the user's existing Claude desktop authentication.
 
+When using the Anthropic API directly, `CAVEMAN_MODEL` MUST also be exported with the model identifier (e.g. `export CAVEMAN_MODEL=<model-id>`) — the skill fails fast with a clear error if it is unset. The `claude` CLI fallback requires no model variable.
+
 ### File size limit
 
 Files larger than 500KB are rejected before any API call is made.
