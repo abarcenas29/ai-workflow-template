@@ -1452,3 +1452,77 @@ A two-part cleanup driven by a prior read-only audit, entirely outside the Vites
 - **Pre-existing, unrelated:** 14 `.opencode/agents/**/*.agent.md` files carry working-tree changes removing the `model:` frontmatter line (mtime 2026-09-13). Not made by this pipeline and intentionally left untouched.
 - **No commit made** by this pipeline — only the two-file-family edits plus memory-bank updates are in the working tree; the orchestrator handles staging/commit.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Pipeline 11 Follow-ups: CAVEMAN_MODEL Docs + Python Artifact Gitignore + Agent Model-Agnostic Commit
+
+**Date:** 2026-09-14
+**Status:** ✅ SUCCESS — reviewer APPROVED (no critical/major, 2 non-blocking minors); 5 atomic conventional commits on `feat/utilize-pg-vector-db`; working tree clean (0 untracked)
+**Pipeline:** coder (3 tasks) → reviewer (✅ APPROVED) → deployer (5 commits) → tracker (this entry) — quick-fix follow-up pipeline
+
+### Summary
+
+Closed the three follow-ups from the Pipeline 11 quick-fix. (1) Documented the now-required `CAVEMAN_MODEL` environment variable in all four caveman-compress skill docs (`compress/SKILL.md`, `caveman-compress/SKILL.md`, `caveman-compress/README.md`, `caveman-compress/SECURITY.md`) — a new `## Configuration` section / `**Model config:**` line / `### Auth behavior` sentence stating that when `ANTHROPIC_API_KEY` is set the script requires `CAVEMAN_MODEL` and fails fast if unset, while the `claude` CLI fallback needs no model variable. (2) Added `__pycache__/` and `*.pyc` to `.gitignore` and deleted the two untracked `__pycache__` directories. (3) Investigated, then committed, the pre-existing working-tree diff that removed one hardcoded `model:` frontmatter line from each of 14 `.opencode/agents/**/*.agent.md` files. All work shipped as **5 atomic conventional commits** (no push) on branch `feat/utilize-pg-vector-db`; the reviewer independently verified the two code/docs changes and the exact 14-file model-removal inventory and returned **APPROVED** (2 non-blocking wording minors).
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | coder | ✅ | **TASK 1 (docs):** `## Configuration` section added to both `SKILL.md` files (new note at line 40); `**Model config:**` line added to `README.md:84`; sentence appended to `SECURITY.md:25` — message consistently covers both the API path (requires `CAVEMAN_MODEL`, fail-fast) and the `claude` CLI fallback (no model var). **TASK 2 (gitignore/cleanup):** `.gitignore` lines 9–11/12 add `# Python build artifacts` + `__pycache__/` + `*.pyc`; both untracked `__pycache__/` dirs deleted (`git check-ignore -v` confirms; `git status` clean of them). **TASK 3 (investigation only):** characterized the pre-existing `.opencode/agents/**` diff as exactly 14 files, each removing exactly one `model:` line (1-deletion hunk, no other changes) — `deepseek/deepseek-v4-pro` ×7 (architect, implementer, plan, researcher, orchestrator ×3) and `deepseek/deepseek-v4-flash` ×7 (coder, deployer, designer, e2e-tester, reviewer, tracker, unit-tester). |
+| 2 | reviewer | ✅ APPROVED | Verified the CAVEMAN_MODEL docs match actual `compress.py` behavior (fail-fast propagates past the sibling `except ImportError`); `.gitignore` correct and not duplicated; no accidental source deletions; the 14-file model-removal inventory is exact (0 insertions / 1 deletion each); no secrets in the diff; nothing staged at review time. **2 non-blocking minors:** (a) `README.md:84` wording is terse enough to be ambiguous; (b) the "anthropic SDK missing" fallback nuance is not documented. No critical/major. |
+| 3 | deployer | ✅ | Created **5 atomic conventional commits** on `feat/utilize-pg-vector-db` (no push) — model-removal, agent-path fixes, CAVEMAN_MODEL docs, gitignore, and docs. **No `--no-verify` used.** Working tree clean afterward; 0 untracked. **Side effect:** the Husky pre-commit `scripts/bump-version.js` hook auto-bumped `package.json` minor on every commit (no `SKIP_BUMP` guard), so the version went **1.44.0 → 1.49.0** across the 5 commits. |
+| 4 | tracker | ✅ | This entry — full pipeline record in `docs/tracker-log.md`, summary in `memory-bank/progress.md`, learned-knowledge Session 2026-09-14, `docs/TRACKER-INDEX.md` update, memory-bank re-index + PG knowledgebase index under canonical `@abarcenas/ai-workflow-template`. `knowledgebase_search` executed — 5 results returned. |
+
+### Commits Produced
+
+| Commit | Message | Contents |
+|---|---|---|
+| `267da69` | `chore(agents): remove hardcoded model bindings from agent definitions` | 14 `.opencode/agents/**/*.agent.md` files, each removing one `model:` line (`deepseek/deepseek-v4-pro` ×7 / `deepseek/deepseek-v4-flash` ×7) + package.json auto-bump (15 files, 1 insertion / 15 deletions). |
+| `04cae6f` | `fix(agents): point agent-path references at .opencode/agents` | `AGENTS.md` (3 live refs) + `.agents/instructions/agent.instructions.md` (10 refs) — stale `.agents/agents/` → `.opencode/agents/` + package.json (14 insertions / 14 deletions). |
+| `ca30ee2` | `fix(skills): require CAVEMAN_MODEL and drop hardcoded model default` | 4 skill docs + both `scripts/compress.py` copies + package.json (29 insertions / 3 deletions); the docs half of this follow-up. |
+| `e064e6a` | `chore: ignore Python build artifacts` | `.gitignore` (+4 lines: blank + `# Python build artifacts` + `__pycache__/` + `*.pyc`) + package.json. |
+| `4f84947` | `docs: record agent model-agnostic migration and pipeline follow-ups` | `learned-knowledge.instructions.md` (+19), `docs/TRACKER-INDEX.md` (+5), `docs/tracker-log.md` (+58 — the prior Pipeline 11 entry), `memory-bank/activeContext.md` (+8), `memory-bank/progress.md` (+38) + package.json (6 files, 125 insertions / 5 deletions). |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/skills/compress/SKILL.md` | **Modified** — new `## Configuration` section (lines 38–40): `CAVEMAN_MODEL` required when `ANTHROPIC_API_KEY` is set (fail-fast); the `claude` CLI fallback needs no model var. |
+| `.agents/skills/caveman-compress/SKILL.md` | **Modified** — identical `## Configuration` section (lines 38–40). |
+| `.agents/skills/caveman-compress/README.md` | **Modified** — `**Model config:**` line added under `**Requires:** Python 3.10+` (line 84), in caveman tone. |
+| `.agents/skills/caveman-compress/SECURITY.md` | **Modified** — sentence appended to the `### Auth behavior` paragraph (line 25). |
+| `.gitignore` | **Modified** — lines 9–12: `# Python build artifacts`, `__pycache__/`, `*.pyc` (grouped after `coverage/`). |
+| `.opencode/agents/**/*.agent.md` | **Committed (pre-existing diff, 14 files)** — one `model:` frontmatter line removed per file (`deepseek/deepseek-v4-pro` ×7 / `deepseek/deepseek-v4-flash` ×7). |
+| `.agents/instructions/agent.instructions.md`, `AGENTS.md` | **Committed** — stale `.agents/agents/` path references repointed to `.opencode/agents/` (the Pipeline 11 quick-fix work, committed here). |
+| `package.json` | **Auto-bumped** — 1.44.0 → 1.49.0 (+0.1.0 per commit, by the Husky pre-commit hook). |
+| `docs/tracker-log.md`, `docs/TRACKER-INDEX.md`, `.agents/instructions/learned-knowledge.instructions.md`, `memory-bank/{activeContext,progress}.md` | **Committed in `4f84947`** — the prior Pipeline 11 tracker record; this follow-up entry is appended by the current tracker step. |
+
+### Key Decisions
+
+- **Document both the primary and fallback paths** — the `CAVEMAN_MODEL` note is written as a conditional: API path (`ANTHROPIC_API_KEY` set) requires the var and fails fast; `claude` CLI fallback needs none. This mirrors the actual `compress.py` control flow and avoids over-stating a requirement that only applies to one path.
+- **Precise pre-commit inventory of a large pre-existing diff** — before committing the 14-file `model:` removal, the coder characterized it exactly (file count, one deletion each, the two distinct model values, no other hunks). This made the atomic `chore(agents)` commit safe and reviewable rather than a blind `git add`.
+- **Commit the pre-existing working-tree diff rather than discard it** — the 14-file model-removal was pre-existing (mtime 2026-09-13) and left untouched by the prior pipeline; committing it (with the stale-path fixes and follow-up docs) as separate atomic commits closes the loop and leaves a clean tree.
+- **No `--no-verify`** — unlike Pipeline 10, the deployer let the pre-commit hook run normally; the resulting version bumps were accepted as a side effect rather than suppressed.
+- **Dedicated docs commit** — the prior pipeline's tracker record (tracker-log entry, index rows, learned-knowledge session, memory-bank updates) shipped as its own `docs:` commit in `4f84947`.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `git log --oneline` (top 5) | ✅ `4f84947` docs ← `e064e6a` chore ← `ca30ee2` fix(skills) ← `04cae6f` fix(agents) ← `267da69` chore(agents) on `feat/utilize-pg-vector-db` |
+| `git status --short` | ✅ Empty (working tree clean; 0 untracked) |
+| Model-removal inventory (commit `267da69`) | ✅ Exactly 14 `.opencode/agents/**/*.agent.md` files, 1 deletion each (0 insertions); `git grep '^model:' HEAD -- .opencode/agents` returns the same 14 files only |
+| `CAVEMAN_MODEL` docs vs `compress.py` behavior | ✅ Match — fail-fast `RuntimeError` propagates (not swallowed by `except ImportError`); fallback path needs no var (reviewer-verified) |
+| `.gitignore` Python artifacts | ✅ `git check-ignore -v` → `.gitignore:10:__pycache__/`; no `__pycache__` in `git status` |
+| No secrets in diff | ✅ Reviewer-confirmed |
+| Reviewer verdict | ✅ APPROVED — no critical/major; 2 non-blocking wording minors |
+| Vitest suite | ✅ Unaffected (no test-relevant surface changed; docs + `.gitignore` + agent frontmatter) |
+
+### Notes / Follow-up
+
+- **⚠️ Auto-bump side effect (documented follow-up):** the Husky pre-commit hook `scripts/bump-version.js` performs a **minor** bump on **every** commit and has no `SKIP_BUMP` guard, so the 5 sequential commits moved `package.json` from **1.44.0 → 1.49.0** (5 minor bumps) without any intended release. `--no-verify` was deliberately NOT used. Recommended: add a `SKIP_BUMP` env guard to `bump-version.js` (or revert/settle the version) before any release is cut from this branch.
+- **🔵 Minor (non-blocking) — README wording:** `README.md:84` is terse enough to be ambiguous about which path requires `CAVEMAN_MODEL`; a one-line clarity pass would close the reviewer's nit.
+- **🔵 Minor (non-blocking) — undocumented fallback nuance:** the "`anthropic` SDK not installed" edge of the auth behavior is not covered in the docs (only the `ANTHROPIC_API_KEY`-set and `claude` CLI paths are described).
+- **No push** — all 5 commits are local to `feat/utilize-pg-vector-db`; no remote/PR action taken.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 ("Pipeline 11 Follow-ups") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.

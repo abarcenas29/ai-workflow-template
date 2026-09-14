@@ -19,6 +19,33 @@ category: "progress"
 
 ## What Works
 
+### 2026-09-14: Coder — Final polish: docs nits + settle package.json to 1.45.0 + SKIP_BUMP guard
+
+Closed the 2 non-blocking reviewer wording minors from the Pipeline 11 follow-ups and added the recommended pre-commit opt-out. Documentation + one script + version settle; **NO commit** (orchestrator/deployer handles staging with `SKIP_BUMP=1`).
+
+- **TASK 1 — `README.md:84` wording** (file is `.agents/skills/caveman-compress/README.md:84`, not the root README): reworded the terse `**Model config:**` line into clear prose naming both paths explicitly — `ANTHROPIC_API_KEY` set ⇒ `CAVEMAN_MODEL` required + fails fast; `claude` CLI fallback ⇒ no model var.
+- **TASK 2 — "Anthropic SDK not installed" fallback nuance documented:** the docs previously stated the API path "REQUIRES" `CAVEMAN_MODEL` unconditionally, but `compress.py`'s `except ImportError: pass` silently falls through to the `claude --print` CLI (no model var). Clarified in `.agents/skills/compress/SKILL.md:40`, `.agents/skills/caveman-compress/SKILL.md:40` (parenthetical "(when the Anthropic SDK is installed)" + explicit "if the SDK is not installed, it falls back to the `claude` CLI") and `.agents/skills/caveman-compress/SECURITY.md` `### Auth behavior` (now enumerates all 3 states: key+SDK → API; key but no SDK → CLI; no key → CLI). Added a one-line comment at the `except ImportError:` fallback in BOTH byte-identical `compress.py` copies (`# anthropic SDK not installed → fall back to CLI (no CAVEMAN_MODEL needed)`) — runtime behavior unchanged.
+- **TASK 3 — `package.json` version settled `1.49.0` → `1.45.0`:** verified via `git show 267da69^:package.json` that `1.44.0` was the version immediately before the batch base commit `267da69`; the batch was ONE logical change set, so a single minor bump over base = `1.45.0` (reverts the 4 extra spurious bumps 1.46.0/1.47.0/1.48.0/1.49.0). No CHANGELOG exists (nothing to fabricate).
+- **TASK 4 — `SKIP_BUMP` opt-out guard added to `scripts/bump-version.js` (lines 9–15):** if `process.env.SKIP_BUMP` is truthy, log `SKIP_BUMP set — version bump skipped` and `process.exit(0)` before reading/writing `package.json`. Default behavior (var unset) unchanged — verified `SKIP_BUMP=1 node scripts/bump-version.js` exits 0 with `package.json` untouched. One-line note added to the README `## Versioning` section.
+- **`package-lock.json` (⚠️ reported, NOT modified):** it exists but is **stale at `1.34.0`** (root `version` at lines 3 and 9) — it does NOT mirror `package.json` (1.49.0 pre-settle / 1.44.0 base). It was last touched in `d788f68`, long before this batch, so the repo's `bump-version.js` convention never syncs it. Per the conditional instruction ("if so, keep them in sync") the mirror condition is not met; left untouched (minimal scope) and flagged as pre-existing drift.
+- **Verification:** `cmp` + `diff` → both `compress.py` copies byte-identical; `python3 -m py_compile` OK on both (exit 0); `__pycache__` cleaned up (now gitignored); `SKIP_BUMP=1 node scripts/bump-version.js` → exit 0, `package.json` unchanged.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` executed — 5 results returned** (surfaced the prior Pipeline 11 auto-bump side effect + the original `SKIP_BUMP` recommendation from 2026-08-02).
+
+### 2026-09-14: Tracker — Pipeline 11 Follow-ups (CAVEMAN_MODEL docs + Python artifact gitignore + agent model-agnostic commit) fully documented
+
+Recorded the complete Pipeline 11 follow-ups run — closing the 3 recommendations from the Pipeline 11 quick-fix (coder → reviewer → deployer):
+
+- **Feature outcome:** (1) `CAVEMAN_MODEL` documented in all four caveman-compress skill docs (`compress/SKILL.md`, `caveman-compress/SKILL.md`, `caveman-compress/README.md:84`, `caveman-compress/SECURITY.md:25`) — conditional message: API path requires the var + fails fast; `claude` CLI fallback needs none. (2) `.gitignore` ignores `__pycache__/` + `*.pyc`; the two untracked `__pycache__/` dirs deleted. (3) The pre-existing 14-file `.opencode/agents/**/*.agent.md` `model:`-line removal was committed. **Final state: 5 atomic conventional commits** on `feat/utilize-pg-vector-db` — `267da69` chore(agents) model-line removal (14 files), `04cae6f` fix(agents) agent-path refs, `ca30ee2` fix(skills) CAVEMAN_MODEL docs + fail-fast, `e064e6a` chore gitignore Python artifacts, `4f84947` docs Pipeline 11 record. Working tree clean (0 untracked); no push. Reviewer APPROVED (no critical/major; 2 non-blocking wording minors).
+- **`docs/tracker-log.md`** — appended full "Pipeline 11 Follow-ups" entry: execution-steps table (coder → reviewer → deployer → tracker), a commits table, files-produced/modified table, key decisions, verification results, and follow-up notes (auto-bump side effect + 2 wording minors).
+- **`memory-bank/progress.md`** — this tracker summary (the per-task coder/reviewer/deployer entries are in the What Works section below).
+- **`.agents/instructions/learned-knowledge.instructions.md`** — appended Session 2026-09-14 ("Pipeline 11 Follow-ups") with reusable knowledge + agent tuning notes (required-env-var docs must cover both paths; precise inventory of a pre-existing diff before committing; Husky `bump-version.js` auto-bump side effect) and re-indexed into the PG knowledgebase with the canonical `projectId` `@abarcenas/ai-workflow-template`.
+- **`docs/TRACKER-INDEX.md`** — added the follow-ups pipeline row, entry-location row, and learned-knowledge session row.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` executed — 5 results returned** (surfaced the prior 2026-09-14 stale-path/env-var session and the vocab-sync/distribution patterns as relevant cross-project context). No failure.
+
+**Outcome:** the Pipeline 11 follow-up loop is closed — required-env-var documentation, Python artifact hygiene, and the agent model-agnostic migration are all committed. ⚠️ **Follow-up:** the Husky `bump-version.js` hook (no `SKIP_BUMP` guard) auto-bumped `package.json` 1.44.0 → 1.49.0 across the 5 commits — settle the version or add a `SKIP_BUMP` guard before release.
+
 ### 2026-09-14: Coder — CAVEMAN_MODEL docs + Python artifact gitignore + agent-model diff inventory (Pipeline 11 quick-fix follow-ups)
 
 Closed the 2 non-blocking reviewer recommendations from the Pipeline 11 quick-fix plus the TASK 3 investigation. Documentation + gitignore only; no source/test changes; NO commit (orchestrator handles staging).
