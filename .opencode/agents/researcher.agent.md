@@ -9,7 +9,6 @@ permission:
   "context7/*": allow
   "memory-bank/*": allow
   "knowledgebase/*": allow
-model: deepseek/deepseek-v4-pro
 ---
 
 # Technical spike research mode

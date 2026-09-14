@@ -9,7 +9,6 @@ permission:
   "github/*": allow
   "memory-bank/*": allow
   "knowledgebase/*": allow
-model: deepseek/deepseek-v4-flash
 ---
 
 # Deployer - Release Engineering

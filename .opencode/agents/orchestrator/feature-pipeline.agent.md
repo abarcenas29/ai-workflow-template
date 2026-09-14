@@ -8,7 +8,6 @@ permission:
   todo: allow
   "memory-bank/*": allow
   "knowledgebase/*": allow
-model: deepseek/deepseek-v4-pro
 ---
 
 # Feature Pipeline
