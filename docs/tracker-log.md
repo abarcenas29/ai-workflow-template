@@ -1394,3 +1394,61 @@ Addressed all three follow-ups from the Pipeline 9 reviewer: (1) **SECURITY** �
 - **Known minor (informational)**: the TEST-05 flat file list must be manually extended when new agent/script files are added (by design — a new file is exactly when an audit should trigger); the unquoted-YAML frontmatter form is not matched (theoretical).
 - **Local `.env` remains** — it is now gitignored; any future clone needs `cp .env.example .env` + fill in own values (README documents this).
 - The tracker Step 5 also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-08-03 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Quick-Fix Pipeline 11: Stale `.agents/agents/` Path References + Hardcoded CAVEMAN Model Default Removal
+
+**Date:** 2026-09-14
+**Status:** ✅ SUCCESS — reviewer APPROVED (no critical/major); 2 non-blocking recommendations; no test-suite change (documentation + Python helper scripts only)
+**Pipeline:** coder → reviewer → tracker (this entry) — quick-fix pipeline
+
+### Summary
+
+A two-part cleanup driven by a prior read-only audit, entirely outside the Vitest test surface (live documentation + Python helper scripts). **(1) Stale agent-path references:** every *live* reference to the non-existent `.agents/agents/` directory was repointed to the real `.opencode/agents/` — `AGENTS.md` (3 occurrences) and `.agents/instructions/agent.instructions.md` (10 occurrences) — with the former `implementation-plan.agent.md` correctly remapped to the actual, existing `implementer.agent.md`. Historical audit-trail files were intentionally frozen. **(2) Hardcoded CAVEMAN model default:** the vendor-specific default (`claude-sonnet-4-5`) was removed from **both** byte-identical copies of the caveman compression helper (`compress.py`); `CAVEMAN_MODEL` is now required, and an unset value fails fast with an actionable `RuntimeError` instead of silently defaulting to a specific vendor model. The reviewer independently verified both changes and returned **APPROVED** with two non-blocking follow-up recommendations (undocumented env var; untracked `__pycache__` artifacts).
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | coder | ✅ | **TASK 1 (stale paths):** `AGENTS.md` lines 9/15/84 and `.agents/instructions/agent.instructions.md` (10 refs) repointed `.agents/agents/` → `.opencode/agents/`; `implementation-plan.agent.md` → `implementer.agent.md` (target verified to exist). **TASK 2 (CAVEMAN model):** in BOTH `compress.py` copies, replaced `model=os.environ.get("CAVEMAN_MODEL", "claude-sonnet-4-5")` with fail-fast resolution — read `CAVEMAN_MODEL`, raise an actionable `RuntimeError` if unset; pre-existing `claude --print` CLI fallback preserved; copies byte-identical. Memory bank updated (`activeContext.md`, `progress.md`). |
+| 2 | reviewer | ✅ APPROVED | Verified all referenced targets exist; **0 stale `.agents/agents` refs in live docs**; historical docs correctly frozen; markdown intact (no broken fences/structure). Verified no hardcoded vendor model string remains; both script copies byte-identical; fail-fast propagates correctly (the `RuntimeError` is **not** swallowed by the narrow `except ImportError`); `py_compile` OK; error message actionable. No critical/major findings; 2 non-blocking recommendations (below). |
+| 3 | tracker | ✅ | This entry — full pipeline record in `docs/tracker-log.md`, summary in `memory-bank/progress.md`, learned-knowledge Session 2026-09-14, `docs/TRACKER-INDEX.md` update, memory-bank re-index + PG knowledgebase index under canonical `@abarcenas/ai-workflow-template`. `knowledgebase_search` executed — 5 results returned. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `AGENTS.md` | **Modified** — 3 live references `.agents/agents/` → `.opencode/agents/` (project-context key-directory bullet; "Plan before implementing" workflow incl. `implementation-plan.agent.md` → `implementer.agent.md`; "Available Agent Workflows" intro). |
+| `.agents/instructions/agent.instructions.md` | **Modified** — 10 references `.agents/agents/` → `.opencode/agents/` (verified diff hunks at lines 15, 194, 202, 366, 397, 403, 409, 459, 494, 567); the location-guide line was simplified to the single real `.opencode/agents/` path. Root cause of the drift: the original Copilot→opencode port mechanically renamed `.github/agents/` → `.agents/agents/` (see `docs/tracker-log.md` line 109 of the 2026-06-25 standalone entry). |
+| `.agents/skills/compress/scripts/compress.py` | **Modified** — hardcoded `CAVEMAN_MODEL` default removed; fail-fast `RuntimeError` when unset with an actionable message (`e.g. export CAVEMAN_MODEL="<model-id>"`). Pre-existing `claude --print` CLI fallback preserved. |
+| `.agents/skills/caveman-compress/scripts/compress.py` | **Modified** — identical change; both copies are byte-identical after the edit (`cmp` clean). |
+
+### Key Decisions
+
+- **Live docs only; historical audit-trail frozen** — `docs/tracker-log.md`, `docs/.orchestrator-log.md`, `memory-bank` history, and `learned-knowledge.instructions.md` deliberately retain the literal `.agents/agents` string as an accurate record (the documented "historical documentation freeze" precedent from the MCP Config Rename / README-trim pipelines). Editing them would falsify the audit trail.
+- **`implementation-plan.agent.md` → `implementer.agent.md`** — the referenced `implementation-plan.agent.md` never existed; `implementer.agent.md` is the real, existing analog (verified) rather than inventing a new agent file.
+- **Fail-fast over a silent vendor default** — resolving `CAVEMAN_MODEL` from the environment and raising when unset is preferred to a hardcoded vendor model (`claude-sonnet-4-5`): it keeps the template vendor-neutral and surfaces misconfiguration immediately instead of silently calling one specific model.
+- **Both script copies changed together** — `.agents/skills/compress/scripts/compress.py` and `.agents/skills/caveman-compress/scripts/compress.py` are duplicates; updating only one would let the copies silently drift.
+- **No test changes** — the change surface is documentation + Python helper scripts that are not part of the Vitest suite; the coder role boundary also excludes test authoring.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| Stale `.agents/agents` refs in live docs (`AGENTS.md`, `agent.instructions.md`) | ✅ 0 hits |
+| Removed vendor model string (`claude-sonnet-4-5`) in both scripts | ✅ 0 hits |
+| Both `compress.py` copies | ✅ `cmp` → byte-identical |
+| `python3 -m py_compile` (both copies) | ✅ OK |
+| Fail-fast propagation | ✅ `RuntimeError` surfaces (not swallowed by the narrow `except ImportError`); stubbed-`anthropic` harness PASS (unset → `RuntimeError` naming `CAVEMAN_MODEL`; set `my-model-123` → forwarded as `model=`) on both copies |
+| Referenced targets exist | ✅ `.opencode/agents/plan.agent.md` and `.opencode/agents/implementer.agent.md` verified present |
+| Vitest suite | ✅ Unaffected (15 files / 285 tests; no test-relevant surface changed) |
+| Reviewer verdict | ✅ APPROVED — no critical/major |
+
+### Notes / Follow-up
+
+- **🟡 Recommendation 1 (non-blocking):** `CAVEMAN_MODEL` is now a *required* environment variable but is undocumented in `.agents/skills/compress/SKILL.md`, `.agents/skills/caveman-compress/SKILL.md`, `.agents/skills/caveman-compress/README.md`, and `.agents/skills/caveman-compress/SECURITY.md` — they mention `ANTHROPIC_API_KEY` and the `claude` CLI fallback but not `CAVEMAN_MODEL`. A one-line docs pass would close the gap.
+- **🔵 Recommendation 2 (non-blocking):** `__pycache__/` and `*.pyc` are not in `.gitignore`; the `py_compile` verification produced untracked `__pycache__/` artifacts under both script directories (present in `git status` as `??`).
+- **Pre-existing, unrelated:** 14 `.opencode/agents/**/*.agent.md` files carry working-tree changes removing the `model:` frontmatter line (mtime 2026-09-13). Not made by this pipeline and intentionally left untouched.
+- **No commit made** by this pipeline — only the two-file-family edits plus memory-bank updates are in the working tree; the orchestrator handles staging/commit.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.

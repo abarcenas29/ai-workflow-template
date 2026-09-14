@@ -1,7 +1,7 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-08-03"
+updated: "2026-09-14"
 
 tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
@@ -18,6 +18,20 @@ category: "progress"
 - **KB Consolidation + Standardization — `plan/process-kb-consolidation-1.md` — STATUS: ✅ COMPLETED 2026-08-03 (ALL 10 TASKS / 4 PHASES DONE — T10 docs/status finalized in Phase 4)** — 10 tasks / 4 phases. Consolidate duplicate KB projects (re-index `@abarcenas/ai-workflow-template` from source → delete `ai-workflow-template`) and standardize projectId derivation (always use `package.json` `name`). **T1 ✅ 2026-08-03**: canonical scoped project re-indexed (16 chunks, +1). **T3 ✅ 2026-08-03**: `.opencode/agents/tracker.agent.md` "Check Knowledge" step gained projectId derivation guidance (line 30) — `knowledgebase_index` `projectId` SHALL be `require('./package.json').name` (scoped `@abarcenas/ai-workflow-template`), NOT orchestrator `projectName`; 14/14 existing spec-wiring tests pass. **T4 ✅ 2026-08-03**: `knowledge-retrieval.instructions.md` gained `### Canonical projectId` subsection (package.json name = single source of truth). **T5 ✅ 2026-08-03**: `knowledgebase.instructions.md` `knowledgebase_index` row `projectId` now "(required — from `package.json` `name` field)" + tool-detail sentence (scoped package name, single canonical project); **T7 (restart note) ✅ 2026-08-03** (dispatched with T5 — same FILE-03): added `### MCP Server Restart After Configuration Changes` subsection (after graceful-degradation section) + "Restart OpenCode after code changes" cross-reference in the `knowledgebase_search` tool description. **T6 (re-batched) ✅ 2026-08-03**: all 3 orchestrator `projectName` descriptions now read `(extracted from user request (prefer package.json "name" for the canonical scoped projectId))` — `orchestrator.agent.md:25` by the T6 agent; `feature-pipeline.agent.md:20` + `tdd-orchestrator.agent.md:20` by the "T7" coder instance (satisfies T9 spec test #4). **T8 ✅ 2026-08-03**: full Vitest suite `npx vitest run` → **14 files / 273 tests / 0 failures** (REQ-06 exact match); setup sub-suite `npx vitest run scripts/setup` → **6 files / 104 tests / 0 failures** — zero regressions from the additive doc changes (VALIDATION ONLY, no files edited). Remaining: T9 (spec test, Batch B parallel), T10 (memory bank + plan complete). No production code changes.
 
 ## What Works
+
+### 2026-09-14: Coder — CAVEMAN_MODEL docs + Python artifact gitignore + agent-model diff inventory (Pipeline 11 quick-fix follow-ups)
+
+Closed the 2 non-blocking reviewer recommendations from the Pipeline 11 quick-fix plus the TASK 3 investigation. Documentation + gitignore only; no source/test changes; NO commit (orchestrator handles staging).
+
+- **TASK 1 — `CAVEMAN_MODEL` documented in all 4 files** (previously undocumented in every one; only `SECURITY.md` mentioned `ANTHROPIC_API_KEY`):
+  - `.agents/skills/compress/SKILL.md:38` — new `## Configuration` section (note at line 40).
+  - `.agents/skills/caveman-compress/SKILL.md:38` — new `## Configuration` section (note at line 40).
+  - `.agents/skills/caveman-compress/README.md:84` — `**Model config:**` line under the `**Requires:** Python 3.10+` line in Install (caveman tone).
+  - `.agents/skills/caveman-compress/SECURITY.md:25` — sentence appended to the existing `### Auth behavior` paragraph.
+  - Message in each: when `ANTHROPIC_API_KEY` is set, the script uses the Anthropic API directly and REQUIRES `CAVEMAN_MODEL` (e.g. `export CAVEMAN_MODEL=<model-id>`) — fails fast with a clear error if unset; the `claude` CLI fallback needs no model variable.
+- **TASK 2 — Python artifacts ignored/cleaned:** `.gitignore` lines 9–11 = `# Python build artifacts` + `__pycache__/` + `*.pyc` (grouped after `coverage/`). Both untracked `__pycache__/` dirs deleted. Verified: `git check-ignore -v` → `.gitignore:10:__pycache__/`; `git status --short` no longer lists any `__pycache__`.
+- **TASK 3 — pre-existing `.opencode/agents/**` diff inventory (investigation only):** **14** files modified, each removing **exactly one** `model:` frontmatter line (1-deletion hunk, no other changes). Removed values: `deepseek/deepseek-v4-pro` ×7 (`architect`, `implementer`, `orchestrator/feature-pipeline`, `orchestrator/orchestrator`, `orchestrator/tdd-orchestrator`, `plan`, `researcher`) and `deepseek/deepseek-v4-flash` ×7 (`coder`, `deployer`, `designer`, `e2e-tester`, `reviewer`, `tracker`, `unit-tester`). `git grep '^model:' HEAD -- .opencode/agents` returns the same 14 files only. Nothing staged or committed.
+- **Knowledgebase outcome (per protocol): `knowledgebase_search` executed — 5 results returned.**
 
 ### 2026-08-03: Reviewer — Independent review of Pipeline 10 (.env remediation + TEST-05 hardening + Pipelines 7-9 commits)
 
@@ -2322,3 +2336,25 @@ Completed all tracker documentation for the Pipeline 10 follow-up pipeline:
 - **Final state**: reviewer APPROVED (C1 resolved, no further conditions); password **0 hits** repo-wide (working tree, commit trees, `.index/`); full suite 285/285; spec trio 26/26.
 - **Appended Pipeline 10 entry to `docs/tracker-log.md`**, updated `docs/TRACKER-INDEX.md`, appended learned-knowledge Session 2026-08-03 (tracked-secret remediation pattern: `git rm --cached` + gitignore + redact-all-sources + commit split fix(security)/feat; redaction must cover ALL sinks — commit trees, working tree, memory-bank, vector index incl. WAL; untracked secret-bearing files are a re-leak footgun; negative-assertion hardening for spec tests; reviewers should NOT append to dirty memory-bank).
 - **Remaining MANUAL user steps**: credential rotation (`ALTER USER postgres WITH PASSWORD '<new>'` + update local `.env`) + history purge of `d788f68` on origin (`git filter-repo`). `knowledgebase_search` executed — 5 results returned.
+
+### 2026-09-14: Coder — Stale agent-path references fixed + hardcoded CAVEMAN model default removed
+
+**What now works:** (1) `AGENTS.md` and `.agents/instructions/agent.instructions.md` no longer point readers at the non-existent `.agents/agents/` directory — all live references now use the real `.opencode/agents/` (including the correct `implementer.agent.md` analog for the former `implementation-plan.agent.md`, which never existed). Root cause of the instruction-file drift: its Copilot→opencode port mechanically renamed `.github/agents/` → `.agents/agents/` (docs/tracker-log.md line 109) instead of `.opencode/agents/`. (2) Both caveman compression scripts are now model-agnostic: the hardcoded vendor model default is gone; `CAVEMAN_MODEL` is required and an unset value fails fast with an actionable `RuntimeError` rather than silently using a specific vendor model.
+
+**Files modified:** `AGENTS.md` (3 references), `.agents/instructions/agent.instructions.md` (10 references), `.agents/skills/compress/scripts/compress.py`, `.agents/skills/caveman-compress/scripts/compress.py` (both byte-identical after edit).
+
+**Verification:** `python3 -m py_compile` → OK on both scripts; `diff` → byte-identical; grep for the removed vendor default → 0 hits; functional harness with a stubbed `anthropic` module → `RuntimeError` (mentioning `CAVEMAN_MODEL`) when unset, `my-model-123` forwarded as `model=` when set — PASS on both copies; final `grep .agents/agents` → 0 hits in live docs.
+
+**Known issues / intentionally untouched:** Historical audit-trail files retain the literal `.agents/agents` string as an accurate record (docs/tracker-log.md, docs/.orchestrator-log.md, memory-bank historical entries, learned-knowledge.instructions.md). The illustrative model example in `.agents/skills/agent-governance/SKILL.md:448` (`Agent("openai:gpt-4o", ...)`) and `docs/spike-vector-db-memory.md` were left untouched per task constraints. Pre-existing unrelated working-tree changes to `.opencode/agents/*.agent.md` (removing `model:` frontmatter lines) were not made by this task and were left alone. No tests written (coder role); no commit (orchestrator handles it). `knowledgebase_search` executed — 5 results returned.
+
+### 2026-09-14: Tracker — Stale Agent-Path References + CAVEMAN Model Default Removal Documented (Quick-Fix Pipeline 11)
+
+Completed all tracker documentation for the stale-path + hardcoded-CAVEMAN-model quick-fix pipeline:
+
+- **Pipeline**: coder (2 tasks) → reviewer (✅ APPROVED) → tracker (this entry)
+- **TASK 1 (stale paths)**: `AGENTS.md` (3 refs) + `.agents/instructions/agent.instructions.md` (10 refs) repointed `.agents/agents/` → `.opencode/agents/`; the non-existent `implementation-plan.agent.md` remapped to the real `implementer.agent.md` (verified on disk). Historical audit-trail files intentionally frozen.
+- **TASK 2 (CAVEMAN model)**: both byte-identical `compress.py` copies (`.agents/skills/compress/scripts/`, `.agents/skills/caveman-compress/scripts/`) lost the hardcoded `claude-sonnet-4-5` default; `CAVEMAN_MODEL` is now required and unset → an actionable `RuntimeError` (correctly NOT swallowed by the sibling `except ImportError`); the pre-existing `claude --print` CLI fallback was preserved.
+- **Review**: ✅ APPROVED — 0 stale refs in live docs; 0 hits of the removed vendor model string; both copies byte-identical (`cmp`); `py_compile` OK; fail-fast propagation verified. 2 non-blocking recommendations (undocumented `CAVEMAN_MODEL`; untracked `__pycache__`).
+- **Appended Pipeline 11 entry to `docs/tracker-log.md`**, appended learned-knowledge Session 2026-09-14, updated `docs/TRACKER-INDEX.md`; memory bank + PG knowledgebase re-indexed under canonical `@abarcenas/ai-workflow-template`.
+- **Follow-ups (non-blocking)**: document `CAVEMAN_MODEL` in the caveman skill docs (`.agents/skills/compress/SKILL.md`, `.agents/skills/caveman-compress/SKILL.md`, `.agents/skills/caveman-compress/README.md`, `.agents/skills/caveman-compress/SECURITY.md`); add `__pycache__/` + `*.pyc` to `.gitignore`.
+- **No test-suite change** — docs + Python helper scripts only; Vitest suite (15 files / 285 tests) unaffected. `knowledgebase_search` executed — 5 results returned.

@@ -1,7 +1,7 @@
 ---
 id: "tracker-index"
 title: "Tracker Pipeline Index"
-updated: "2026-08-03"
+updated: "2026-09-14"
 tags: [tracker, index, pipeline, orchestrator]
 doc_type: "tracker-index"
 ---
@@ -31,6 +31,7 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Feature Pipeline 7 | Close knowledge-vector gaps with graceful-failure KB access | 2026-08-03 | ✅ Complete (14 files / 273 tests + 14/14 spec-wiring tests; shared protocol + 10 agent specs + 3 orchestrators wired; reviewer APPROVED after 1 CHANGES REQUESTED cycle; 0 production code) |
 | Process Pipeline 9 | Consolidate duplicate KB projects + standardize projectId convention | 2026-08-03 | ✅ Complete (15 files / 284 tests + setup 104/104; 4 projects / 37 chunks consolidated, zero data loss; projectId SHALL = package.json name enforced; reviewer APPROVED) |
 | Process Pipeline 10 | .env remediation + TEST-05 hardening + commit Pipelines 7-9 work | 2026-08-03 | ✅ Complete (15 files / 285 tests, 0 failures; `.env` untracked + gitignored; TEST-05 negative assertion non-vacuous; commits c931cb9 fix(security) + bd5f780 feat + efc3cf5 docs; reviewer APPROVED after condition #1 + C1 redactions; password 0 hits repo-wide) |
+| Quick-Fix Pipeline 11 | Stale `.agents/agents/` path references + hardcoded CAVEMAN model default removal | 2026-09-14 | ✅ Complete (0 stale refs in live docs; `CAVEMAN_MODEL` required + fail-fast; both `compress.py` copies byte-identical; reviewer APPROVED; 2 non-blocking follow-ups — undocumented env var + untracked `__pycache__`) |
 
 ## Entry Locations
 
@@ -54,6 +55,7 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | Knowledge-Vector Gap Closure (graceful-failure KB) | `docs/tracker-log.md`, `plan/feature-knowledge-vector-gaps-1.md`, `.agents/instructions/knowledge-retrieval.instructions.md`, `.agents/instructions/knowledgebase.instructions.md`, `tests/spec-knowledge-retrieval.test.js`, `tests/spec-orchestrator-parity.test.js` |
 | KB Consolidation + projectId Standardization | `docs/tracker-log.md`, `plan/process-kb-consolidation-1.md`, `.opencode/agents/tracker.agent.md`, `.agents/instructions/knowledge-retrieval.instructions.md`, `.agents/instructions/knowledgebase.instructions.md`, `tests/spec-kb-consolidation.test.js` |
 | .env Remediation + TEST-05 Hardening + Commits | `docs/tracker-log.md`, `plan/process-env-remediation-1.md`, `tests/spec-kb-consolidation.test.js`, `.gitignore`, commits `c931cb9`/`bd5f780`/`efc3cf5` |
+| Stale Agent-Path References + CAVEMAN Model Default Removal | `docs/tracker-log.md`, `AGENTS.md`, `.agents/instructions/agent.instructions.md`, `.agents/skills/compress/scripts/compress.py`, `.agents/skills/caveman-compress/scripts/compress.py` |
 
 ### Learned Knowledge Sessions
 
@@ -75,3 +77,4 @@ Shared index of all tracked pipelines and their latest entry timestamps.
 | 2026-08-03 | Knowledge-Vector Gap Closure (shared-protocol-file pattern, graceful-failure contract, grep-based spec tests with occurrence-count guards, orchestrator template symmetry, plan-authoritative FILE mapping, layers-vs-tiers disambiguation) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-08-03 | KB Consolidation + projectId Standardization (data-consolidation safety pattern — re-index-from-source then delete with transactional guards; canonical projectId derivation rule; required-vs-optional projectId asymmetry; restart-required gotcha codified; negative-assertion hardening for spec tests; pre-existing `.env` credential issue) | `.agents/instructions/learned-knowledge.instructions.md` |
 | 2026-08-03 | .env Remediation + TEST-05 Hardening + Commits (tracked-secret remediation pattern — `git rm --cached` + gitignore + redact-all-sources + commit split fix(security)/feat; redaction must cover ALL sinks incl. memory-bank + vector index WAL; untracked secret-bearing files are a re-leak footgun; negative-assertion hardening; reviewers should NOT append to dirty memory-bank) | `.agents/instructions/learned-knowledge.instructions.md` |
+| 2026-09-14 | Stale Path Reference Cleanup + Env-Var Fail-Fast (bulk path rename must be existence-verified; freeze historical audit-trail docs; vendor-neutral fail-fast default; fail-fast must not be swallowed by sibling `except`; byte-identical duplicates edited in lockstep + `cmp`-verified; required env var must be documented alongside sibling env vars) | `.agents/instructions/learned-knowledge.instructions.md` |
