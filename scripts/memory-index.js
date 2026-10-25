@@ -238,53 +238,130 @@ async function indexFile(filePath) {
   for (let i = 0; i < chunks.length; i++) {
     const chunkHash = hashContent(chunks[i]);
 
-    // Check if already indexed with same hash
-    const existing = db.prepare(
-      'SELECT id, content_hash FROM memory_chunks WHERE source_file = ? AND chunk_index = ?'
-    ).get(sourceFile, i);
+    // Check if already indexed with the same content AND a resolvable vector.
+    // The LEFT JOIN distinguishes a live link from a dangling one (legacy DB or
+    // a crash between the vector insert and the link update).
+    const existing = db.prepare(`
+      SELECT mc.id, mc.content_hash, mc.vec_rowid, v.rowid AS vec_exists
+      FROM memory_chunks mc
+      LEFT JOIN vec_memory v ON v.rowid = mc.vec_rowid
+      WHERE mc.source_file = ? AND mc.chunk_index = ?
+    `).get(sourceFile, i);
 
-    if (existing && existing.content_hash === chunkHash) {
+    if (existing && existing.content_hash === chunkHash && existing.vec_exists != null) {
       skipped++;
       continue;
     }
 
-    let rowid;
+    let chunkId;
     if (existing) {
-      const existingId = Number(existing.id);
+      chunkId = Number(existing.id);
       const oldVecRowid = existing.vec_rowid;
 
-      // Update content
-      db.prepare(
-        'UPDATE memory_chunks SET content = ?, content_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-      ).run(chunks[i], chunkHash, existingId);
+      // Detach the old vector before re-embedding so a failed embed cannot
+      // leave a dangling vec_rowid, then delete it: vec0 has no foreign key,
+      // so an unlinked row would be an invisible storage leak.
+      db.transaction(() => {
+        db.prepare(
+          'UPDATE memory_chunks SET content = ?, content_hash = ?, vec_rowid = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        ).run(chunks[i], chunkHash, chunkId);
 
-      // Remove old vector
-      if (oldVecRowid != null) {
-        db.prepare('DELETE FROM vec_memory WHERE rowid = ?').run(Number(oldVecRowid));
-      }
-      rowid = existingId;
+        if (oldVecRowid != null) {
+          db.prepare('DELETE FROM vec_memory WHERE rowid = ?').run(Number(oldVecRowid));
+        }
+      })();
     } else {
       // Insert new chunk
       const info = db.prepare(
         'INSERT INTO memory_chunks (source_file, chunk_index, content, content_hash) VALUES (?, ?, ?, ?)'
       ).run(sourceFile, i, chunks[i], chunkHash);
-      rowid = Number(info.lastInsertRowid);
+      chunkId = Number(info.lastInsertRowid);
     }
 
     try {
       const embedding = await embed(chunks[i]);
-      // Insert into vec0 without explicit rowid (auto-assigned)
-      const vecInfo = db.prepare('INSERT INTO vec_memory (embedding) VALUES (?)').run(embedding);
-      const vecRowid = Number(vecInfo.lastInsertRowid);
-      // Link vec0 rowid back to memory_chunks
-      db.prepare('UPDATE memory_chunks SET vec_rowid = ? WHERE id = ?').run(vecRowid, rowid);
+      // Insert + link atomically: a vector inserted without its link (or vice
+      // versa) would be an orphan.
+      db.transaction(() => {
+        // Insert into vec0 without explicit rowid (auto-assigned)
+        const vecInfo = db.prepare('INSERT INTO vec_memory (embedding) VALUES (?)').run(embedding);
+        const vecRowid = Number(vecInfo.lastInsertRowid);
+        // Link vec0 rowid back to memory_chunks
+        db.prepare('UPDATE memory_chunks SET vec_rowid = ? WHERE id = ?').run(vecRowid, chunkId);
+      })();
       indexed++;
     } catch (err) {
       console.warn(`[memory-index] Failed to embed chunk ${i} of ${sourceFile}: ${err.message}`);
     }
   }
 
+  // A file that lost sections keeps its old trailing chunks (and their
+  // vectors) forever otherwise: (source_file, chunk_index) is the identity, so
+  // indices past the new chunk count are unreachable debris.
+  const removedChunks = db.prepare(
+    'SELECT id, vec_rowid FROM memory_chunks WHERE source_file = ? AND chunk_index >= ?'
+  ).all(sourceFile, chunks.length);
+
+  if (removedChunks.length > 0) {
+    db.transaction(() => {
+      const deleteVector = db.prepare('DELETE FROM vec_memory WHERE rowid = ?');
+      const deleteChunk = db.prepare('DELETE FROM memory_chunks WHERE id = ?');
+      for (const row of removedChunks) {
+        if (row.vec_rowid != null) deleteVector.run(Number(row.vec_rowid));
+        deleteChunk.run(Number(row.id));
+      }
+    })();
+  }
+
   return { indexed, skipped };
+}
+
+/**
+ * Delete chunks (and their vectors) whose source file is no longer present.
+ * Returns the number of chunks pruned.
+ */
+function pruneMissingSources(db, activeSources) {
+  const stale = db
+    .prepare('SELECT id, source_file, vec_rowid FROM memory_chunks')
+    .all()
+    .filter((row) => !activeSources.has(row.source_file));
+
+  if (stale.length === 0) return 0;
+
+  db.transaction(() => {
+    const deleteVector = db.prepare('DELETE FROM vec_memory WHERE rowid = ?');
+    const deleteChunk = db.prepare('DELETE FROM memory_chunks WHERE id = ?');
+    for (const row of stale) {
+      if (row.vec_rowid != null) deleteVector.run(Number(row.vec_rowid));
+      deleteChunk.run(Number(row.id));
+    }
+  })();
+
+  return stale.length;
+}
+
+/**
+ * Delete vector rows that no chunk links to. Older versions of this module
+ * orphaned them on every content change; a full rebuild would eventually clear
+ * them, but an incremental update should heal the index in place.
+ * Returns the number of orphaned vectors removed.
+ */
+function pruneOrphanVectors(db) {
+  const orphans = db.prepare(`
+    SELECT v.rowid AS rowid
+    FROM vec_memory v
+    LEFT JOIN memory_chunks mc ON mc.vec_rowid = v.rowid
+    WHERE mc.id IS NULL
+  `).all();
+
+  if (orphans.length === 0) return 0;
+
+  db.transaction(() => {
+    const deleteVector = db.prepare('DELETE FROM vec_memory WHERE rowid = ?');
+    for (const row of orphans) deleteVector.run(Number(row.rowid));
+  })();
+
+  return orphans.length;
 }
 
 /**
@@ -360,29 +437,35 @@ async function incrementalUpdate() {
   let totalIndexed = 0;
   let totalSkipped = 0;
   const changed = [];
+  const activeSources = new Set();
+  const db = await getDB();
 
   for (const file of allFiles) {
     if (file.includes('/.index/')) continue;
 
     const content = readFileSync(file, 'utf8');
     const sourceFile = basename(file);
+    activeSources.add(sourceFile);
     const { body } = parseFrontmatter(content);
-    const bodyHash = hashContent(body);
 
-    // Quick check: if the full body hash matches the last indexed state, skip
-    const db = await getDB();
-    const existingChunks = db.prepare(
-      'SELECT content_hash FROM memory_chunks WHERE source_file = ?'
-    ).all(sourceFile);
+    // Quick check: if the full body hash matches the last indexed state and
+    // every chunk still resolves to a vector, skip.
+    const existingChunks = db.prepare(`
+      SELECT mc.content_hash, mc.vec_rowid, v.rowid AS vec_exists
+      FROM memory_chunks mc
+      LEFT JOIN vec_memory v ON v.rowid = mc.vec_rowid
+      WHERE mc.source_file = ?
+    `).all(sourceFile);
 
     const combinedHash = existingChunks.map(c => c.content_hash).join('|');
+    const allVectorsPresent = existingChunks.every((c) => c.vec_exists != null);
 
     if (existingChunks.length > 0) {
       // Check if any chunk's content changed by recomputing hashes
       const chunks = chunkMarkdown(body);
       const newCombinedHash = chunks.map(c => hashContent(c)).join('|');
 
-      if (newCombinedHash === combinedHash) {
+      if (newCombinedHash === combinedHash && allVectorsPresent) {
         totalSkipped += existingChunks.length;
         continue;
       }
@@ -395,6 +478,11 @@ async function incrementalUpdate() {
     totalIndexed += indexed;
     totalSkipped += skipped;
   }
+
+  // Reclaim rows for files that disappeared and vectors that lost their link
+  // (including orphans left behind by older versions of this module).
+  pruneMissingSources(db, activeSources);
+  pruneOrphanVectors(db);
 
   return { indexed: totalIndexed, skipped: totalSkipped, changed };
 }

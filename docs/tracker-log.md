@@ -1816,3 +1816,84 @@ The memory tests use **real temporary SQLite databases** (`mkdtempSync`) with `b
 - **Entry-point guard conventions differ slightly:** `scripts/sync.js` compares `realpathSync()` of both sides (required on macOS, where `/var/...` and `/private/var/...` are the same file); `normalize-memory.js`, `mcp-memory-server.js`, and `playwright-mcp-launcher.js` use plain `resolve()` on `process.argv[1]`. That is sufficient for repo-local paths but is a residual inconsistency worth remembering.
 - **No push** — one local commit on `feat/mat-integration`; no remote/PR action taken.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Bug-Fix Pipeline: `vec_memory` Orphan Leaks (Update, Chunk Prune, File Deletion)
+
+**Plan:** none — resolves the open follow-up recorded by the Coverage Pipeline above (commit `308c90f`)
+**Date:** 2026-10-25
+**Status:** ✅ SUCCESS — `npx vitest run` → **26 files / 753 tests / 0 failures**; `npx vitest run --coverage` → **exit 0** (97.02 / 95.28 / 96.74 / 97.25); `npm test` (Playwright) → **7 passed, 1 skipped, exit 0**. One local commit with `SKIP_BUMP=1` (version stays `1.46.0`); nothing pushed, tagged, or published.
+**Pipeline:** coder (test-first fix + 7 tests) → deployer (this entry + commit)
+
+> **Follow-up status:** the `vec_memory` orphan-row bug recorded in commit `308c90f` ("Open follow-up (latent bug, deliberately NOT fixed here)") is **RESOLVED** by this pipeline.
+
+### Summary
+
+`scripts/memory-index.js` leaked `vec_memory` rows. The leak was structural, not incidental: the per-chunk lookup selected **only `id, content_hash`**, so `existing.vec_rowid` was always `undefined` and the update path's `if (oldVecRowid != null)` delete branch was **dead code**. Re-indexing a changed chunk therefore inserted a new vector and orphaned the old one — invisible to `search` (the JOIN keys on `memory_chunks.vec_rowid`) but an unbounded storage leak that grew with every edit.
+
+Fixing it surfaced **three leaks, not one**. All are now closed and pinned by tests:
+
+| # | Leak | Before | After |
+|---|---|---|---|
+| 1 | **Re-embed on content change** | The lookup never selected `vec_rowid`, so the delete guard never fired; each edit orphaned the previous vector. | Lookup selects `mc.vec_rowid` + `v.rowid AS vec_exists` via `LEFT JOIN`; the update detaches (`vec_rowid = NULL`) and deletes the old vector in one transaction **before** re-embedding, then inserts + relinks in another. |
+| 2 | **Trailing chunks after a section is removed / indices shift** | `(source_file, chunk_index)` is the identity, so chunks past the new chunk count — and their vectors — were unreachable debris forever. | `indexFile` prunes `chunk_index >= chunks.length` together with their vectors (covers a removed section, shifted sections, or a file that became empty). |
+| 3 | **Deleted source files in `incrementalUpdate`** | **No deleted-file pruning existed at all.** Both `memory_chunks` and `vec_memory` rows survived, so `search` could still return a file that no longer existed. | `pruneMissingSources()` deletes chunks + vectors of vanished files; `pruneOrphanVectors()` sweeps any vector row no chunk references, healing indexes already corrupted by the old code. The incremental fast path now also requires every chunk's vector to resolve. |
+
+**Root cause (precise):** a `SELECT` that feeds a cross-table cleanup must project every column the cleanup condition reads. Here the condition read `existing.vec_rowid`, but the projection omitted it — a silent `undefined` turned cleanup into dead code that no existing test could observe, because the leaked rows are invisible to the normal query path by construction.
+
+### The invariant now enforced
+
+`vec0` virtual tables have **no foreign keys**; a vector row is reachable only through `memory_chunks.vec_rowid`. The correct invariant is therefore **one vector per *linked* chunk**, not `vec_memory == memory_chunks`:
+
+```
+COUNT(vec_memory) === COUNT(memory_chunks WHERE vec_rowid IS NOT NULL)
+                   === COUNT(DISTINCT vec_rowid)
+orphan vectors  = 0
+dangling links  = 0
+```
+
+`memory_chunks.vec_rowid IS NULL` is legal **only** where embedding legitimately failed, so each test states that count explicitly (`expectWithoutVector`) rather than hiding it.
+
+### Test-first evidence
+
+Seven tests were written **first** and failed with the predicted messages before any implementation change:
+
+| Predicted failure | Observed |
+|---|---|
+| Re-embedding must not grow `vec_memory` | `vec_memory` **3 vs 2** after one content edit |
+| Removed section must not leave a chunk behind | **2 chunks vs 1** after the file shrank |
+| Retry must re-embed a chunk whose vector is missing/dangling | `indexed 0 / skipped 2` |
+| Deleted file must stop being searchable | deleted-file chunks still present |
+| Legacy orphans must be reclaimed | orphan `vec_memory` row still there |
+| End-to-end invariant | **5 vectors vs 4 linked** |
+
+`scripts/memory-index.test.js` now has **68 tests** (was 61); the suite is **753** (was 746), across the same 26 files.
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `scripts/memory-index.js` | Lookup projects `vec_rowid` + `vec_exists` (`LEFT JOIN`); detach-then-delete-then-reinsert transactions on update; tail prune in `indexFile`; new `pruneMissingSources()` / `pruneOrphanVectors()` wired into `incrementalUpdate`; fast-path skip requires resolvable vectors. |
+| `scripts/memory-index.test.js` | `assertVectorIntegrity()` helper (vectors vs linked vs distinct + orphan + dangling counts) and 7 new tests in a `vec_memory integrity` describe block. |
+| `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md` | Implementing agent's records of the fix — reviewed for coherence, not duplicated. |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` | ✅ 26 files / **753 tests** / 0 failures, exit 0 |
+| `npx vitest run --coverage` | ✅ exit 0 — **97.02 / 95.28 / 96.74 / 97.25** (was 96.93 / 95.23 / 96.62 / 97.16) |
+| `scripts/memory-index.js` coverage | ✅ 98.83 statements / 96.33 branches / 96.87 functions / 99.56 lines |
+| `npm test` (Playwright) | ✅ 7 passed, 1 skipped, exit 0 |
+| `node scripts/validate-memory-schema.js` | ✅ exit 0 |
+| `git diff vitest.config.ts` | ✅ empty — no threshold, exclude, or config change |
+| Version | ✅ `1.46.0` before and after (`SKIP_BUMP=1`) |
+
+### Notes / Follow-up
+
+- **SQLite files do not shrink after `DELETE` without `VACUUM`.** Row growth stops immediately, but the `.db` file keeps its high-water mark until a `VACUUM`; file size is **not** the right leak metric — row counts are.
+- **`rebuildIndex` was never leaking** — it already wiped both tables. The leaking paths were update, tail prune, and deletion; an index audit must cover **removal**, not just update.
+- **No behavioural change to `search` semantics** — result shape, ordering, and filters are untouched; the fix removes rows that search could never legitimately return (orphans) and rows it should never have returned (deleted files).
+- **No push** — one local commit; no remote, tag, or publish action taken.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 (`vec_memory` orphans) appended to `.agents/instructions/learned-knowledge.instructions.md`.

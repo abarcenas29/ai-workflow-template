@@ -117,6 +117,43 @@ function writeTwoSectionFile(root) {
   return writeRepoFile(root, 'memory-bank/doc.md', FILE_TWO_SECTIONS)
 }
 
+/**
+ * The vector invariant: vec0 has no foreign keys, so every vec_memory row must
+ * be referenced by exactly one memory_chunks row, and every non-null
+ * memory_chunks.vec_rowid must resolve. Chunks with a NULL vec_rowid are
+ * allowed only when embedding legitimately failed (`expectWithoutVector`).
+ */
+function assertVectorIntegrity(db, { expectWithoutVector = 0 } = {}) {
+  const count = (sql) => db.prepare(sql).get().count
+  const vectors = count('SELECT COUNT(*) AS count FROM vec_memory')
+  const linked = count('SELECT COUNT(*) AS count FROM memory_chunks WHERE vec_rowid IS NOT NULL')
+  const distinctLinked = count(
+    'SELECT COUNT(DISTINCT vec_rowid) AS count FROM memory_chunks WHERE vec_rowid IS NOT NULL',
+  )
+  const unlinked = count('SELECT COUNT(*) AS count FROM memory_chunks WHERE vec_rowid IS NULL')
+  const orphaned = count(`
+    SELECT COUNT(*) AS count FROM vec_memory v
+    LEFT JOIN memory_chunks mc ON mc.vec_rowid = v.rowid
+    WHERE mc.id IS NULL
+  `)
+  const dangling = count(`
+    SELECT COUNT(*) AS count FROM memory_chunks mc
+    LEFT JOIN vec_memory v ON v.rowid = mc.vec_rowid
+    WHERE mc.vec_rowid IS NOT NULL AND v.rowid IS NULL
+  `)
+
+  expect(
+    unlinked,
+    `expected ${expectWithoutVector} chunk(s) without a vector, found ${unlinked}`,
+  ).toBe(expectWithoutVector)
+  expect(distinctLinked).toBe(linked)
+  expect(vectors, 'vec_memory must hold exactly one row per linked chunk').toBe(linked)
+  expect(orphaned, 'vec_memory contains row(s) no chunk references').toBe(0)
+  expect(dangling, 'memory_chunks.vec_rowid points at a missing vec_memory row').toBe(0)
+
+  return { vectors, linked, distinctLinked, unlinked, orphaned, dangling }
+}
+
 // ── Test lifecycle ─────────────────────────────────────────────────────────
 
 let mod
@@ -762,6 +799,247 @@ describe('incrementalUpdate', () => {
     const result = await mod.incrementalUpdate()
 
     expect(result.changed).toEqual(['a.md'])
+  })
+})
+
+// ── vec_memory integrity ───────────────────────────────────────────────────
+//
+// vec0 has no foreign keys: a vector row is only reachable through
+// memory_chunks.vec_rowid, so any row that loses its link becomes an invisible
+// storage leak. These tests pin the invariant (one vector per linked chunk, no
+// orphans, no dangling links) across the update, prune and failure paths.
+
+describe('vec_memory integrity', () => {
+  it('does not orphan the previous vector when a chunk is re-embedded', async () => {
+    writeTwoSectionFile(root)
+    await mod.indexFile(join(root, 'memory-bank/doc.md'))
+
+    const before = openDb(root)
+    let oldVecRowid
+    let beforeCount
+    try {
+      oldVecRowid = before
+        .prepare('SELECT vec_rowid FROM memory_chunks WHERE chunk_index = 0')
+        .get().vec_rowid
+      beforeCount = before.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count
+    } finally {
+      before.close()
+    }
+
+    writeRepoFile(
+      root,
+      'memory-bank/doc.md',
+      ['# Doc', '', section('Alpha', 'alpha REWRITTEN content'), section('Beta', 'beta beta content')].join('\n'),
+    )
+    expect(await mod.indexFile(join(root, 'memory-bank/doc.md'))).toEqual({ indexed: 1, skipped: 1 })
+
+    const after = openDb(root)
+    try {
+      const chunk = after
+        .prepare('SELECT content, vec_rowid FROM memory_chunks WHERE chunk_index = 0')
+        .get()
+      const vectorCount = after.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count
+
+      expect(vectorCount, 're-embedding a chunk must not grow vec_memory').toBe(beforeCount)
+      expect(
+        after.prepare('SELECT rowid FROM vec_memory WHERE rowid = ?').get(oldVecRowid),
+        `stale vec_memory row ${oldVecRowid} was orphaned by the update`,
+      ).toBeUndefined()
+      expect(chunk.content).toContain('REWRITTEN')
+      expect(after.prepare('SELECT rowid FROM vec_memory WHERE rowid = ?').get(chunk.vec_rowid)).toBeTruthy()
+      assertVectorIntegrity(after)
+    } finally {
+      after.close()
+    }
+
+    const results = await mod.search('alpha REWRITTEN', { sourceFile: 'doc.md', topK: 1 })
+    expect(results[0].content).toContain('REWRITTEN')
+  })
+
+  it('prunes replaced and trailing chunks together with their vectors', async () => {
+    writeRepoFile(
+      root,
+      'memory-bank/doc.md',
+      ['# Doc', '', section('Alpha', 'alpha alpha content'), section('Beta', 'beta beta content')].join('\n'),
+    )
+    await mod.indexFile(join(root, 'memory-bank/doc.md'))
+
+    const before = openDb(root)
+    let oldRowids
+    try {
+      oldRowids = before
+        .prepare('SELECT vec_rowid FROM memory_chunks ORDER BY chunk_index')
+        .all()
+        .map((row) => row.vec_rowid)
+    } finally {
+      before.close()
+    }
+
+    // Shrink two sections to one: chunk 0 is replaced (new content) and chunk 1
+    // disappears entirely. Both old vectors must go.
+    writeRepoFile(root, 'memory-bank/doc.md', ['# Doc', '', section('Gamma', 'gamma gamma content')].join('\n'))
+    expect(await mod.indexFile(join(root, 'memory-bank/doc.md'))).toEqual({ indexed: 1, skipped: 0 })
+
+    const after = openDb(root)
+    try {
+      const chunks = after.prepare('SELECT chunk_index, content, vec_rowid FROM memory_chunks').all()
+      expect(chunks).toHaveLength(1)
+      expect(chunks[0].content).toContain('Gamma')
+      expect(after.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count).toBe(1)
+      for (const rowid of oldRowids) {
+        expect(
+          after.prepare('SELECT rowid FROM vec_memory WHERE rowid = ?').get(rowid),
+          `stale vec_memory row ${rowid} survived the chunk prune`,
+        ).toBeUndefined()
+      }
+      assertVectorIntegrity(after)
+    } finally {
+      after.close()
+    }
+  })
+
+  it('re-embeds chunks whose vector is missing or dangling', async () => {
+    writeTwoSectionFile(root)
+    await mod.indexFile(join(root, 'memory-bank/doc.md'))
+
+    const broken = openDb(root)
+    try {
+      const rows = broken
+        .prepare('SELECT id, vec_rowid FROM memory_chunks ORDER BY chunk_index')
+        .all()
+      // Chunk 0: the vector never landed (legacy row / embed failure).
+      broken.prepare('DELETE FROM vec_memory WHERE rowid = ?').run(rows[0].vec_rowid)
+      broken.prepare('UPDATE memory_chunks SET vec_rowid = NULL WHERE id = ?').run(rows[0].id)
+      // Chunk 1: the link survives but the vector row does not.
+      broken.prepare('DELETE FROM vec_memory WHERE rowid = ?').run(rows[1].vec_rowid)
+    } finally {
+      broken.close()
+    }
+
+    expect(await mod.indexFile(join(root, 'memory-bank/doc.md'))).toEqual({ indexed: 2, skipped: 0 })
+
+    const after = openDb(root)
+    try {
+      expect(after.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count).toBe(2)
+      assertVectorIntegrity(after)
+    } finally {
+      after.close()
+    }
+  })
+
+  it('retries unchanged content when a chunk still needs a vector', async () => {
+    writeRepoFile(root, 'memory-bank/a.md', '# A\n\nalpha alpha content')
+    await mod.rebuildIndex()
+
+    const broken = openDb(root)
+    try {
+      const chunk = broken.prepare('SELECT id, vec_rowid FROM memory_chunks').get()
+      broken.prepare('DELETE FROM vec_memory WHERE rowid = ?').run(chunk.vec_rowid)
+      broken.prepare('UPDATE memory_chunks SET vec_rowid = NULL WHERE id = ?').run(chunk.id)
+    } finally {
+      broken.close()
+    }
+
+    const result = await mod.incrementalUpdate()
+
+    expect(result).toEqual({ indexed: 1, skipped: 0, changed: ['a.md'] })
+    const after = openDb(root)
+    try {
+      expect(after.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count).toBe(1)
+      assertVectorIntegrity(after)
+    } finally {
+      after.close()
+    }
+  })
+
+  it('prunes chunks and vectors of files deleted before an incremental update', async () => {
+    writeRepoFile(root, 'memory-bank/keep.md', '# Keep\n\nkeep keep content')
+    writeRepoFile(root, 'memory-bank/gone.md', '# Gone\n\ngone gone content')
+    writeRepoFile(root, 'memory-bank/never-embedded.md', `# Bad\n\n${embedMocks.FAIL_MARKER} broken content`)
+    await mod.rebuildIndex()
+
+    rmSync(join(root, 'memory-bank/gone.md'))
+    rmSync(join(root, 'memory-bank/never-embedded.md'))
+    const result = await mod.incrementalUpdate()
+
+    expect(result.changed).toEqual([])
+    const db = openDb(root)
+    try {
+      expect(db.prepare('SELECT DISTINCT source_file FROM memory_chunks').all()).toEqual([
+        { source_file: 'keep.md' },
+      ])
+      expect(db.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count).toBe(1)
+      assertVectorIntegrity(db)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('removes vec_memory rows that no chunk references', async () => {
+    writeRepoFile(root, 'memory-bank/a.md', '# A\n\nalpha alpha content')
+    await mod.rebuildIndex()
+
+    const seeded = openDb(root)
+    let orphanRowid
+    try {
+      orphanRowid = Number(
+        seeded.prepare('INSERT INTO vec_memory (embedding) VALUES (?)').run(
+          new Float32Array(embedMocks.DIM),
+        ).lastInsertRowid,
+      )
+      expect(seeded.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count).toBe(2)
+    } finally {
+      seeded.close()
+    }
+
+    await mod.incrementalUpdate()
+
+    const after = openDb(root)
+    try {
+      expect(
+        after.prepare('SELECT rowid FROM vec_memory WHERE rowid = ?').get(orphanRowid),
+        `orphan vec_memory row ${orphanRowid} was not reclaimed`,
+      ).toBeUndefined()
+      expect(after.prepare('SELECT COUNT(*) AS count FROM vec_memory').get().count).toBe(1)
+      assertVectorIntegrity(after)
+    } finally {
+      after.close()
+    }
+  })
+
+  it('holds the invariant across new, edited, deleted and repeated indexing', async () => {
+    writeRepoFile(root, 'memory-bank/one.md', FILE_TWO_SECTIONS)
+    writeRepoFile(root, 'docs/two.md', '# Two\n\ntwo two content')
+    await mod.rebuildIndex()
+
+    writeRepoFile(root, 'memory-bank/three.md', '# Three\n\nthree three content')
+    writeRepoFile(
+      root,
+      'memory-bank/one.md',
+      ['# Doc', '', section('Alpha', 'alpha EDITED content'), section('Beta', 'beta beta content')].join('\n'),
+    )
+    writeRepoFile(root, 'memory-bank/bad.md', `# Bad\n\n${embedMocks.FAIL_MARKER} will never embed`)
+    rmSync(join(root, 'docs/two.md'))
+
+    await mod.incrementalUpdate()
+    await mod.incrementalUpdate()
+
+    const db = openDb(root)
+    try {
+      const { vectors, linked, unlinked } = assertVectorIntegrity(db, { expectWithoutVector: 1 })
+      expect(linked).toBe(3) // one.md (2) + three.md (1); bad.md has no vector
+      expect(vectors).toBe(3)
+      expect(unlinked).toBe(1)
+      expect(
+        db.prepare('SELECT DISTINCT source_file FROM memory_chunks ORDER BY source_file').all(),
+      ).toEqual([
+        { source_file: 'bad.md' },
+        { source_file: 'one.md' },
+        { source_file: 'three.md' },
+      ])
+    } finally {
+      db.close()
+    }
   })
 })
 

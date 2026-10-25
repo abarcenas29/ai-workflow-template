@@ -19,6 +19,20 @@ category: "progress"
 
 ## What Works
 
+### 2026-10-25: Coder — `vec_memory` orphans fixed across update, prune and failure paths
+
+`scripts/memory-index.js` no longer leaks a `vec_memory` row every time an indexed chunk changes. The leak was structural: the per-chunk lookup selected only `id, content_hash`, so `existing.vec_rowid` was `undefined`, the "delete old vector" guard never fired, and the old row stayed behind unlinked. Search never showed it (the JOIN keys on `memory_chunks.vec_rowid`), which is why it survived until now.
+
+- **Update path:** the lookup selects `vec_rowid` and `v.rowid AS vec_exists` via a LEFT JOIN; a chunk is skipped only when its hash matches **and** its vector resolves. On change, the chunk is detached (`vec_rowid = NULL`) and the old vector deleted in one transaction **before** re-embedding. The replacement insert + link are also one transaction, so an embed failure cannot leave a dangling link.
+- **Null / dangling links are retried:** chunks whose vector never landed (`vec_rowid IS NULL`, legacy DBs, embed failure) or whose link points at a missing row are re-embedded on the next pass instead of being skipped forever. `incrementalUpdate`'s fast path now also requires every chunk's vector to resolve, so unchanged files heal too.
+- **Chunk removal:** `indexFile` prunes chunks (and their vectors) at `chunk_index >= chunks.length`, covering a removed section, a shifted section, or a file that became empty. Previously those trailing rows were unreachable debris.
+- **Deleted files / legacy orphans:** `rebuildIndex` already wipes both tables (no leak there), but `incrementalUpdate` never pruned vanished files at all — chunks **and** vectors survived. It now calls `pruneMissingSources()` and `pruneOrphanVectors()`, the latter reclaiming any vector row no chunk references (heals indexes already corrupted by the old code).
+- **Invariant:** `COUNT(vec_memory) === COUNT(memory_chunks WHERE vec_rowid IS NOT NULL) === COUNT(DISTINCT vec_rowid)`, `orphan vectors = 0`, `dangling links = 0`. `vec_rowid IS NULL` is legal **only** for embed failures, and each test states that count explicitly rather than hiding it.
+- **Evidence:** the seven new tests failed first exactly as predicted — `vec_memory` 3 vs 2 after one edit, 2 chunks vs 1 after a shrink, retry `indexed 0 / skipped 2`, deleted-file chunks still present, orphan row still there, invariant `5 vectors vs 4 linked`.
+- **Verification:** `npx vitest run` → 26 files / 753 tests / exit 0 (746 baseline + 7); `npx vitest run --coverage` → exit 0, **97.02 / 95.28 / 96.74 / 97.25** (`memory-index.js` 98.83 / 96.33 / 96.87 / 99.56); `npm test` → 7 passed / 1 skipped / exit 0. No new dependencies; `vitest.config.ts`, thresholds and excludes untouched; no `v8 ignore` / `istanbul ignore`; no commit.
+
+**Knowledgebase outcome (per protocol): `memory_search` returned "No results found. The index may be empty"; `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
 ### 2026-10-25: Deployer — Repo-wide 90% coverage gate passes (50.6% → 96.93% statements, 331 → 746 tests)
 
 The `vitest.config.ts` coverage gate over `scripts/**` now passes honestly. Ten modules that were structurally untestable were fixed rather than excluded, and four source files were refactored for in-process testability:
