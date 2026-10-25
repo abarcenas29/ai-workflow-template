@@ -34,6 +34,7 @@ vi.mock('./utils.js', () => ({
 
 import { spawn } from 'child_process'
 import { runSyncPhase } from './sync-phase.js'
+import { logInfo, logWarn } from './utils.js'
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 
@@ -45,15 +46,22 @@ import { runSyncPhase } from './sync-phase.js'
  * This allows the Promise-based flow in spawnScript() to resolve naturally.
  *
  * @param {object}   opts
- * @param {number}   [opts.exitCode=0]    - Exit code for the 'close' event
+ * @param {number|null} [opts.exitCode=0] - Exit code for the 'close' event
  * @param {string}   [opts.stdoutData='']  - Data emitted via stdout 'data'
  * @param {string}   [opts.stderrData='']  - Data emitted via stderr 'data'
+ * @param {boolean}  [opts.emitError=false] - Emit an 'error' event instead
  * @returns {object} Mock child process with .stdout.on, .stderr.on, .on
  */
-function createMockChild({ exitCode = 0, stdoutData = '', stderrData = '' } = {}) {
+function createMockChild({
+  exitCode = 0,
+  stdoutData = '',
+  stderrData = '',
+  emitError = false,
+} = {}) {
   const stdoutHandlers = []
   const stderrHandlers = []
   let closeHandler = null
+  let errorHandler = null
 
   const child = {
     stdout: {
@@ -68,11 +76,18 @@ function createMockChild({ exitCode = 0, stdoutData = '', stderrData = '' } = {}
     },
     on: (event, handler) => {
       if (event === 'close') closeHandler = handler
+      if (event === 'error') errorHandler = handler
     },
   }
 
   // Fire events on a microtask so handlers are registered first
   Promise.resolve().then(() => {
+    if (emitError) {
+      if (errorHandler) {
+        errorHandler(new Error('spawn ENOENT'))
+      }
+      return
+    }
     if (stdoutData) {
       stdoutHandlers.forEach((h) => h(Buffer.from(stdoutData)))
     }
@@ -190,6 +205,169 @@ describe('sync-phase verbose spawn behavior', () => {
       expect(r.output).toBe('copying files...')
       expect(r.success).toBe(true)
       expect(r.exitCode).toBe(0)
+    }
+  })
+})
+
+// ── Execution paths (skip / dry-run / failures / forwarding) ───────────────
+
+describe('sync-phase execution paths', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('skipSync=true returns "skipped" without spawning anything', async () => {
+    const result = await runSyncPhase(makeContext({ skipSync: true }))
+
+    expect(result).toEqual({
+      action: 'skipped',
+      message: 'Sync phase skipped (--skip-sync)',
+      results: [],
+    })
+    expect(spawn).not.toHaveBeenCalled()
+    expect(logInfo).toHaveBeenCalledWith(
+      '[setup] Sync phase skipped (--skip-sync)',
+    )
+  })
+
+  it('dryRun=true returns "dry-run" and mentions the consumer root', async () => {
+    const result = await runSyncPhase(makeContext({ dryRun: true }))
+
+    expect(result.action).toBe('dry-run')
+    expect(result.message).toContain('sync.js')
+    expect(result.message).toContain('normalize-memory.js')
+    expect(result.message).toContain('/fake/consumer')
+    expect(result.results).toEqual([])
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('forwards --force to both child scripts when flags.force is set', async () => {
+    vi.mocked(spawn).mockImplementation(() => createMockChild({ exitCode: 0 }))
+
+    await runSyncPhase(makeContext({ flags: { force: true } }))
+
+    const argv = vi.mocked(spawn).mock.calls.map((c) => c[1])
+    expect(argv).toHaveLength(2)
+    for (const args of argv) {
+      expect(args).toContain('--force')
+    }
+  })
+
+  it('does not forward --force by default', async () => {
+    vi.mocked(spawn).mockImplementation(() => createMockChild({ exitCode: 0 }))
+
+    await runSyncPhase(makeContext({ flags: {} }))
+
+    for (const call of vi.mocked(spawn).mock.calls) {
+      expect(call[1]).not.toContain('--force')
+    }
+  })
+
+  it('treats a non-zero exit as partial and logs each failing script', async () => {
+    vi.mocked(spawn)
+      .mockImplementationOnce(() => createMockChild({ exitCode: 1 }))
+      .mockImplementationOnce(() => createMockChild({ exitCode: 0 }))
+
+    const result = await runSyncPhase(makeContext())
+
+    expect(result.action).toBe('partial')
+    expect(result.message).toBe(
+      'Sync phase completed with 1 script failure(s)',
+    )
+    expect(result.results).toHaveLength(2)
+    expect(result.results[0]).toMatchObject({ script: 'sync.js', success: false, exitCode: 1 })
+    expect(result.results[1]).toMatchObject({ script: 'normalize-memory.js', success: true })
+
+    expect(logWarn).toHaveBeenCalledWith(
+      '[setup] Sync phase completed with 1 script failure(s)',
+    )
+    expect(logWarn).toHaveBeenCalledWith(
+      '[setup]   sync.js exited with code 1',
+    )
+  })
+
+  it('counts every failing script in the partial message', async () => {
+    vi.mocked(spawn)
+      .mockImplementationOnce(() => createMockChild({ exitCode: 2 }))
+      .mockImplementationOnce(() => createMockChild({ exitCode: 3 }))
+
+    const result = await runSyncPhase(makeContext())
+
+    expect(result.action).toBe('partial')
+    expect(result.message).toBe('Sync phase completed with 2 script failure(s)')
+    expect(logWarn).toHaveBeenCalledWith('[setup]   sync.js exited with code 2')
+    expect(logWarn).toHaveBeenCalledWith(
+      '[setup]   normalize-memory.js exited with code 3',
+    )
+  })
+
+  it('forwards child stderr to the parent stderr in non-verbose mode', async () => {
+    const writeSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true)
+    vi.mocked(spawn).mockImplementation(() =>
+      createMockChild({
+        exitCode: 0,
+        stdoutData: 'copied files\n',
+        stderrData: 'skipped locally modified file\n',
+      }),
+    )
+
+    try {
+      const result = await runSyncPhase(makeContext({ verbose: false }))
+
+      // Warning text reaches the terminal even though stdout is captured
+      expect(writeSpy).toHaveBeenCalledWith('skipped locally modified file\n')
+      // ...and the same text is preserved in the captured output
+      for (const r of result.results) {
+        expect(r.output).toContain('copied files')
+        expect(r.output).toContain('skipped locally modified file')
+      }
+    } finally {
+      writeSpy.mockRestore()
+    }
+  })
+
+  it('verbose mode streams output and does not capture it', async () => {
+    vi.mocked(spawn).mockImplementation(() => createMockChild({ exitCode: 0 }))
+
+    const result = await runSyncPhase(makeContext({ verbose: true }))
+
+    expect(result.action).toBe('completed')
+    for (const r of result.results) {
+      expect(r.output).toBe('(streamed to terminal)')
+    }
+    for (const call of vi.mocked(spawn).mock.calls) {
+      expect(call[2].stdio).toBe('inherit')
+    }
+  })
+
+  it('resolves a spawn error event into a failed result instead of throwing', async () => {
+    vi.mocked(spawn).mockImplementation(() => createMockChild({ emitError: true }))
+
+    const result = await runSyncPhase(makeContext())
+
+    expect(result.action).toBe('partial')
+    expect(result.results).toHaveLength(2)
+    for (const r of result.results) {
+      expect(r.success).toBe(false)
+      expect(r.exitCode).toBe(-1)
+      expect(r.output).toContain('Failed to spawn child process')
+      expect(r.output).toContain('spawn ENOENT')
+    }
+  })
+
+  it('normalises a null exit code (killed by signal) to -1', async () => {
+    vi.mocked(spawn).mockImplementation(() =>
+      createMockChild({ exitCode: null }),
+    )
+
+    const result = await runSyncPhase(makeContext())
+
+    expect(result.action).toBe('partial')
+    for (const r of result.results) {
+      expect(r.success).toBe(false)
+      expect(r.exitCode).toBe(-1)
     }
   })
 })

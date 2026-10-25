@@ -1744,3 +1744,75 @@ Total: **9 vendored skill files**, 2 config files, 1 agent spec, 2 setup scripts
 - **Only the 5 new skills are pin-covered** in `skills-lock.json`; the other 29 skills remain unpinned (pre-existing, documented as intentional).
 - `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` is not configured in this session); per the graceful-failure contract this is reported, not retried. Learned-knowledge re-indexing was likewise skipped.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-24 ("Matt Pocock Skills Integration") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Coverage Pipeline: Repo-Wide Vitest Gate (90%) Met + MCP Launcher ESM Fix
+
+**Plan:** none — follow-up to the repo-wide coverage shortfall recorded in Feature Pipeline 12 (see "Known Issues / Honest Accounting" above)
+**Date:** 2026-10-25
+**Status:** ✅ SUCCESS — `npx vitest run --coverage` → **exit 0**; `npx vitest run` → **26 files / 746 tests / 0 failures**; `npm test` (Playwright) → **7 passed, 1 skipped, exit 0**. All work shipped as **one local commit** with `SKIP_BUMP=1` (version stays `1.46.0`); nothing pushed, tagged, or published.
+**Pipeline:** coder (in-process refactors + tests) → deployer (this entry + commit)
+
+### Summary
+
+Closed the pre-existing repo-wide coverage failure that Feature Pipeline 12 documented and deliberately did not "fix" opportunistically. `vitest.config.ts` enforces 90% over `scripts/**`; at HEAD the tree measured **48.05% statements** and before this change **~50.6%**, so the gate never passed. Rather than weaken the gate, ten modules that were structurally untestable were made testable **in process** and given real tests: nine had no sibling test file at all, and `scripts/sync.js` had 15 tests but read **0%** because every one of them spawned the script as a child process — and the v8 provider cannot instrument a child process.
+
+Final: **96.93% statements / 95.23% branches / 96.62% functions / 97.16% lines** repo-wide, **94.97 / 93.76 / 93.16 / 95.24** for `scripts/`, **99.88 / 97.80 / 100 / 100** for `scripts/setup/`. The suite grew from **331 to 746 tests** (+415) across 16 → 26 files. **No thresholds were lowered, no coverage excludes were added, and no `v8 ignore` / `istanbul ignore` comments exist anywhere** (`grep` → 0 hits across `scripts/`, `tests/`, `vitest.config.ts`); `git diff vitest.config.ts` is empty. The number is real.
+
+### The bug found on the way
+
+`scripts/mcp/playwright-mcp-launcher.js` was **dead on arrival**: the package is `"type": "module"`, the file used CommonJS `require(...)`, so any real invocation threw `ReferenceError: require is not defined`. Import-time tests never caught it because nothing executed the file. The CJS → ESM conversion is a genuine runtime fix, not just a testability refactor.
+
+### What was 0% (and why)
+
+| Module | Before | Why it was 0% / absent |
+|---|---|---|
+| `scripts/sync.js` | **0.00%** | Executed at import; all 15 tests used `spawnSync('node', ['scripts/sync.js', …])`. v8 does not instrument child processes. |
+| `scripts/normalize-memory.js` | **0.00%** | Executed at import; no sibling test. |
+| `scripts/mcp-memory-server.js` | **0.00%** | Executed at import **and opened a stdio transport** on import — actively hostile to being imported. |
+| `scripts/mcp/playwright-mcp-launcher.js` | **0.00%** | Executed at import; also CJS in an ESM package (runtime-broken). |
+| `scripts/bump-version.js` | **0.00%** | No sibling test. |
+| `scripts/memory-cli.js` | **0.00%** | No sibling test. |
+| `scripts/memory-index.js` | **0.00%** | No sibling test. |
+| `scripts/setup/husky-init.js` | **0.00%** | No sibling test. |
+| `scripts/setup/ui.js` | **0.00%** | No sibling test. |
+| `scripts/setup/utils.js` | **0.00%** | No sibling test. |
+
+### Source changes (4 files)
+
+| File | Change |
+|---|---|
+| `scripts/sync.js` | Top-level body extracted into named, exportable units — `parseArgs`, `createSyncContext`, `readManifest` / `writeManifest`, `isUntouched`, `isPathInside`, `resolvePruneEntry`, `isRegularFile`, `syncProject`, `runSync` — plus an `isEntryPoint()` guard that keeps `node scripts/sync.js` working. **All 15 pre-existing spawn-based tests pass unmodified.** One behavioural difference: a missing `.agents` dir now returns early from `syncProject` instead of calling `process.exit(0)` — externally identical. |
+| `scripts/normalize-memory.js` | Direct-run guard + named exports of the existing units. **No body changes.** |
+| `scripts/mcp-memory-server.js` | Extracted `listTools()` / `handleToolCall()`, exported `main()`, added `bootstrap()` + a direct-run guard so importing no longer opens a stdio transport. |
+| `scripts/mcp/playwright-mcp-launcher.js` | **CJS → ESM conversion** (bug fix, see above): `import` instead of `require`, `buildArgs()` / `launch()` helpers with injectable `env` / `proc` / `exit`, direct-run guard. |
+
+### Tests (10 new files, 6 extended)
+
+| Type | Files |
+|---|---|
+| **New (10)** | `scripts/bump-version.test.js`, `scripts/mcp-memory-server.test.js`, `scripts/mcp/playwright-mcp-launcher.test.js`, `scripts/memory-cli.test.js`, `scripts/memory-index.test.js`, `scripts/normalize-memory.test.js`, `scripts/setup/husky-init.test.js`, `scripts/setup/ui.test.js`, `scripts/setup/utils.test.js`, `scripts/sync-unit.test.js` |
+| **Extended (6)** | `scripts/setup/discover.test.js`, `scripts/setup/hooks.test.js`, `scripts/setup/index.test.js`, `scripts/setup/knowledgebase.test.js`, `scripts/setup/sync-phase.test.js`, `scripts/vocab-sync.test.js` |
+
+The memory tests use **real temporary SQLite databases** (`mkdtempSync`) with `better-sqlite3` + `sqlite-vec` — both load in this environment, so only `@xenova/transformers` is mocked (its real use downloads a ~90 MB model).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run --coverage` | ✅ exit 0 — 96.93 / 95.23 / 96.62 / 97.16 |
+| `npx vitest run` | ✅ 26 files / **746 tests** / 0 failures (0 skipped, 0 todo) |
+| `npm test` (Playwright) | ✅ 7 passed, 1 skipped, exit 0 |
+| `git diff vitest.config.ts` | ✅ empty — no threshold or exclude changed |
+| `grep -rn "v8 ignore\|istanbul ignore\|c8 ignore"` | ✅ 0 hits |
+| `node scripts/validate-memory-schema.js` | ✅ exit 0 |
+| Pre-existing spawn tests in `scripts/sync.test.js` | ✅ 15/15, unmodified |
+
+### Notes / Follow-up
+
+- **🔴 Open follow-up (latent bug, deliberately NOT fixed here): `scripts/memory-index.js` orphans its `vec_memory` row on re-index.** Around lines 242–263 the `SELECT` fetches only `id, content_hash`, so `existing.vec_rowid` is always `undefined`; the update path's `if (oldVecRowid != null)` is therefore dead code and a changed chunk leaves its previous `vec_memory` row behind. The orphan stays invisible to search (the JOIN keys on `memory_chunks.vec_rowid`) but leaks storage, so the index grows on every re-index of a modified chunk. Out of scope for a coverage change — fixing it would also change query semantics — so it is recorded, not touched. Suggested fix: add `vec_rowid` to the `SELECT` (or re-derive it from `memory_chunks` before deleting).
+- **Behavioural note on the `sync.js` refactor:** the early return for a missing `.agents` directory replaces a `process.exit(0)`. Externally identical (exit code 0, same message), but it means `syncProject` is now a normal function that returns instead of terminating the process — which is exactly why it is testable.
+- **Entry-point guard conventions differ slightly:** `scripts/sync.js` compares `realpathSync()` of both sides (required on macOS, where `/var/...` and `/private/var/...` are the same file); `normalize-memory.js`, `mcp-memory-server.js`, and `playwright-mcp-launcher.js` use plain `resolve()` on `process.argv[1]`. That is sufficient for repo-local paths but is a residual inconsistency worth remembering.
+- **No push** — one local commit on `feat/mat-integration`; no remote/PR action taken.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.

@@ -19,6 +19,21 @@ category: "progress"
 
 ## What Works
 
+### 2026-10-25: Deployer — Repo-wide 90% coverage gate passes (50.6% → 96.93% statements, 331 → 746 tests)
+
+The `vitest.config.ts` coverage gate over `scripts/**` now passes honestly. Ten modules that were structurally untestable were fixed rather than excluded, and four source files were refactored for in-process testability:
+
+- **The 0% was structural, not missing tests.** `scripts/sync.js` had 15 passing tests and still read **0.00%**, because they all invoked the script with `spawnSync` and v8 cannot instrument a child process. Nine other modules had no sibling test at all (`bump-version`, `memory-cli`, `memory-index`, `normalize-memory`, `mcp-memory-server`, `mcp/playwright-mcp-launcher`, `setup/husky-init`, `setup/ui`, `setup/utils`).
+- **`sync.js`** extracted `parseArgs`/`createSyncContext`/`readManifest`/`writeManifest`/`isUntouched`/`isPathInside`/`resolvePruneEntry`/`isRegularFile`/`syncProject`/`runSync` plus an `isEntryPoint()` guard. All 15 pre-existing spawn tests pass **unmodified**; the one behavioural difference (missing `.agents` dir early-returns instead of `process.exit(0)`) is externally identical. 0% → 99.65%.
+- **`mcp-memory-server.js`** no longer opens a stdio transport on import — `listTools()`/`handleToolCall()`/`main()`/`bootstrap()` are extracted behind a direct-run guard.
+- **`mcp/playwright-mcp-launcher.js` — real bug fix.** Under `"type": "module"` the file's `require(...)` threw `ReferenceError: require is not defined`; it was dead on arrival and no test ever executed it, so nothing noticed. Converted to `import` + `buildArgs()`/`launch()` helpers.
+- **Tests:** 10 new files + 6 extended; memory tests use real temp SQLite DBs (`mkdtempSync`, `better-sqlite3` + `sqlite-vec` both load) and mock only `@xenova/transformers` (a ~90 MB model download otherwise).
+- **Results:** `npx vitest run --coverage` → exit 0, **96.93 / 95.23 / 96.62 / 97.16** (`scripts/` 94.97 / 93.76 / 93.16 / 95.24; `scripts/setup/` 99.88 / 97.80 / 100 / 100); `npx vitest run` → **26 files / 746 tests / 0 failures**; `npm test` → 7 passed / 1 skipped. **No threshold, exclude, or ignore-comment changes** — `git diff vitest.config.ts` is empty and a grep for `v8 ignore`/`istanbul ignore`/`c8 ignore` returns 0 hits.
+- **Shipped:** one local Conventional Commit with `SKIP_BUMP=1` (version stays `1.46.0`); nothing pushed, tagged, or published.
+- **Known issue (open, deliberately not fixed):** `scripts/memory-index.js` ~242–263 selects only `id, content_hash`, so `existing.vec_rowid` is `undefined`, the `if (oldVecRowid != null)` cleanup is dead code, and re-indexing a changed chunk orphans its old `vec_memory` row. Invisible to search (the JOIN keys on `memory_chunks.vec_rowid`) but a storage leak that grows per changed chunk.
+
+**Knowledgebase outcome (per protocol): `memory_search` returned "No results found. The index may be empty"; `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
 ### 2026-10-24: Coder — `npm test` exits 0 (both residual Playwright failures resolved)
 
 The two failures left after the runner-collision fix are fixed, so `npm test` is green for the first time: **7 passed / 1 skipped, exit 0**.

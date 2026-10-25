@@ -812,3 +812,91 @@ describe('direct-run guard', () => {
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 })
+
+// ── Additional branch coverage (scalar quoting, empty tags, guard) ─────────
+
+describe('parseFrontmatter — scalar quoting', () => {
+  it('strips single quotes from scalar values', async () => {
+    const vs = await loadFresh()
+    const content = "---\ntitle: 'Single Quoted'\n---\nBody"
+
+    expect(vs.parseFrontmatter(content).title).toBe('Single Quoted')
+  })
+
+  it('leaves unquoted scalars untouched', async () => {
+    const vs = await loadFresh()
+    const content = '---\ncategory: context\n---\nBody'
+
+    expect(vs.parseFrontmatter(content).category).toBe('context')
+  })
+
+  it('keeps a value that only starts with a quote as-is', async () => {
+    const vs = await loadFresh()
+    const content = "---\ntitle: 'unterminated\n---\nBody"
+
+    expect(vs.parseFrontmatter(content).title).toBe("'unterminated")
+  })
+})
+
+describe('buildKnownTags — degenerate entries', () => {
+  it('ignores whitespace-only tags inside a group', async () => {
+    const vs = await loadFresh()
+    const known = vs.buildKnownTags({ tags: { topic: ['   ', 'real'] } })
+
+    expect(known.has('real')).toBe(true)
+    expect(known.size).toBe(1)
+  })
+
+  it('ignores entity_patterns keys that normalize to an empty string', async () => {
+    const vs = await loadFresh()
+    const known = vs.buildKnownTags({
+      tags: { topic: ['real'] },
+      entity_patterns: { '   ': ['x'], '': ['y'] },
+    })
+
+    expect([...known]).toEqual(['real'])
+  })
+})
+
+describe('collectNewTags — normalization edge cases', () => {
+  it('drops tags that normalize to an empty string but survive parsing', async () => {
+    const dir = createTempDir()
+    // Quoted whitespace is kept by parseFrontmatter (truthy raw string) and
+    // only becomes empty after normalizeTag().
+    writeRepoFile(dir, 'memory-bank/a.md', '---\ntags: ["   "]\n---\nBody')
+    const vs = await loadVocabSyncIn(dir)
+
+    expect(
+      vs.collectNewTags(['memory-bank/a.md'], { tags: { topic: [] } }),
+    ).toEqual([])
+  })
+
+  it('still collects real tags alongside the empty ones', async () => {
+    const dir = createTempDir()
+    writeRepoFile(dir, 'memory-bank/a.md', '---\ntags: ["   ", "real-tag"]\n---\nBody')
+    const vs = await loadVocabSyncIn(dir)
+
+    expect(
+      vs.collectNewTags(['memory-bank/a.md'], { tags: { topic: [] } }),
+    ).toEqual(['real-tag'])
+  })
+})
+
+describe('direct-run guard — argv edge cases', () => {
+  it('does not run main() when process.argv[1] is empty', async () => {
+    const dir = createTempDir()
+    gitInitRepo(dir)
+    writeRepoFile(dir, 'memory-bank/a.md', frontmatterWithTags(['new-tag']))
+    gitAdd(dir, ['memory-bank/a.md'])
+    writeVocab(dir, { tags: { topic: [] } })
+
+    process.chdir(dir)
+    process.argv[1] = ''
+    vi.resetModules()
+    await import('./vocab-sync.js')
+
+    // main() never ran, so nothing was written or warned about
+    expect(readVocab(dir).tags.topic).toEqual([])
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+})

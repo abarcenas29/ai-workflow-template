@@ -21,7 +21,7 @@
 //  13. Result structure validation                  → all fields present
 // ═════════════════════════════════════════════════════════════════════════════
 
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   mkdtempSync,
   mkdirSync,
@@ -143,6 +143,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: false, isManaged: false },
         'post-merge': { exists: false, isManaged: false },
+        'post-commit': { exists: false, isManaged: false },
       },
     })
     mkdirSync(join(ctx.consumerRoot, '.husky'))
@@ -301,6 +302,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: true },
         'post-merge': { exists: true, isManaged: true },
+        'post-commit': { exists: true, isManaged: true },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
@@ -375,6 +377,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: false, isManaged: false },
         'post-merge': { exists: false, isManaged: false },
+        'post-commit': { exists: false, isManaged: false },
       },
     })
     mkdirSync(join(ctx.consumerRoot, '.husky'))
@@ -480,6 +483,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: false },
         'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
@@ -509,6 +513,7 @@ describe('installHooks', () => {
       existingHooks: {
         'pre-commit': { exists: true, isManaged: true },
         'post-merge': { exists: true, isManaged: true },
+        'post-commit': { exists: true, isManaged: true },
       },
     })
     const huskyDir = join(ctx.consumerRoot, '.husky')
@@ -531,5 +536,187 @@ describe('installHooks', () => {
     for (const r of results) {
       expect(r.message).toContain(r.hook)
     }
+  })
+  it('force-overwrites a hook that the context reports but disk lost', async () => {
+    // Defensive path: context says the hook exists, but safeReadFile returns
+    // null, so the backup is written with empty content.
+    const ctx = makeContext({
+      hasHuskyDir: true,
+      force: true,
+      existingHooks: {
+        'pre-commit': { exists: true, isManaged: false },
+        'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
+      },
+    })
+    mkdirSync(join(ctx.consumerRoot, '.husky'))
+
+    const results = await installHooks(ctx)
+
+    for (const r of results) {
+      expect(r.action).toBe('overwritten')
+    }
+    const huskyDir = join(ctx.consumerRoot, '.husky')
+    expect(readFileSync(join(huskyDir, 'pre-commit.bak'), 'utf-8')).toBe('')
+    expect(readFileSync(join(huskyDir, 'pre-commit'), 'utf-8')).toBe(
+      expectedContent('pre-commit'),
+    )
+  })
+
+  it('merges against empty content when the reported hook is gone from disk', async () => {
+    const ctx = makeContext({
+      hasHuskyDir: true,
+      existingHooks: {
+        'pre-commit': { exists: true, isManaged: false },
+        'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
+      },
+    })
+    mkdirSync(join(ctx.consumerRoot, '.husky'))
+
+    const results = await installHooks(ctx)
+
+    for (const r of results) {
+      expect(r.action).toBe('merged')
+    }
+    const merged = readFileSync(
+      join(ctx.consumerRoot, '.husky', 'pre-commit'),
+      'utf-8',
+    )
+    expect(merged.startsWith(`\n${HOOK_MERGE_SEPARATOR}\n`)).toBe(true)
+    expect(merged).toContain(expectedContent('pre-commit'))
+  })
+})
+
+// ── 17. Dry-run action classification (all four message branches) ──────────
+
+describe('installHooks — dry-run classification', () => {
+  let logSpy
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+    cleanupTempDirs()
+  })
+
+  it('dry-run describes creating .husky/ when the directory is missing', async () => {
+    const ctx = makeContext({ hasHuskyDir: false, dryRun: true })
+
+    const results = await installHooks(ctx)
+
+    expect(results).toHaveLength(Object.keys(TEMPLATE_HOOKS).length)
+    for (const r of results) {
+      expect(r.action).toBe('dry-run')
+      expect(r.message).toContain('Would create .husky/')
+      expect(r.message).toContain(r.hook)
+      expect(r.message).toContain(
+        TEMPLATE_HOOKS[r.hook].description,
+      )
+    }
+    expect(existsSync(join(ctx.consumerRoot, '.husky'))).toBe(false)
+  })
+
+  it('dry-run describes writing when .husky/ exists without the hook', async () => {
+    const ctx = makeContext({
+      hasHuskyDir: true,
+      dryRun: true,
+      existingHooks: {
+        'pre-commit': { exists: false, isManaged: false },
+        'post-merge': { exists: false, isManaged: false },
+        'post-commit': { exists: false, isManaged: false },
+      },
+    })
+    mkdirSync(join(ctx.consumerRoot, '.husky'))
+
+    const results = await installHooks(ctx)
+
+    for (const r of results) {
+      expect(r.message).toContain('Would write')
+      expect(r.message).not.toContain('Would append')
+    }
+  })
+
+  it('dry-run describes an idempotent overwrite for managed hooks', async () => {
+    const ctx = makeContext({
+      hasHuskyDir: true,
+      dryRun: true,
+      existingHooks: {
+        'pre-commit': { exists: true, isManaged: true },
+        'post-merge': { exists: true, isManaged: true },
+        'post-commit': { exists: true, isManaged: true },
+      },
+    })
+    const huskyDir = join(ctx.consumerRoot, '.husky')
+    mkdirSync(huskyDir)
+    writeFileSync(join(huskyDir, 'pre-commit'), `${HOOK_MARKER}\nold\n`)
+    writeFileSync(join(huskyDir, 'post-merge'), `${HOOK_MARKER}\nold\n`)
+    const before = readFileSync(join(huskyDir, 'pre-commit'), 'utf-8')
+
+    const results = await installHooks(ctx)
+
+    for (const r of results) {
+      expect(r.action).toBe('dry-run')
+      expect(r.message).toContain('idempotent update')
+      expect(r.message).toContain(r.hook)
+    }
+    expect(readFileSync(join(huskyDir, 'pre-commit'), 'utf-8')).toBe(before)
+  })
+
+  it('dry-run describes appending for unmanaged hooks without force', async () => {
+    const ctx = makeContext({
+      hasHuskyDir: true,
+      dryRun: true,
+      force: false,
+      flags: {},
+      existingHooks: {
+        'pre-commit': { exists: true, isManaged: false },
+        'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
+      },
+    })
+    const huskyDir = join(ctx.consumerRoot, '.husky')
+    mkdirSync(huskyDir)
+    writeFileSync(join(huskyDir, 'pre-commit'), '#!/bin/sh\ncustom\n')
+    writeFileSync(join(huskyDir, 'post-merge'), '#!/bin/sh\ncustom\n')
+
+    const results = await installHooks(ctx)
+
+    for (const r of results) {
+      expect(r.action).toBe('dry-run')
+      expect(r.message).toContain('Would append to existing')
+      expect(r.message).not.toContain('force')
+    }
+    expect(readFileSync(join(huskyDir, 'pre-commit'), 'utf-8')).toBe(
+      '#!/bin/sh\ncustom\n',
+    )
+    expect(existsSync(join(huskyDir, 'pre-commit.bak'))).toBe(false)
+  })
+
+  it('dry-run backs up + overwrites when force comes from flags', async () => {
+    const ctx = makeContext({
+      hasHuskyDir: true,
+      dryRun: true,
+      force: false,
+      flags: { force: true },
+      existingHooks: {
+        'pre-commit': { exists: true, isManaged: false },
+        'post-merge': { exists: true, isManaged: false },
+        'post-commit': { exists: true, isManaged: false },
+      },
+    })
+    const huskyDir = join(ctx.consumerRoot, '.husky')
+    mkdirSync(huskyDir)
+
+    const results = await installHooks(ctx)
+
+    for (const r of results) {
+      expect(r.message).toContain('overwrite with force')
+    }
+    // Nothing is actually written or backed up
+    expect(existsSync(join(huskyDir, 'pre-commit'))).toBe(false)
+    expect(existsSync(join(huskyDir, 'pre-commit.bak'))).toBe(false)
   })
 })
