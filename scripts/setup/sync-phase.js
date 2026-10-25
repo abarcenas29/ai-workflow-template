@@ -154,7 +154,12 @@ function spawnScript(name, scriptPath, cwd, extraArgs, verbose = false) {
       })
 
       child.stderr.on('data', (data) => {
-        output += data.toString()
+        const chunk = data.toString()
+        output += chunk
+        // Surface warnings immediately. sync.js reports skipped locally
+        // modified files on stderr, and this phase is often the only place a
+        // consumer would ever see them (CON-04). stdout stays captured only.
+        process.stderr.write(chunk)
       })
     }
 

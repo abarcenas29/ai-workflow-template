@@ -123,6 +123,7 @@ describe('tracker.agent.md projectId derivation (plan T9 / TEST-05)', () => {
       '.opencode/agents/plan.agent.md',
       '.opencode/agents/researcher.agent.md',
       '.opencode/agents/reviewer.agent.md',
+      '.opencode/agents/scope.agent.md',
       '.opencode/agents/tracker.agent.md',
       '.opencode/agents/unit-tester.agent.md',
       '.opencode/agents/orchestrator/orchestrator.agent.md',

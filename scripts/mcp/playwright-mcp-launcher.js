@@ -6,41 +6,67 @@
  * based on environment variables and project settings.
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
+import { spawn } from 'node:child_process'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-// Get environment variables
-const headless = process.env.HEADLESS === 'true';
-const slowMo = process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : 0;
+/**
+ * Builds the `npx @playwright/mcp@latest` argument list from the environment.
+ *
+ * @param {NodeJS.ProcessEnv} [env=process.env] - Environment to read.
+ * @returns {string[]} Arguments passed to `npx`.
+ */
+export function buildArgs(env = process.env) {
+  const args = ['@playwright/mcp@latest']
 
-// Build command arguments
-const args = ['@playwright/mcp@latest'];
+  if (env.HEADLESS === 'true') {
+    args.push('--headless')
+  }
 
-// Add headless flag if needed
-if (headless) {
-  args.push('--headless');
+  if (env.VIEWPORT) {
+    args.push('--viewport', env.VIEWPORT)
+  }
+
+  return args
 }
 
-// Add viewport size if specified
-if (process.env.VIEWPORT) {
-  args.push('--viewport', process.env.VIEWPORT);
+/**
+ * Spawns the Playwright MCP server and forwards signals / exit codes.
+ *
+ * @param {object}   [options]
+ * @param {object}   [options.env=process.env] - Environment to read.
+ * @param {object}   [options.proc=process]    - Process-like emitter for signals.
+ * @param {Function} [options.exit=process.exit] - Exit function.
+ * @returns {import('node:child_process').ChildProcess} The spawned child.
+ */
+export function launch({
+  env = process.env,
+  proc = process,
+  exit = process.exit,
+} = {}) {
+  const child = spawn('npx', buildArgs(env), {
+    stdio: 'inherit',
+    shell: true,
+  })
+
+  proc.on('SIGINT', () => {
+    child.kill('SIGINT')
+  })
+
+  proc.on('SIGTERM', () => {
+    child.kill('SIGTERM')
+  })
+
+  child.on('exit', (code) => {
+    exit(code || 0)
+  })
+
+  return child
 }
 
-// Launch the MCP server
-const child = spawn('npx', args, {
-  stdio: 'inherit',
-  shell: true
-});
+const isDirectRun =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 
-// Handle process signals
-process.on('SIGINT', () => {
-  child.kill('SIGINT');
-});
-
-process.on('SIGTERM', () => {
-  child.kill('SIGTERM');
-});
-
-child.on('exit', (code) => {
-  process.exit(code || 0);
-});
+if (isDirectRun) {
+  launch()
+}

@@ -29,6 +29,9 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Module mocks — all external dependencies are fully mocked so tests are
@@ -76,6 +79,10 @@ vi.mock('./knowledgebase.js', () => ({
   registerKnowledgebase: vi.fn(),
 }))
 
+vi.mock('./skills-phase.js', () => ({
+  runSkillsPhase: vi.fn(),
+}))
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Imports — these resolve to the mocked modules above
 // ═════════════════════════════════════════════════════════════════════════════
@@ -98,6 +105,7 @@ import { handlePrepare } from './prepare.js'
 import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
 import { registerKnowledgebase } from './knowledgebase.js'
+import { runSkillsPhase } from './skills-phase.js'
 import { EXIT_CODES } from './constants.js'
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -202,6 +210,10 @@ describe('main() — setup orchestrator', () => {
       message: 'Registered "test-consumer" — 5 chunks indexed, 0 skipped',
       chunks_indexed: 5,
       chunks_skipped: 0,
+    })
+    runSkillsPhase.mockResolvedValue({
+      action: 'completed',
+      message: 'Pinned skills refreshed',
     })
 
     // Spy on console.log for --version tests
@@ -739,4 +751,271 @@ describe('main() — setup orchestrator', () => {
     expect(initHusky).toHaveBeenCalledTimes(1)
     expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
   })
+  // ── 24. Hooks aggregation branches ──────────────────────────────────────
+
+  it('mixed hook actions are summarised by count', async () => {
+    installHooks.mockResolvedValue([
+      { hook: 'pre-commit', action: 'created', message: 'a' },
+      { hook: 'post-merge', action: 'merged', message: 'b' },
+      { hook: 'post-commit', action: 'overwritten', message: 'c' },
+    ])
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'hooks',
+          status: 'success',
+          message: '1 created, 1 merged, 1 overwritten',
+        }),
+      ]),
+    )
+  })
+
+  it('a skipped hook marks the hooks phase as an error', async () => {
+    installHooks.mockResolvedValue([
+      { hook: 'pre-commit', action: 'skipped', message: 'denied' },
+      { hook: 'post-merge', action: 'created', message: 'ok' },
+      { hook: 'post-commit', action: 'created', message: 'ok' },
+    ])
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.FATAL)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'hooks',
+          status: 'error',
+          message: 'One or more hooks failed',
+        }),
+      ]),
+    )
+  })
+
+  it('all-overwritten hooks report "All hooks installed"', async () => {
+    installHooks.mockResolvedValue([
+      { hook: 'pre-commit', action: 'overwritten', message: 'a' },
+      { hook: 'post-merge', action: 'overwritten', message: 'b' },
+      { hook: 'post-commit', action: 'overwritten', message: 'c' },
+    ])
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'hooks',
+          status: 'success',
+          message: 'All hooks installed',
+        }),
+      ]),
+    )
+  })
+
+  it('hook dry-run results report "Dry-run complete"', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, dryRun: true })
+    installHooks.mockResolvedValue([
+      { hook: 'pre-commit', action: 'dry-run', message: 'a' },
+      { hook: 'post-merge', action: 'dry-run', message: 'b' },
+      { hook: 'post-commit', action: 'dry-run', message: 'c' },
+    ])
+
+    const code = await main(['--dry-run'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'hooks',
+          status: 'success',
+          message: 'Dry-run complete (no files modified)',
+        }),
+      ]),
+    )
+  })
+
+  // ── 25. actionStatus mapping ────────────────────────────────────────────
+
+  it('maps skipped and partial actions to warnings', async () => {
+    handlePrepare.mockResolvedValue({ action: 'skipped', message: 'prepare skipped' })
+    runSyncPhase.mockResolvedValue({
+      action: 'partial',
+      message: 'sync partially completed',
+      results: [],
+    })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'prepare', status: 'warn' }),
+        expect.objectContaining({ phase: 'sync', status: 'warn' }),
+      ]),
+    )
+  })
+
+  it('maps a failed knowledgebase action to an error status', async () => {
+    registerKnowledgebase.mockResolvedValue({
+      action: 'failed',
+      message: 'sync failed',
+    })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.FATAL)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'knowledgebase', status: 'error' }),
+      ]),
+    )
+  })
+
+  it('treats an unknown phase action as a warning', async () => {
+    handlePrepare.mockResolvedValue({ action: 'mystery-action', message: 'hm' })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'prepare', status: 'warn', message: 'hm' }),
+      ]),
+    )
+  })
+
+  // ── 26. Skills / knowledgebase failure paths ────────────────────────────
+
+  it('skills phase failure degrades to a warning and continues', async () => {
+    runSkillsPhase.mockRejectedValue(new Error('network down'))
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(stepWarn).toHaveBeenCalledWith(
+      expect.stringContaining('Skills phase skipped: network down'),
+    )
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'skills',
+          status: 'warn',
+          message: 'Skipped — network down',
+        }),
+      ]),
+    )
+    // Later phases still ran
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
+  })
+
+  it('knowledgebase phase failure degrades to a warning and continues', async () => {
+    registerKnowledgebase.mockRejectedValue(new Error('pg unreachable'))
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(stepWarn).toHaveBeenCalledWith(
+      expect.stringContaining('Knowledgebase registration skipped: pg unreachable'),
+    )
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'knowledgebase',
+          status: 'warn',
+          message: 'Skipped — pg unreachable',
+        }),
+      ]),
+    )
+  })
+
+  it('--skip-knowledgebase does not call the knowledgebase phase', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, skipKnowledgebase: true })
+
+    const code = await main(['--skip-knowledgebase'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(registerKnowledgebase).not.toHaveBeenCalled()
+  })
+
+  it('--skip-sync also skips the skills phase', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, skipSync: true })
+
+    const code = await main(['--skip-sync'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(runSyncPhase).not.toHaveBeenCalled()
+    expect(runSkillsPhase).not.toHaveBeenCalled()
+    expect(stepWarn).toHaveBeenCalledWith(
+      'Skills: phase skipped (--skip-sync)',
+    )
+  })
+
+  it('--skip-sync in quiet mode omits the skills skip notice', async () => {
+    parseCliArgs.mockReturnValue({
+      ...defaultFlags,
+      skipSync: true,
+      quiet: true,
+    })
+
+    await main(['--skip-sync', '--quiet'])
+
+    expect(runSkillsPhase).not.toHaveBeenCalled()
+    expect(stepWarn).not.toHaveBeenCalledWith(
+      'Skills: phase skipped (--skip-sync)',
+    )
+  })
+
+  // ── 27. Quiet fatal path ────────────────────────────────────────────────
+
+  it('discovery failure in quiet mode suppresses the summary', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, quiet: true })
+    discover.mockRejectedValue(new Error('fatal discovery'))
+
+    const code = await main(['--quiet'])
+
+    expect(code).toBe(EXIT_CODES.FATAL)
+    expect(stepError).toHaveBeenCalledWith(
+      expect.stringContaining('fatal discovery'),
+    )
+    expect(summary).not.toHaveBeenCalled()
+  })
+
+  // ── 28. --version fallbacks (fresh module instances) ────────────────────
+
+  it('--version falls back to 0.0.0 when package.json cannot be read', async () => {
+    vi.resetModules()
+    resolvePackageRoot.mockImplementation(() => {
+      throw new Error('package root unavailable')
+    })
+    parseCliArgs.mockReturnValue({ ...defaultFlags, version: true })
+
+    const fresh = await import('./index.js')
+    const code = await fresh.main(['--version'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(logSpy).toHaveBeenCalledWith('0.0.0')
+  })
+
+  it('--version falls back to 0.0.0 when the version field is missing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'index-test-'))
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'no-version' }))
+    vi.resetModules()
+    resolvePackageRoot.mockImplementation(() => dir)
+    parseCliArgs.mockReturnValue({ ...defaultFlags, version: true })
+
+    try {
+      const fresh = await import('./index.js')
+      const code = await fresh.main(['--version'])
+
+      expect(code).toBe(EXIT_CODES.SUCCESS)
+      expect(logSpy).toHaveBeenCalledWith('0.0.0')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
 })

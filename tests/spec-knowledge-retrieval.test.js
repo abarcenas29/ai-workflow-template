@@ -56,6 +56,7 @@ const EXPECTED_PIPELINE_AGENTS = [
   'implementer.agent.md',
   'researcher.agent.md',
   'reviewer.agent.md',
+  'scope.agent.md',
   'tracker.agent.md',
   'unit-tester.agent.md',
 ]
@@ -96,9 +97,9 @@ describe('pipeline agent specs reference the knowledge-retrieval protocol (plan 
   })
 
   it('TEST-06: plan.agent.md is correctly excluded from the pipeline agent list (no false positive)', () => {
-    // The pipeline list must be exactly the 10 in-scope agents — plan.agent.md
+    // The pipeline list must be exactly the 11 in-scope agents — plan.agent.md
     // is a standalone pre-pipeline agent and must never be checked (ALT-01).
-    expect(pipelineAgentSpecs).toHaveLength(10)
+    expect(pipelineAgentSpecs).toHaveLength(11)
     expect(pipelineAgentSpecs).not.toContain('plan.agent.md')
     expect(pipelineAgentSpecs).toEqual(EXPECTED_PIPELINE_AGENTS)
   })

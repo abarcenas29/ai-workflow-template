@@ -13,12 +13,24 @@ test.describe('AI Workflow Template Structure', () => {
       expect(existsSync('AGENTS.md')).toBeTruthy();
     });
 
-    await test.step('Validate .github/instructions directory exists', async () => {
-      expect(existsSync('.github/instructions')).toBeTruthy();
+    await test.step('Validate .agents/instructions directory exists', async () => {
+      expect(existsSync('.agents/instructions')).toBeTruthy();
     });
 
-    await test.step('Validate .github/skills directory exists', async () => {
-      expect(existsSync('.github/skills')).toBeTruthy();
+    await test.step('Validate .agents/skills directory exists', async () => {
+      expect(existsSync('.agents/skills')).toBeTruthy();
+    });
+
+    await test.step('Validate .opencode/agents directory exists', async () => {
+      // Agent specs live here (see README.md "Agents" table); .github/ holds
+      // workflow YAML only, so there is no .github/instructions or .github/skills.
+      expect(existsSync('.opencode/agents')).toBeTruthy();
+    });
+
+    await test.step('Validate test-runner configuration files exist', async () => {
+      expect(existsSync('package.json')).toBeTruthy();
+      expect(existsSync('playwright.config.ts')).toBeTruthy();
+      expect(existsSync('vitest.config.ts')).toBeTruthy();
     });
   });
 
@@ -71,15 +83,24 @@ test.describe('AI Workflow Template Structure', () => {
 
 test.describe('AI Workflow Template Functionality', () => {
   test('should be able to load skill definitions', async () => {
-    await test.step('Check if skills directory contains skill files', async () => {
+    await test.step('Check that skills directory contains skill definitions', async () => {
       const fs = await import('fs/promises');
-      const skillsDir = '.github/skills';
-      
-      if (existsSync(skillsDir)) {
-        const files = await fs.readdir(skillsDir);
-        const skillFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.json'));
-        expect(skillFiles.length).toBeGreaterThan(0);
-      }
+      const skillsDir = '.agents/skills';
+
+      // The directory is required — an absent skills dir is a real defect, so
+      // assert it rather than silently passing the way the old guard did.
+      expect(existsSync(skillsDir)).toBeTruthy();
+
+      // Each skill is a directory holding a SKILL.md, e.g.
+      // `.agents/skills/grilling/SKILL.md` — not a flat *.md file.
+      const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+      const skillDirs = entries.filter(
+        (entry) => entry.isDirectory() && existsSync(join(skillsDir, entry.name, 'SKILL.md')),
+      );
+
+      // Floor, not an exact count: the shipped skill set grows and shrinks, and
+      // pinning the number would make every addition a test failure.
+      expect(skillDirs.length).toBeGreaterThanOrEqual(30);
     });
   });
 

@@ -35,6 +35,7 @@ vi.mock('./utils.js', () => ({
 
 import { spawn } from 'child_process'
 import { registerKnowledgebase } from './knowledgebase.js'
+import { logWarn } from './utils.js'
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 
@@ -248,5 +249,104 @@ describe('registerKnowledgebase', () => {
     expect(result.message).toContain('exit code -1')
     expect(result.message).toContain('ENOENT')
     expect(spawn).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+// ── Execution / option branches ────────────────────────────────────────────
+
+describe('registerKnowledgebase — execution branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.DATABASE_URL = 'postgres://localhost:5432/knowledgebase'
+  })
+
+  afterEach(() => {
+    delete process.env.DATABASE_URL
+  })
+
+  it('spawns the CLI with the project id and inherits stdio in verbose mode', async () => {
+    vi.mocked(spawn).mockImplementation(() =>
+      createMockChild({ exitCode: 0 }),
+    )
+
+    const result = await registerKnowledgebase(makeContext({ verbose: true }))
+
+    // No chunk-count line in the output → both counters default to zero
+    expect(result).toMatchObject({
+      action: 'indexed',
+      chunks_indexed: 0,
+      chunks_skipped: 0,
+    })
+    expect(result.message).toBe(
+      'Registered "test-consumer" — 0 chunks indexed, 0 skipped',
+    )
+
+    const call = vi.mocked(spawn).mock.calls[0]
+    expect(call[1]).toEqual([
+      '/fake/package/root/scripts/knowledgebase-cli.js',
+      'sync',
+      '--project',
+      'test-consumer',
+    ])
+    expect(call[2].stdio).toBe('inherit')
+    expect(call[2].env.INIT_CWD).toBe('/fake/consumer')
+  })
+
+  it('falls back to process.cwd() when consumerRoot is missing', async () => {
+    vi.mocked(spawn).mockImplementation(() =>
+      createMockChild({
+        exitCode: 0,
+        stdoutData: 'Indexed 1 new, updated 0, skipped 0 chunks from project "test-consumer"',
+      }),
+    )
+
+    const ctx = makeContext()
+    delete ctx.consumerRoot
+
+    const result = await registerKnowledgebase(ctx)
+
+    expect(result.action).toBe('indexed')
+    expect(vi.mocked(spawn).mock.calls[0][2].cwd).toBe(process.cwd())
+  })
+
+  it('treats a null exit code (signal) as -1', async () => {
+    vi.mocked(spawn).mockImplementation(() =>
+      createMockChild({ exitCode: null }),
+    )
+
+    const result = await registerKnowledgebase(makeContext())
+
+    expect(result.action).toBe('failed')
+    expect(result.message).toContain('exit code -1')
+  })
+
+  it('gracefully skips when spawning throws synchronously', async () => {
+    vi.mocked(spawn).mockImplementation(() => {
+      throw new Error('ENOENT: knowledgebase-cli.js is missing')
+    })
+
+    const result = await registerKnowledgebase(makeContext())
+
+    expect(result.action).toBe('skipped')
+    expect(result.message).toContain('knowledgebase-cli.js not available')
+    expect(result.message).toContain('ENOENT')
+    expect(logWarn).toHaveBeenCalledWith(
+      expect.stringContaining('Skipping Phase 6'),
+    )
+  })
+
+  it('defaults flags and verbose when the context omits them', async () => {
+    vi.mocked(spawn).mockImplementation(() =>
+      createMockChild({ exitCode: 0 }),
+    )
+
+    const result = await registerKnowledgebase({
+      consumerRoot: '/fake/consumer',
+      consumerPackageJson: { name: 'test-consumer' },
+    })
+
+    expect(result.action).toBe('indexed')
+    expect(vi.mocked(spawn).mock.calls[0][2].stdio).toBe('pipe')
   })
 })

@@ -346,4 +346,29 @@ function main() {
   console.log('[normalize-memory] Done.');
 }
 
-main();
+// Only run when executed directly (node scripts/normalize-memory.js). When the
+// module is imported — e.g. by unit tests — no side effects are triggered.
+const isDirectRun =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main();
+}
+
+export {
+  loadVocabulary,
+  getAllTags,
+  parseFrontmatter,
+  extractTitle,
+  suggestTags,
+  suggestEntities,
+  inferCategory,
+  getGitMtime,
+  buildFrontmatterYaml,
+  normalizeFile,
+  inferDocType,
+  collectMdFiles,
+  migratePlanToDocs,
+  ensureDir,
+  main,
+};

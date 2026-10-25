@@ -52,7 +52,7 @@ npx ai-workflow-setup --help           # Show all options
 
 ## What This Package Does
 
-- **29 specialized AI skills**, framework instructions, and prompt templates (`.agents/`)
+- **34 specialized AI skills**, framework instructions, and prompt templates (`.agents/`)
 - **Smart agent frameworks** — Plan Mode, Implementation Plans, Research Spikes
 - **Multi-agent orchestrator** — dynamic pipelines with 10+ specialized sub-agents
 - **TDD orchestrator** — strict RED→GREEN→REFACTOR/VERIFY pipeline (90% coverage gate)
@@ -84,7 +84,7 @@ Post-install, your project receives this structure:
 ```text
 .agents/
 ├── instructions/   # Framework, workflow, and security guidance
-├── skills/         # 29 specialized AI skills
+├── skills/         # 34 specialized AI skills
 └── prompts/        # Reusable prompt templates
 .opencode/agents/   # Orchestrator + specialized sub-agents
 .github/workflows/  # CI/CD automation (excluded from sync)
@@ -99,6 +99,7 @@ AGENTS.md           # Master instruction file with agent guidance
 | Agent | File | Role |
 | --- | --- | --- |
 | Orchestrator | `.opencode/agents/orchestrator/orchestrator.agent.md` | Master — analyzes requests, builds pipelines, delegates |
+| Scope | `.opencode/agents/scope.agent.md` | Conditional front door for underspecified requests — grilling rounds, then a spike doc |
 | Researcher | `.opencode/agents/researcher.agent.md` | Technical investigation, library evaluation |
 | Architect | `.opencode/agents/architect.agent.md` | System design, component architecture |
 | Implementer | `.opencode/agents/implementer.agent.md` | Translates designs into implementation plans |
@@ -121,6 +122,7 @@ Invoke the orchestrator with `@orchestrator` followed by your task:
 ```
 
 - **Run flow:** auto-bootstraps architecture on first run → builds a pipeline → executes agents sequentially (confirm/skip each step, or enable auto-confirm) → tracker documents to `docs/tracker-log.md` → persists new knowledge.
+- **Scope step (conditional, runs first):** inserted at the front of the pipeline only when the request is underspecified — `scope` runs grilling rounds against a draft file, writes `docs/spike-<feature>.md`, then hands off to `researcher` or `implementer`. Always interactive (auto-confirm cannot skip it) and has **no command-execution permission** — prototypes are delegated to `coder` (logic) or `designer` (UI).
 - **First run only:** runs the architecture-blueprint-generator skill to detect tech stack/patterns, writing context to `docs/.architecture-context.md` and `.agents/instructions/learned-knowledge.instructions.md`; later runs skip this.
 
 ### MCP Tooling
@@ -222,6 +224,7 @@ All memory-bank files use YAML frontmatter (`id`, `title`, `updated`, `tags`, `e
 
 ## Featured Skills
 
+- **Feature scoping:** `grilling`, `grill-me`, `grill-with-docs`, `domain-modeling`, `prototype` — narrow underspecified requests into a spike; `GLOSSARY.md` and `docs/adr/` locations come from `.agents/config/domain.md`
 - **Workflow automation:** `architecture-blueprint-generator`, `create-implementation-plan`, `create-readme`, `context-map`, `graphify` (global skill), `graphify-framework-aware`
 - **Development tools:** `playwright-explore-website`, `playwright-generate-test`, `github-issues`, `gh-cli`, `polygot-test-agent`, `microsoft-docs`
 - **Token & efficiency:** `caveman`, `caveman-compress`, `compress`, `caveman-commit`, `cavecrew`, `caveman-stats`

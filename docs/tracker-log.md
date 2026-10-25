@@ -1605,3 +1605,295 @@ Closed the last two non-blocking reviewer wording nits from the Pipeline 11 foll
 - **🔵 M-5 (non-blocking, documentation):** the prior tracker entry's "`1.49.0`" narrative now reads stale relative to the settled `1.45.0` — historical record intentionally left frozen; this entry documents the settle.
 - **No push** — all 4 commits are local to `feat/utilize-pg-vector-db`; no remote/PR action taken.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 ("Pipeline 11 Final Polish") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Feature Pipeline 12: Matt Pocock Skills Integration + Scope Agent
+
+**Plan:** `plan/feature-matt-skills-integration-v1.md` (v1)
+**Date:** 2026-10-24
+**Status:** ✅ SUCCESS — 17/17 tasks complete; `npx vitest run` → 16 files / 331 tests / 0 failures. Work is **uncommitted** on branch `feat/mat-integration` (working tree dirty by design; this tracker entry is part of it).
+**Pipeline:** implementer (bootstrap + read-only pre-flight) → coder ∥(T1,T2,T3) → coder(T4) → coder ∥(T5,T6) → coder(T7) → coder(T8+T9) → coder(T10+T11) → coder ∥(T12,T13,T14) → coder(T15) → coder ∥(T16,T17) → tracker (this entry)
+
+### Summary
+
+Vendored five Matt Pocock scoping skills (`grilling`, `grill-me`, `grill-with-docs`,
+`domain-modeling`, `prototype`) byte-identically at `v1.3.1`, added a `.agents/config/`
+discovery layer, and introduced a new `scope` pipeline agent that narrows underspecified
+requests through numbered-question rounds and terminates in a `docs/spike-<feature>.md`
+document that `researcher`/`implementer` already accept as input. The orchestrator now has a
+`scope` registry row, a "Foggy feature" pipeline pattern, and a Step 2a
+insertion/interactivity contract (`autoConfirm` cannot skip it). Distribution is pinned and
+backward-compatible: `skills-lock.json` records a tag ref plus per-file
+`sha256`/`upstreamPath`, a new setup phase fetches from upstream with a shipped-copy
+fallback, and `scripts/sync.js` gained opt-in `--prune`. No existing skill, agent,
+instruction, or prompt was deleted or renamed; `plan.agent.md` is untouched and demoted only
+in documentation.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 0 | implementer | ✅ | Bootstrap not needed (`docs/.architecture-context.md` + memory bank already populated). A **read-only pre-flight** produced 9 corrections to the plan before any implementation batch ran (wrong file target, coverage gate, inverted dependency, parity-test trap, incomplete lock schema, and others). |
+| A | coder ∥ | ✅ | T1, T2, T3 — disjoint files, no collisions. |
+| B | coder | ✅ | T4 then T5 (same file, sequential). T5 deliberately left the spec-knowledge-retrieval count change to T15. |
+| C | coder | ✅ | T6 — orchestrator wiring; `spec-orchestrator-parity` stayed 8/8 with phrase counts unchanged. |
+| D | coder | ✅ | T8 + T9 combined (both touch the setup phase surface). T7 landed first. |
+| E | coder | ✅ | T10 + T11 combined (implementation + its tests). |
+| F | coder ∥ | ✅ | T12, T13, T14 — three disjoint documentation files. |
+| G | coder ∥ | ✅ | T15 first (test unblock), then T16 and T17. |
+| — | tracker | ✅ | This entry; no source/test/plan changes. |
+
+### Task Results (T1–T17)
+
+| Task | Status | Artifacts / Result |
+|---|---|---|
+| T1 | ✅ | `.agents/skills/{grilling,grill-me,grill-with-docs,domain-modeling,prototype}/` — 5 directories / **9 files**, byte-identical to upstream `v1.3.1` @ `24fe0ef7` (CON-07). |
+| T2 | ✅ | `.agents/config/domain.md` (37 lines) — single-context layout: `GLOSSARY.md` at root, ADRs in `docs/adr/`; proceeds silently when absent; flags ADR conflicts. |
+| T3 | ✅ | `.agents/config/README.md` (43 lines) — five skills + `scope` agent pointer; states it is the discovery path when consumer `AGENTS.md` is locally edited (CON-04 backstop). |
+| T4 | ✅ | `.opencode/agents/scope.agent.md` created — permissions `read, search, edit, skill, question`; **zero** `execute` hits; draft-state round protocol, numbered questions with recommended answers, terminal spike artifact, prototype hand-off. |
+| T5 | ✅ | `scope.agent.md` +15 lines — `## Check Knowledge` section + `Knowledge:` line in the return format; 4/4 knowledge-retrieval token assertions satisfied (TEST-01/02). |
+| T6 | ✅ | `orchestrator.agent.md` — `scope` registry row, `Foggy feature: scope ⏸️ → researcher ⏸️ → implementer ⏸️ → …` pattern, Step 2a insertion rule (REQ-09), always-interactive override (REQ-10), round-trip protocol, prototype hand-off (REQ-11), `scope` added to `confirmationGates`. `spec-orchestrator-parity` 8/8; literal phrase counts unchanged (2× / 2×). |
+| T7 | ✅ | `skills-lock.json` — `ref: "v1.3.1"` + per-file `{ path, sha256, upstreamPath }` for all 9 vendored files, plus `skillPath`; caveman entries untouched. **90 insertions / 0 deletions.** |
+| T8 | ✅ | `scripts/setup/skills-phase.js` (new) + `scripts/setup/index.js` Phase 6 wiring — reads pinned entries, fetches pinned raw URLs, verifies `sha256`, buffer-then-write, local-edit warning, one fallback notice, `--dry-run`, idempotent. |
+| T9 | ✅ | Fetch phase gated by the existing `!flags.skipSync`; no-op when zero pinned entries; one-line status in all three cases. **No new CI guard invented** — no setup-level CI guard exists (CI skips hooks only). |
+| T10 | ✅ | `scripts/sync.js` — opt-in `--prune` (off by default), pre-run manifest snapshot (only pre-existing keys considered), channel resolution, path containment; non-regular files and unknown `__` namespaces never pruned. |
+| T11 | ✅ | `scripts/sync.test.js` 7 → **15 tests**; TEST-02..05 covered (default inert, unmodified-only removal, modified survives, package-owned never removed). |
+| T12 | ✅ | `AGENTS.md` — new `## Agent skills` (Skills table, Scope agent, Domain docs), Plan Mode rewritten (scope first, `plan.agent.md` optional deep planning), Core Workflow step 2 updated, skill inventory reconciled to 34/34. `plan.agent.md` untouched. |
+| T13 | ✅ | `README.md` both counts 29 → 34, scope row in the sub-agent table, How-to-Use bullet, Featured Skills. `package.json` 1.45.0 → 1.46.0 (minor, CON-06); `package-lock.json` root version corrected from stale 1.34.0. |
+| T14 | ✅ | `.agents/instructions/memory-bank.instructions.md` — 4-step scope-first ordering + spike tracking note (11 insertions, 0 deletions). |
+| T15 | ✅ | `tests/spec-knowledge-retrieval.test.js` — `scope` added to `EXPECTED_PIPELINE_AGENTS` (10 → 11), `plan.agent.md` still excluded. Bonus: `scope.agent.md` added to `CHECK_PATHS` in `tests/spec-kb-consolidation.test.js` (stale enumeration found here). |
+| T16 | ✅ | `npx vitest run` → 16 files / **331 tests** / 0 failures; `validate-memory-schema.js` exit 0; coverage run green for all tests. See Known Issues for the repo-wide threshold. |
+| T17 | ✅ | End-to-end packaging matrix on a scratch consumer (`npm pack` → install → setup → sync → prune) — all steps PASS; **DEF-01** found and fixed. Scratch dir + tarball deleted; repo untouched. |
+
+### Files Created
+
+| File | Description |
+|---|---|
+| `.agents/skills/grilling/SKILL.md` | Vendored v1.3.1 skill (1 file). |
+| `.agents/skills/grill-me/SKILL.md` | Vendored router skill (157 bytes, `disable-model-invocation`). |
+| `.agents/skills/grill-with-docs/SKILL.md` | Vendored router skill (247 bytes, `disable-model-invocation`). |
+| `.agents/skills/domain-modeling/{SKILL.md,GLOSSARY-FORMAT.md,ADR-FORMAT.md}` | Vendored skill + 2 format references. |
+| `.agents/skills/prototype/{SKILL.md,LOGIC.md,UI.md}` | Vendored skill + 2 branch references. |
+| `.agents/config/domain.md` | Domain-docs location contract for `domain-modeling`. |
+| `.agents/config/README.md` | Discovery pointer that survives an edited consumer `AGENTS.md`. |
+| `.opencode/agents/scope.agent.md` | New pipeline agent (299 lines) — grilling rounds → spike doc; no `execute`. |
+| `scripts/setup/skills-phase.js` | Pinned upstream install phase with shipped-copy fallback. |
+| `scripts/setup/skills-phase.test.js` | Unit + wiring tests for the phase (FILE-19). |
+
+Total: **9 vendored skill files**, 2 config files, 1 agent spec, 2 setup scripts/tests.
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `.opencode/agents/orchestrator/orchestrator.agent.md` | Registry row, Foggy-feature pattern, Step 2a insertion + interactivity rules, `confirmationGates`. |
+| `skills-lock.json` | +90 lines: tag ref and per-file hashes/`upstreamPath` for the 5 skills; caveman entries unchanged. |
+| `scripts/setup/index.js` | Phase 6 — skills phase wired into the setup pipeline. |
+| `scripts/setup/sync-phase.js` | **DEF-01 fix** — forwards captured child stderr to `process.stderr` in non-verbose mode (CON-04 warning now visible). |
+| `scripts/sync.js` | Opt-in `--prune` (pre-run snapshot + containment). |
+| `scripts/sync.test.js` | 7 → 15 tests (prune matrix). |
+| `AGENTS.md` | New `## Agent skills`; Plan Mode rewritten; 34/34 skills inventory. |
+| `README.md` | Skill counts 29 → 34; scope agent surfaced. |
+| `package.json` | Version 1.45.0 → 1.46.0 (minor). |
+| `package-lock.json` | Root version corrected 1.34.0 → 1.46.0. |
+| `.agents/instructions/memory-bank.instructions.md` | Scope-first Plan Mode ordering (+11 lines). |
+| `tests/spec-knowledge-retrieval.test.js` | `scope` in the parity set (10 → 11). |
+| `tests/spec-kb-consolidation.test.js` | `scope.agent.md` added to `CHECK_PATHS` (+1 line). |
+
+**Explicitly unchanged:** `.opencode/agents/plan.agent.md` (byte-identical through the packaging check), all pre-existing skill directories, `.agents/prompts/`, and all `docs/` distribution behavior (CON-09).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` (full suite) | ✅ **16 files / 331 tests / 0 failures** (~1.8s; no skipped/todo) |
+| `npx vitest run scripts/sync.test.js` | ✅ 15/15 |
+| `npx vitest run scripts/setup/` | ✅ 7 files / **142/142** |
+| `tests/spec-orchestrator-parity.test.js` | ✅ 8/8 (literal phrase counts unchanged) |
+| `tests/spec-knowledge-retrieval.test.js` | ✅ 6/6 (11 in-scope agents, `plan.agent.md` still excluded) |
+| `node scripts/validate-memory-schema.js` | ✅ exit 0 |
+| T17 packaging matrix | ✅ **all PASS** — 156-file tarball, version 1.46.0, 9 skill files + 2 config files + `scope.agent.md` present, `plan.agent.md` byte-identical, zero `docs/`/`tests/`/`plan/` entries, edited `AGENTS.md` warned + skipped unchanged, `--prune` deleted 0 of a 125-file snapshot, upstream fetch + drift overwrite + fallback all exercised |
+| Per-file coverage — `scripts/setup/skills-phase.js` | ✅ 99.42% stmts / 97.34% branch / 100% funcs / 100% lines |
+| Repo-wide coverage threshold | ⚠️ **pre-existing failure**, see Known Issues — not a regression |
+
+### Known Issues / Honest Accounting
+
+- **Repo-wide coverage threshold was already failing at HEAD.** `vitest.config.ts` enforces 90% over `scripts/**`; the baseline at HEAD measured **48.05% statements** before this work, and the tree now measures **~50.69%** (50.69 / 50.51 / 51.1 / 51.18). This is **not a regression** — coverage rose. CI gates on `test:unit`, not `npm run test:unit:coverage`, so the threshold is not a merge gate. It was deliberately not "fixed" opportunistically: no thresholds or exclusions were changed.
+- **`scripts/sync.js` reports 0% coverage structurally.** Its tests spawn it as a child process (`spawnSync('node', ['scripts/sync.js', ...])`), and the v8 provider cannot instrument child processes. The 0% is meaningless — behavioural assertions in `scripts/sync.test.js` are the real guard. Pre-existing condition.
+- **`--dry-run` message is cosmetic-only.** It prints `Would fetch 5 pinned skill(s) from upstream`, but a real first install fetches nothing: the sync phase copies the vendored files first, so their hashes already match the pin and the fetch phase correctly reports `5 already up to date`. No functional impact; the wording invites a small follow-up.
+
+### Deviations From the Written Plan
+
+| ID | Deviation | Rationale / Outcome |
+|---|---|---|
+| DEV-01 | T8/T9 implemented in `scripts/setup/` (`skills-phase.js` + a phase in `scripts/setup/index.js`), **not** `bin/setup.js`. | `bin/setup.js` is a 26-line shim that only imports `main()`; all phases live in `scripts/setup/`. Plan rows were annotated in place. |
+| DEV-02 | The plan's generic "per-file hash" schema became `{ path, sha256, upstreamPath }` + `skillPath`. | Upstream categories are **asymmetric** (`skills/productivity/` for `grilling`/`grill-me`, `skills/engineering/` for the other three), so a URL cannot be derived from a skill name. Caveman entries untouched (90 insertions / 0 deletions). |
+| DEV-03 | New test file `scripts/setup/skills-phase.test.js` added, not in the original task table. | Required by the `scripts/**` 90% coverage gate — every setup module has a sibling `.test.js`. Recorded as FILE-19 in the plan. |
+| DEV-04 | `tests/spec-kb-consolidation.test.js` also needed `scope.agent.md` in `CHECK_PATHS`. | A second, independent agent-spec enumeration — stale once the 11th agent landed. Found during T15. |
+| DEV-05 | `package-lock.json` root version corrected 1.34.0 → 1.46.0 alongside the `package.json` minor bump. | The lockfile was separately stale; leaving it would have re-introduced drift the plan explicitly wanted settled. |
+| DEV-06 | `csv` row: n/a — no CSV artifact exists in this feature. | Superseded by DEV-02's `upstreamPath` schema note. |
+| DEF-01 | **Defect found in T17 and fixed.** `scripts/setup/sync-phase.js` swallowed sync stderr in non-verbose mode, so the CON-04 "Skipped locally modified root file" warning never reached the consumer. | Fixed by forwarding each stderr chunk to `process.stderr` while still capturing it (stdout remains capture-only). Re-verified on a fresh consumer: warning appears, file unchanged. |
+
+### Notes / Follow-up
+
+- **Plan frontmatter is stale.** All 17 task rows are ✅ (dated 2026-10-23/24), but `status: Planned` and the `![Status: Planned]` badge were never updated. Recorded here rather than edited — the tracker does not modify plan files.
+- **`docs/.orchestrator-log.md` is incomplete for this session.** Its status table stops at `G-T15` and has no T16/T17 rows and no `FINAL STATUS` block; the T16/T17 outcomes exist only in the plan rows and in this entry (reconciled here from the pipeline summaries).
+- **Nothing is committed.** Branch `feat/mat-integration`; the plan file itself is untracked (`?? plan/feature-matt-skills-integration-v1.md`). A deployer step is still outstanding if this is to ship.
+- **`grill-me` is vendored but unused by design** — `disable-model-invocation: true` and stateless; agents must invoke `grilling` (plus `domain-modeling`) directly. `grill-with-docs` is the router for the interview + glossary/ADR record.
+- **Only the 5 new skills are pin-covered** in `skills-lock.json`; the other 29 skills remain unpinned (pre-existing, documented as intentional).
+- `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` is not configured in this session); per the graceful-failure contract this is reported, not retried. Learned-knowledge re-indexing was likewise skipped.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-24 ("Matt Pocock Skills Integration") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Coverage Pipeline: Repo-Wide Vitest Gate (90%) Met + MCP Launcher ESM Fix
+
+**Plan:** none — follow-up to the repo-wide coverage shortfall recorded in Feature Pipeline 12 (see "Known Issues / Honest Accounting" above)
+**Date:** 2026-10-25
+**Status:** ✅ SUCCESS — `npx vitest run --coverage` → **exit 0**; `npx vitest run` → **26 files / 746 tests / 0 failures**; `npm test` (Playwright) → **7 passed, 1 skipped, exit 0**. All work shipped as **one local commit** with `SKIP_BUMP=1` (version stays `1.46.0`); nothing pushed, tagged, or published.
+**Pipeline:** coder (in-process refactors + tests) → deployer (this entry + commit)
+
+### Summary
+
+Closed the pre-existing repo-wide coverage failure that Feature Pipeline 12 documented and deliberately did not "fix" opportunistically. `vitest.config.ts` enforces 90% over `scripts/**`; at HEAD the tree measured **48.05% statements** and before this change **~50.6%**, so the gate never passed. Rather than weaken the gate, ten modules that were structurally untestable were made testable **in process** and given real tests: nine had no sibling test file at all, and `scripts/sync.js` had 15 tests but read **0%** because every one of them spawned the script as a child process — and the v8 provider cannot instrument a child process.
+
+Final: **96.93% statements / 95.23% branches / 96.62% functions / 97.16% lines** repo-wide, **94.97 / 93.76 / 93.16 / 95.24** for `scripts/`, **99.88 / 97.80 / 100 / 100** for `scripts/setup/`. The suite grew from **331 to 746 tests** (+415) across 16 → 26 files. **No thresholds were lowered, no coverage excludes were added, and no `v8 ignore` / `istanbul ignore` comments exist anywhere** (`grep` → 0 hits across `scripts/`, `tests/`, `vitest.config.ts`); `git diff vitest.config.ts` is empty. The number is real.
+
+### The bug found on the way
+
+`scripts/mcp/playwright-mcp-launcher.js` was **dead on arrival**: the package is `"type": "module"`, the file used CommonJS `require(...)`, so any real invocation threw `ReferenceError: require is not defined`. Import-time tests never caught it because nothing executed the file. The CJS → ESM conversion is a genuine runtime fix, not just a testability refactor.
+
+### What was 0% (and why)
+
+| Module | Before | Why it was 0% / absent |
+|---|---|---|
+| `scripts/sync.js` | **0.00%** | Executed at import; all 15 tests used `spawnSync('node', ['scripts/sync.js', …])`. v8 does not instrument child processes. |
+| `scripts/normalize-memory.js` | **0.00%** | Executed at import; no sibling test. |
+| `scripts/mcp-memory-server.js` | **0.00%** | Executed at import **and opened a stdio transport** on import — actively hostile to being imported. |
+| `scripts/mcp/playwright-mcp-launcher.js` | **0.00%** | Executed at import; also CJS in an ESM package (runtime-broken). |
+| `scripts/bump-version.js` | **0.00%** | No sibling test. |
+| `scripts/memory-cli.js` | **0.00%** | No sibling test. |
+| `scripts/memory-index.js` | **0.00%** | No sibling test. |
+| `scripts/setup/husky-init.js` | **0.00%** | No sibling test. |
+| `scripts/setup/ui.js` | **0.00%** | No sibling test. |
+| `scripts/setup/utils.js` | **0.00%** | No sibling test. |
+
+### Source changes (4 files)
+
+| File | Change |
+|---|---|
+| `scripts/sync.js` | Top-level body extracted into named, exportable units — `parseArgs`, `createSyncContext`, `readManifest` / `writeManifest`, `isUntouched`, `isPathInside`, `resolvePruneEntry`, `isRegularFile`, `syncProject`, `runSync` — plus an `isEntryPoint()` guard that keeps `node scripts/sync.js` working. **All 15 pre-existing spawn-based tests pass unmodified.** One behavioural difference: a missing `.agents` dir now returns early from `syncProject` instead of calling `process.exit(0)` — externally identical. |
+| `scripts/normalize-memory.js` | Direct-run guard + named exports of the existing units. **No body changes.** |
+| `scripts/mcp-memory-server.js` | Extracted `listTools()` / `handleToolCall()`, exported `main()`, added `bootstrap()` + a direct-run guard so importing no longer opens a stdio transport. |
+| `scripts/mcp/playwright-mcp-launcher.js` | **CJS → ESM conversion** (bug fix, see above): `import` instead of `require`, `buildArgs()` / `launch()` helpers with injectable `env` / `proc` / `exit`, direct-run guard. |
+
+### Tests (10 new files, 6 extended)
+
+| Type | Files |
+|---|---|
+| **New (10)** | `scripts/bump-version.test.js`, `scripts/mcp-memory-server.test.js`, `scripts/mcp/playwright-mcp-launcher.test.js`, `scripts/memory-cli.test.js`, `scripts/memory-index.test.js`, `scripts/normalize-memory.test.js`, `scripts/setup/husky-init.test.js`, `scripts/setup/ui.test.js`, `scripts/setup/utils.test.js`, `scripts/sync-unit.test.js` |
+| **Extended (6)** | `scripts/setup/discover.test.js`, `scripts/setup/hooks.test.js`, `scripts/setup/index.test.js`, `scripts/setup/knowledgebase.test.js`, `scripts/setup/sync-phase.test.js`, `scripts/vocab-sync.test.js` |
+
+The memory tests use **real temporary SQLite databases** (`mkdtempSync`) with `better-sqlite3` + `sqlite-vec` — both load in this environment, so only `@xenova/transformers` is mocked (its real use downloads a ~90 MB model).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run --coverage` | ✅ exit 0 — 96.93 / 95.23 / 96.62 / 97.16 |
+| `npx vitest run` | ✅ 26 files / **746 tests** / 0 failures (0 skipped, 0 todo) |
+| `npm test` (Playwright) | ✅ 7 passed, 1 skipped, exit 0 |
+| `git diff vitest.config.ts` | ✅ empty — no threshold or exclude changed |
+| `grep -rn "v8 ignore\|istanbul ignore\|c8 ignore"` | ✅ 0 hits |
+| `node scripts/validate-memory-schema.js` | ✅ exit 0 |
+| Pre-existing spawn tests in `scripts/sync.test.js` | ✅ 15/15, unmodified |
+
+### Notes / Follow-up
+
+- **🔴 Open follow-up (latent bug, deliberately NOT fixed here): `scripts/memory-index.js` orphans its `vec_memory` row on re-index.** Around lines 242–263 the `SELECT` fetches only `id, content_hash`, so `existing.vec_rowid` is always `undefined`; the update path's `if (oldVecRowid != null)` is therefore dead code and a changed chunk leaves its previous `vec_memory` row behind. The orphan stays invisible to search (the JOIN keys on `memory_chunks.vec_rowid`) but leaks storage, so the index grows on every re-index of a modified chunk. Out of scope for a coverage change — fixing it would also change query semantics — so it is recorded, not touched. Suggested fix: add `vec_rowid` to the `SELECT` (or re-derive it from `memory_chunks` before deleting).
+- **Behavioural note on the `sync.js` refactor:** the early return for a missing `.agents` directory replaces a `process.exit(0)`. Externally identical (exit code 0, same message), but it means `syncProject` is now a normal function that returns instead of terminating the process — which is exactly why it is testable.
+- **Entry-point guard conventions differ slightly:** `scripts/sync.js` compares `realpathSync()` of both sides (required on macOS, where `/var/...` and `/private/var/...` are the same file); `normalize-memory.js`, `mcp-memory-server.js`, and `playwright-mcp-launcher.js` use plain `resolve()` on `process.argv[1]`. That is sufficient for repo-local paths but is a residual inconsistency worth remembering.
+- **No push** — one local commit on `feat/mat-integration`; no remote/PR action taken.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Bug-Fix Pipeline: `vec_memory` Orphan Leaks (Update, Chunk Prune, File Deletion)
+
+**Plan:** none — resolves the open follow-up recorded by the Coverage Pipeline above (commit `308c90f`)
+**Date:** 2026-10-25
+**Status:** ✅ SUCCESS — `npx vitest run` → **26 files / 753 tests / 0 failures**; `npx vitest run --coverage` → **exit 0** (97.02 / 95.28 / 96.74 / 97.25); `npm test` (Playwright) → **7 passed, 1 skipped, exit 0**. One local commit with `SKIP_BUMP=1` (version stays `1.46.0`); nothing pushed, tagged, or published.
+**Pipeline:** coder (test-first fix + 7 tests) → deployer (this entry + commit)
+
+> **Follow-up status:** the `vec_memory` orphan-row bug recorded in commit `308c90f` ("Open follow-up (latent bug, deliberately NOT fixed here)") is **RESOLVED** by this pipeline.
+
+### Summary
+
+`scripts/memory-index.js` leaked `vec_memory` rows. The leak was structural, not incidental: the per-chunk lookup selected **only `id, content_hash`**, so `existing.vec_rowid` was always `undefined` and the update path's `if (oldVecRowid != null)` delete branch was **dead code**. Re-indexing a changed chunk therefore inserted a new vector and orphaned the old one — invisible to `search` (the JOIN keys on `memory_chunks.vec_rowid`) but an unbounded storage leak that grew with every edit.
+
+Fixing it surfaced **three leaks, not one**. All are now closed and pinned by tests:
+
+| # | Leak | Before | After |
+|---|---|---|---|
+| 1 | **Re-embed on content change** | The lookup never selected `vec_rowid`, so the delete guard never fired; each edit orphaned the previous vector. | Lookup selects `mc.vec_rowid` + `v.rowid AS vec_exists` via `LEFT JOIN`; the update detaches (`vec_rowid = NULL`) and deletes the old vector in one transaction **before** re-embedding, then inserts + relinks in another. |
+| 2 | **Trailing chunks after a section is removed / indices shift** | `(source_file, chunk_index)` is the identity, so chunks past the new chunk count — and their vectors — were unreachable debris forever. | `indexFile` prunes `chunk_index >= chunks.length` together with their vectors (covers a removed section, shifted sections, or a file that became empty). |
+| 3 | **Deleted source files in `incrementalUpdate`** | **No deleted-file pruning existed at all.** Both `memory_chunks` and `vec_memory` rows survived, so `search` could still return a file that no longer existed. | `pruneMissingSources()` deletes chunks + vectors of vanished files; `pruneOrphanVectors()` sweeps any vector row no chunk references, healing indexes already corrupted by the old code. The incremental fast path now also requires every chunk's vector to resolve. |
+
+**Root cause (precise):** a `SELECT` that feeds a cross-table cleanup must project every column the cleanup condition reads. Here the condition read `existing.vec_rowid`, but the projection omitted it — a silent `undefined` turned cleanup into dead code that no existing test could observe, because the leaked rows are invisible to the normal query path by construction.
+
+### The invariant now enforced
+
+`vec0` virtual tables have **no foreign keys**; a vector row is reachable only through `memory_chunks.vec_rowid`. The correct invariant is therefore **one vector per *linked* chunk**, not `vec_memory == memory_chunks`:
+
+```
+COUNT(vec_memory) === COUNT(memory_chunks WHERE vec_rowid IS NOT NULL)
+                   === COUNT(DISTINCT vec_rowid)
+orphan vectors  = 0
+dangling links  = 0
+```
+
+`memory_chunks.vec_rowid IS NULL` is legal **only** where embedding legitimately failed, so each test states that count explicitly (`expectWithoutVector`) rather than hiding it.
+
+### Test-first evidence
+
+Seven tests were written **first** and failed with the predicted messages before any implementation change:
+
+| Predicted failure | Observed |
+|---|---|
+| Re-embedding must not grow `vec_memory` | `vec_memory` **3 vs 2** after one content edit |
+| Removed section must not leave a chunk behind | **2 chunks vs 1** after the file shrank |
+| Retry must re-embed a chunk whose vector is missing/dangling | `indexed 0 / skipped 2` |
+| Deleted file must stop being searchable | deleted-file chunks still present |
+| Legacy orphans must be reclaimed | orphan `vec_memory` row still there |
+| End-to-end invariant | **5 vectors vs 4 linked** |
+
+`scripts/memory-index.test.js` now has **68 tests** (was 61); the suite is **753** (was 746), across the same 26 files.
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `scripts/memory-index.js` | Lookup projects `vec_rowid` + `vec_exists` (`LEFT JOIN`); detach-then-delete-then-reinsert transactions on update; tail prune in `indexFile`; new `pruneMissingSources()` / `pruneOrphanVectors()` wired into `incrementalUpdate`; fast-path skip requires resolvable vectors. |
+| `scripts/memory-index.test.js` | `assertVectorIntegrity()` helper (vectors vs linked vs distinct + orphan + dangling counts) and 7 new tests in a `vec_memory integrity` describe block. |
+| `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md` | Implementing agent's records of the fix — reviewed for coherence, not duplicated. |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` | ✅ 26 files / **753 tests** / 0 failures, exit 0 |
+| `npx vitest run --coverage` | ✅ exit 0 — **97.02 / 95.28 / 96.74 / 97.25** (was 96.93 / 95.23 / 96.62 / 97.16) |
+| `scripts/memory-index.js` coverage | ✅ 98.83 statements / 96.33 branches / 96.87 functions / 99.56 lines |
+| `npm test` (Playwright) | ✅ 7 passed, 1 skipped, exit 0 |
+| `node scripts/validate-memory-schema.js` | ✅ exit 0 |
+| `git diff vitest.config.ts` | ✅ empty — no threshold, exclude, or config change |
+| Version | ✅ `1.46.0` before and after (`SKIP_BUMP=1`) |
+
+### Notes / Follow-up
+
+- **SQLite files do not shrink after `DELETE` without `VACUUM`.** Row growth stops immediately, but the `.db` file keeps its high-water mark until a `VACUUM`; file size is **not** the right leak metric — row counts are.
+- **`rebuildIndex` was never leaking** — it already wiped both tables. The leaking paths were update, tail prune, and deletion; an index audit must cover **removal**, not just update.
+- **No behavioural change to `search` semantics** — result shape, ordering, and filters are untouched; the fix removes rows that search could never legitimately return (orphans) and rows it should never have returned (deleted files).
+- **No push** — one local commit; no remote, tag, or publish action taken.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 (`vec_memory` orphans) appended to `.agents/instructions/learned-knowledge.instructions.md`.

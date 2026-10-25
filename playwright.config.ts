@@ -12,7 +12,10 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
-  
+
+  /* Only Playwright specs — Vitest suites in the same directory are excluded. */
+  testMatch: '**/*.spec.ts',
+
   /* Run tests in files in parallel */
   fullyParallel: true,
   

@@ -16,7 +16,7 @@ vi.mock('./utils.js', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...actual,
-    getConsumerRoot: () => mockConsumerRoot,
+    getConsumerRoot: vi.fn(() => mockConsumerRoot),
     getNodeVersion: vi.fn(() => 20),
     isCI: vi.fn(() => false),
   }
@@ -24,7 +24,7 @@ vi.mock('./utils.js', async (importOriginal) => {
 
 import { discover } from './discover.js'
 import { HOOK_MARKER, TEMPLATE_HOOKS } from './constants.js'
-import { getNodeVersion, isCI } from './utils.js'
+import { getConsumerRoot, getNodeVersion, isCI } from './utils.js'
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 
@@ -404,5 +404,127 @@ describe('discover()', () => {
     const ctx = await discover()
 
     expect(ctx.verbose).toBe(false)
+  })
+})
+
+// ── Defensive / early-return paths ─────────────────────────────────────────
+
+describe('discover() — defensive paths', () => {
+  beforeEach(() => {
+    mockConsumerRoot = ''
+    vi.mocked(getConsumerRoot).mockImplementation(() => mockConsumerRoot)
+    vi.mocked(getNodeVersion).mockReturnValue(20)
+    vi.mocked(isCI).mockReturnValue(false)
+  })
+
+  afterEach(() => {
+    vi.mocked(getConsumerRoot).mockImplementation(() => mockConsumerRoot)
+    cleanupTempDirs()
+  })
+
+  it('returns early with just node/CI info when the consumer root is empty', async () => {
+    mockConsumerRoot = ''
+
+    const ctx = await discover()
+
+    expect(ctx.consumerRoot).toBe('')
+    expect(ctx.hasGit).toBe(false)
+    expect(ctx.hasHuskyDir).toBe(false)
+    expect(ctx.hasPackageJson).toBe(false)
+    expect(ctx.consumerPackageJson).toBeNull()
+    expect(ctx.nodeVersion).toBe(20)
+    expect(ctx.isCI).toBe(false)
+    // Every hook keeps its safe default descriptor
+    for (const name of Object.keys(TEMPLATE_HOOKS)) {
+      expect(ctx.existingHooks[name]).toEqual({
+        exists: false,
+        content: null,
+        isManaged: false,
+      })
+    }
+  })
+
+  it('returns early when resolving the consumer root throws', async () => {
+    vi.mocked(getConsumerRoot).mockImplementation(() => {
+      throw new Error('INIT_CWD exploded')
+    })
+    vi.mocked(isCI).mockReturnValue(true)
+
+    const ctx = await discover()
+
+    expect(ctx.consumerRoot).toBe('')
+    expect(ctx.isCI).toBe(true)
+    expect(ctx.nodeVersion).toBe(20)
+    expect(ctx.hasGit).toBe(false)
+  })
+
+  it('falls back to isCI=false when CI detection throws', async () => {
+    const dir = createProject()
+    mockConsumerRoot = dir
+    vi.mocked(isCI).mockImplementation(() => {
+      throw new Error('env exploded')
+    })
+
+    const ctx = await discover()
+
+    expect(ctx.isCI).toBe(false)
+    expect(ctx.hasGit).toBe(true)
+  })
+
+  it('falls back to nodeVersion=0 when version detection throws', async () => {
+    const dir = createProject()
+    mockConsumerRoot = dir
+    vi.mocked(getNodeVersion).mockImplementation(() => {
+      throw new Error('version exploded')
+    })
+
+    const ctx = await discover()
+
+    expect(ctx.nodeVersion).toBe(0)
+  })
+
+  it('treats an unreadable hook path as default when readFile fails', async () => {
+    const dir = createProject({ huskyDir: true })
+    // A directory named like a hook makes safeReadFile throw EISDIR
+    mkdirSync(join(dir, '.husky', 'pre-commit'), { recursive: true })
+    mockConsumerRoot = dir
+
+    const ctx = await discover()
+
+    expect(ctx.existingHooks['pre-commit']).toEqual({
+      exists: false,
+      content: null,
+      isManaged: false,
+    })
+  })
+
+  it('classifies prepare as complex when the classifier itself throws', async () => {
+    const dir = createProject({
+      packageJson: { name: 'trim-test', scripts: { prepare: 'npm run build' } },
+    })
+    mockConsumerRoot = dir
+
+    const originalTrim = String.prototype.trim
+    let calls = 0
+    // discover() trims the prepare script twice before handing it to
+    // isPrepareSimple(); making the third call throw exercises the catch.
+    const spy = vi
+      .spyOn(String.prototype, 'trim')
+      .mockImplementation(function mockedTrim() {
+        calls += 1
+        if (calls === 3) throw new Error('trim exploded')
+        return originalTrim.call(this)
+      })
+
+    let ctx
+    try {
+      ctx = await discover()
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(calls).toBeGreaterThanOrEqual(3)
+    expect(ctx.existingPrepare).toBe('npm run build')
+    expect(ctx.prepareIsSimple).toBe(false)
   })
 })

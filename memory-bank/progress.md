@@ -1,9 +1,9 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-09-14"
+updated: "2026-10-25"
 
-tags: [architect, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up]
+tags: [architect, coder, implementer, deployer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, agents]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
 category: "progress"
 ---
@@ -18,6 +18,245 @@ category: "progress"
 - **KB Consolidation + Standardization — `plan/process-kb-consolidation-1.md` — STATUS: ✅ COMPLETED 2026-08-03 (ALL 10 TASKS / 4 PHASES DONE — T10 docs/status finalized in Phase 4)** — 10 tasks / 4 phases. Consolidate duplicate KB projects (re-index `@abarcenas/ai-workflow-template` from source → delete `ai-workflow-template`) and standardize projectId derivation (always use `package.json` `name`). **T1 ✅ 2026-08-03**: canonical scoped project re-indexed (16 chunks, +1). **T3 ✅ 2026-08-03**: `.opencode/agents/tracker.agent.md` "Check Knowledge" step gained projectId derivation guidance (line 30) — `knowledgebase_index` `projectId` SHALL be `require('./package.json').name` (scoped `@abarcenas/ai-workflow-template`), NOT orchestrator `projectName`; 14/14 existing spec-wiring tests pass. **T4 ✅ 2026-08-03**: `knowledge-retrieval.instructions.md` gained `### Canonical projectId` subsection (package.json name = single source of truth). **T5 ✅ 2026-08-03**: `knowledgebase.instructions.md` `knowledgebase_index` row `projectId` now "(required — from `package.json` `name` field)" + tool-detail sentence (scoped package name, single canonical project); **T7 (restart note) ✅ 2026-08-03** (dispatched with T5 — same FILE-03): added `### MCP Server Restart After Configuration Changes` subsection (after graceful-degradation section) + "Restart OpenCode after code changes" cross-reference in the `knowledgebase_search` tool description. **T6 (re-batched) ✅ 2026-08-03**: all 3 orchestrator `projectName` descriptions now read `(extracted from user request (prefer package.json "name" for the canonical scoped projectId))` — `orchestrator.agent.md:25` by the T6 agent; `feature-pipeline.agent.md:20` + `tdd-orchestrator.agent.md:20` by the "T7" coder instance (satisfies T9 spec test #4). **T8 ✅ 2026-08-03**: full Vitest suite `npx vitest run` → **14 files / 273 tests / 0 failures** (REQ-06 exact match); setup sub-suite `npx vitest run scripts/setup` → **6 files / 104 tests / 0 failures** — zero regressions from the additive doc changes (VALIDATION ONLY, no files edited). Remaining: T9 (spec test, Batch B parallel), T10 (memory bank + plan complete). No production code changes.
 
 ## What Works
+
+### 2026-10-25: Coder — `vec_memory` orphans fixed across update, prune and failure paths
+
+`scripts/memory-index.js` no longer leaks a `vec_memory` row every time an indexed chunk changes. The leak was structural: the per-chunk lookup selected only `id, content_hash`, so `existing.vec_rowid` was `undefined`, the "delete old vector" guard never fired, and the old row stayed behind unlinked. Search never showed it (the JOIN keys on `memory_chunks.vec_rowid`), which is why it survived until now.
+
+- **Update path:** the lookup selects `vec_rowid` and `v.rowid AS vec_exists` via a LEFT JOIN; a chunk is skipped only when its hash matches **and** its vector resolves. On change, the chunk is detached (`vec_rowid = NULL`) and the old vector deleted in one transaction **before** re-embedding. The replacement insert + link are also one transaction, so an embed failure cannot leave a dangling link.
+- **Null / dangling links are retried:** chunks whose vector never landed (`vec_rowid IS NULL`, legacy DBs, embed failure) or whose link points at a missing row are re-embedded on the next pass instead of being skipped forever. `incrementalUpdate`'s fast path now also requires every chunk's vector to resolve, so unchanged files heal too.
+- **Chunk removal:** `indexFile` prunes chunks (and their vectors) at `chunk_index >= chunks.length`, covering a removed section, a shifted section, or a file that became empty. Previously those trailing rows were unreachable debris.
+- **Deleted files / legacy orphans:** `rebuildIndex` already wipes both tables (no leak there), but `incrementalUpdate` never pruned vanished files at all — chunks **and** vectors survived. It now calls `pruneMissingSources()` and `pruneOrphanVectors()`, the latter reclaiming any vector row no chunk references (heals indexes already corrupted by the old code).
+- **Invariant:** `COUNT(vec_memory) === COUNT(memory_chunks WHERE vec_rowid IS NOT NULL) === COUNT(DISTINCT vec_rowid)`, `orphan vectors = 0`, `dangling links = 0`. `vec_rowid IS NULL` is legal **only** for embed failures, and each test states that count explicitly rather than hiding it.
+- **Evidence:** the seven new tests failed first exactly as predicted — `vec_memory` 3 vs 2 after one edit, 2 chunks vs 1 after a shrink, retry `indexed 0 / skipped 2`, deleted-file chunks still present, orphan row still there, invariant `5 vectors vs 4 linked`.
+- **Verification:** `npx vitest run` → 26 files / 753 tests / exit 0 (746 baseline + 7); `npx vitest run --coverage` → exit 0, **97.02 / 95.28 / 96.74 / 97.25** (`memory-index.js` 98.83 / 96.33 / 96.87 / 99.56); `npm test` → 7 passed / 1 skipped / exit 0. No new dependencies; `vitest.config.ts`, thresholds and excludes untouched; no `v8 ignore` / `istanbul ignore`; no commit.
+
+**Knowledgebase outcome (per protocol): `memory_search` returned "No results found. The index may be empty"; `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-25: Deployer — Repo-wide 90% coverage gate passes (50.6% → 96.93% statements, 331 → 746 tests)
+
+The `vitest.config.ts` coverage gate over `scripts/**` now passes honestly. Ten modules that were structurally untestable were fixed rather than excluded, and four source files were refactored for in-process testability:
+
+- **The 0% was structural, not missing tests.** `scripts/sync.js` had 15 passing tests and still read **0.00%**, because they all invoked the script with `spawnSync` and v8 cannot instrument a child process. Nine other modules had no sibling test at all (`bump-version`, `memory-cli`, `memory-index`, `normalize-memory`, `mcp-memory-server`, `mcp/playwright-mcp-launcher`, `setup/husky-init`, `setup/ui`, `setup/utils`).
+- **`sync.js`** extracted `parseArgs`/`createSyncContext`/`readManifest`/`writeManifest`/`isUntouched`/`isPathInside`/`resolvePruneEntry`/`isRegularFile`/`syncProject`/`runSync` plus an `isEntryPoint()` guard. All 15 pre-existing spawn tests pass **unmodified**; the one behavioural difference (missing `.agents` dir early-returns instead of `process.exit(0)`) is externally identical. 0% → 99.65%.
+- **`mcp-memory-server.js`** no longer opens a stdio transport on import — `listTools()`/`handleToolCall()`/`main()`/`bootstrap()` are extracted behind a direct-run guard.
+- **`mcp/playwright-mcp-launcher.js` — real bug fix.** Under `"type": "module"` the file's `require(...)` threw `ReferenceError: require is not defined`; it was dead on arrival and no test ever executed it, so nothing noticed. Converted to `import` + `buildArgs()`/`launch()` helpers.
+- **Tests:** 10 new files + 6 extended; memory tests use real temp SQLite DBs (`mkdtempSync`, `better-sqlite3` + `sqlite-vec` both load) and mock only `@xenova/transformers` (a ~90 MB model download otherwise).
+- **Results:** `npx vitest run --coverage` → exit 0, **96.93 / 95.23 / 96.62 / 97.16** (`scripts/` 94.97 / 93.76 / 93.16 / 95.24; `scripts/setup/` 99.88 / 97.80 / 100 / 100); `npx vitest run` → **26 files / 746 tests / 0 failures**; `npm test` → 7 passed / 1 skipped. **No threshold, exclude, or ignore-comment changes** — `git diff vitest.config.ts` is empty and a grep for `v8 ignore`/`istanbul ignore`/`c8 ignore` returns 0 hits.
+- **Shipped:** one local Conventional Commit with `SKIP_BUMP=1` (version stays `1.46.0`); nothing pushed, tagged, or published.
+- **Known issue (open, deliberately not fixed):** `scripts/memory-index.js` ~242–263 selects only `id, content_hash`, so `existing.vec_rowid` is `undefined`, the `if (oldVecRowid != null)` cleanup is dead code, and re-indexing a changed chunk orphans its old `vec_memory` row. Invisible to search (the JOIN keys on `memory_chunks.vec_rowid`) but a storage leak that grows per changed chunk.
+
+**Knowledgebase outcome (per protocol): `memory_search` returned "No results found. The index may be empty"; `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — `npm test` exits 0 (both residual Playwright failures resolved)
+
+The two failures left after the runner-collision fix are fixed, so `npm test` is green for the first time: **7 passed / 1 skipped, exit 0**.
+
+- **Stale layout assertions (`tests/ai-workflow.spec.ts`).** The template-structure test asserted `.github/instructions` and `.github/skills`, which have never existed here — `.github/` holds workflow YAML only (`git ls-tree HEAD .github` = `workflows/`), and the documented layout is `.agents/instructions` + `.agents/skills` with agent specs under `.opencode/agents`. Assertions now target the real paths, plus a new `.opencode/agents` check and a test-runner config check (`package.json`, `playwright.config.ts`, `vitest.config.ts`; no `tsconfig.json` — it does not exist). The skill-loading test was also repaired: it now reads directory entries and counts those containing `SKILL.md` (`>= 30`, currently 34) instead of the old flat `*.md` filter that could never match, and the old `if (existsSync(...))` guard no longer hides a missing skills directory.
+- **Inapplicable web example (`tests/example.spec.ts`).** The scaffold example called `page.goto('/')` while the config leaves `baseURL` undefined without `BASE_URL` and ships no `webServer`. It is now skipped at file scope via `test.skip(!process.env.BASE_URL, …)` with a comment explaining it is a consumer sample that asserts nothing about this repo. Proven conditional, not silenced: `BASE_URL=http://127.0.0.1:1 npx playwright test tests/example.spec.ts` actually runs it and fails on navigation.
+- **Unchanged and still green:** `npx vitest run` → 16 files / 331 tests; `npx playwright test --list` → 8 tests in 2 files with no Vitest `.test.js` collected. No new dependencies, `vitest.config.ts` untouched, nothing deleted, no file moved, no commit.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — `npm test` no longer crashes (Playwright/Vitest collision fixed)
+
+`npx playwright test` runs again instead of dying on `TypeError: Cannot redefine property: Symbol($$jest-matchers-object)`. The cause was configuration, not test content: `playwright.config.ts` had `testDir: './tests'` and no `testMatch`, so Playwright's default glob also picked up the three Vitest suites (`tests/spec-*.test.js`) living in the same directory, and `@vitest/expect` collided with Playwright over the jest-matchers symbol. One added line — `testMatch: '**/*.spec.ts'` — restricts collection to the two real specs. `--list` now shows **8 tests in 2 files** with no `.test.js`; `npx vitest run` is unchanged at **331/331**; no test file was renamed or moved and `vitest.config.ts` was not touched. Chromium had to be installed (`npx playwright install chromium`) because the binary was absent. Two pre-existing, unrelated failures remain and are **not** caused by this fix: the stale `.github/instructions` / `.github/skills` assertions in `tests/ai-workflow.spec.ts:17` (the repo uses `.agents/*`), and the `tests/example.spec.ts` placeholder that calls `page.goto('/')` with no `baseURL`/`webServer` (environment limitation). Both are recorded as follow-up items rather than silently patched. Note for CI: both workflows run only `npm run test:unit`, so Playwright breakage is invisible to CI.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — Scratch-consumer packaging verified end-to-end; sync warning defect fixed (T17, plan/feature-matt-skills-integration-v1.md)
+
+The published package and the setup CLI now provably deliver the Matt-skills feature to a real consumer — and the one thing that did not work (a swallowed warning) was fixed rather than explained away.
+
+- **Packaging (npm tarball):** `abarcenas-ai-workflow-template-1.46.0.tgz`, 156 files. Contains all 9 Matt skill files, `.agents/config/{domain.md,README.md}`, `.opencode/agents/{scope,plan}.agent.md`, `skills-lock.json`, `AGENTS.md`, `opencode.mcp.example.json`; contains **no `docs/`**, no tests, no plans (CON-09). No `files` array change was required.
+- **Consumer sync:** seeded `package.json` + locally edited `AGENTS.md`; after the run the consumer has 34 skills, 11 in-scope agent specs (+ `plan.agent.md`), `orchestrator/`, both config files, `scope.agent.md`, and a synced `skills-lock.json`. `plan.agent.md` is byte-identical to the packaged copy (CON-02).
+- **Defect found and fixed (CON-04):** `scripts/setup/sync-phase.js` piped child stderr into a string and never printed it, so a consumer whose `AGENTS.md` was skipped saw only "Sync phase completed" — no warning. Now each stderr chunk is also written to `process.stderr`; a fresh-consumer re-run prints `[ai-workflow-template] Skipped locally modified root file: AGENTS.md` and leaves the file untouched. `npx vitest run scripts/setup/` → 142/142 pass.
+- **Prune:** `sync.js --prune` reports `Pruned 0 stale file(s); skipped 0 locally modified.`; a 125-file sha256 snapshot is identical before and after.
+- **Skills phase / network:** upstream fetch **succeeded** (`Fetched 1 pinned skill(s) from upstream` after drift was injected into `grilling/SKILL.md`); the local-edit warning names the file and the pinned hash is restored, 9/9 files matching `skills-lock.json`. A fresh consumer legitimately reports `5 already up to date` because sync has just copied the vendored copies. Fallback path verified separately with a throwing `fetchImpl`: exactly one notice, shipped copies restored, no throw.
+- **Cleanup:** tarball and scratch consumer deleted; `git status` has no `.tgz` and no scratch artifacts. ASSUMPTION-01 (no `.claude/` layer) confirmed.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — Full suite green, coverage shortfall confirmed pre-existing (T16, plan/feature-matt-skills-integration-v1.md)
+
+The whole repository now passes its test suite with the Matt-skills feature in place, and the coverage question is settled with numbers rather than assumption.
+
+- **`npx vitest run` → exit 0:** `Test Files 16 passed (16)`, `Tests 331 passed (331)`, 1.11s, 0 failures, 0 skipped/todo. The `git`/`fatal: not a git repository` lines in the output are the long-standing stderr noise from tests that spawn git in temp directories — not failures.
+- **`node scripts/validate-memory-schema.js` → exit 0** (frontmatter schema intact after these records).
+- **Coverage (`npm run test:unit:coverage`, informational, exits 1 on the global gate):** `scripts/setup/skills-phase.js` = **99.42% stmts / 97.34% branch / 100% funcs / 100% lines** (uncovered lines 179, 193, 320). Global = **50.69% stmts / 50.51% branch / 51.1% funcs / 51.18% lines** against a 90% threshold.
+- **Pre-existing, not a regression:** the repo-wide 90% gate was already failing at HEAD at **48.05% statements** before any of this feature work; CI (`pr-test.yml`) runs `test:unit`, not coverage. The dominant 0% files are unrelated to this feature (`scripts/sync.js` — its tests spawn a child process v8 cannot instrument — plus the `memory-*`/`normalize-memory`/`bump-version`/`husky-init`/`mcp-launcher` modules).
+- **No cheat:** `vitest.config.ts` thresholds and exclusions untouched; no assertion skipped, `.todo`ed, or deleted; no production source file needed repair for any failing test. The only edits in this task are documentation (plan row + memory bank).
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — `scope.agent.md` joins the knowledge-retrieval parity assertion (T15, plan/feature-matt-skills-integration-v1.md)
+
+The spec-wiring suite is green again: `tests/spec-knowledge-retrieval.test.js` now covers **11** pipeline agents (was 10) because the `scope` agent created in T4 is part of the checked set instead of falling outside it.
+
+- **Root cause:** T4 added `.opencode/agents/scope.agent.md`, but `EXPECTED_PIPELINE_AGENTS` still enumerated the pre-scope 10, so the readdir-derived list (11) and the constant disagreed — `expected [ 'architect.agent.md', …(10) ] to have a length of 10 but got 11`.
+- **Fix (tests only):** `'scope.agent.md'` inserted between `'reviewer.agent.md'` and `'tracker.agent.md'` (the array is alphabetical), and TEST-06's length assertion raised `10` → `11` with its comment updated to match.
+- **ALT-01 preserved:** `plan.agent.md` is still filtered out by name and still asserted absent, so the exclusion precedent is verified rather than weakened. `scope.agent.md` needed no wording change — T5's `## Check Knowledge` section already carries `knowledge-retrieval`, `knowledgebase_search`, and `learned-knowledge`, so TEST-01/TEST-02 pass unchanged.
+- **Sweep:** `scripts/` holds no agent-count assertions; the only other hardcoded agent spec list was `CHECK_PATHS` in `tests/spec-kb-consolidation.test.js` (TEST-05 negative `projectId` scan), which omitted `scope.agent.md` — now added, keeping that scan's coverage complete for every agent spec.
+- **Verification:** spec-knowledge-retrieval **6/6**, spec-orchestrator-parity **8/8**, spec-kb-consolidation **12/12** (run because `CHECK_PATHS` changed). Full suite deliberately deferred to T16.
+
+### 2026-10-24: Coder — `AGENTS.md` gains `## Agent skills` + Plan Mode demotion (T12, plan/feature-matt-skills-integration-v1.md)
+
+`AGENTS.md` now documents the five vendored scoping skills and the `scope` agent, and no longer presents `plan.agent.md` as the universal entry point (+42 / −3 lines, one file — `plan.agent.md` itself untouched, CON-02).
+
+- **New `## Agent skills` section** (between `## Available Prompts` and `## Available Agent Workflows`): `### Skills` is a 5-row table of name, `.agents/skills/<name>/SKILL.md` path and a "use it when" grounded in each vendored SKILL.md frontmatter, plus the note that `grill-me` / `grill-with-docs` are `disable-model-invocation: true` routers so agents call `grilling` (and `domain-modeling`) directly.
+- **`### Scope agent`** describes only real capability: front door for underspecified work, grilling rounds against one draft file, numbered questions with recommended answers, terminal `docs/spike-<feature>.md` (the input `researcher.agent.md` already expects), and no command-execution permission — empirical questions become `prototype needed: <question>` handed to `coder` (logic) or `designer` (UI).
+- **`### Domain docs`** points at `.agents/config/domain.md`: single-context layout (`GLOSSARY.md` at root, ADRs in `docs/adr/`), silent proceed and lazy creation when the file or docs are absent.
+- **Plan Mode rewritten, heading and 9-step sequence preserved:** scope is the default front door for underspecified work; `plan.agent.md` is an *optional deep-planning mode*, explicitly "not deleted and not deprecated — demoted in the default flow only". `## Core Workflow` step 2 also names `scope` first.
+- **`## Available Skills` reconciled (Option 1, extended):** the list held 26 of 34 installed skills, so the 5 new entries were added along with the 3 pre-existing omissions, and the intro now reads "All 34 skills installed in `.agents/skills/` are listed below" + a pointer to `### Skills` for detail. One inventory, no competing list, no stale count.
+- **Verification:** bullet names diffed against `ls .agents/skills` → identical 34/34; diff reviewed hunk-by-hunk; no line over the 400-char markdown limit (one paragraph soft-wrapped, 418 → under); no stale skill-count string remains; no inbound anchor references to the unchanged Plan Mode heading. No test run in this task — T16 owns the full suite, and no test asserts `AGENTS.md` content (`tests/ai-workflow.spec.ts:12` only checks existence).
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — README skill count + scope agent, version settled to 1.46.0 (T13/FILE-18, plan/feature-matt-skills-integration-v1.md)
+
+The published README now advertises what the package actually ships: **34** skills (was 29) and the `scope` agent. The version was settled once, by hand, so the husky hook cannot re-bump it per commit.
+
+- **Skill count (REQ-18):** both claims updated — `## What This Package Does` (line 55) and the `.agents/` tree in `## Core Structure` (line 87). Count verified against the directory (`ls .agents/skills/` → 34); `grep -n "29" README.md` exits 1 (no stale count left).
+- **Scope agent:** added to the agent table as the first sub-agent row (after the Orchestrator master row, mirroring the orchestrator registry) and to `### How to Use` as a conditional, always-first pipeline step — grilling rounds against a draft → `docs/spike-<feature>.md` → `researcher`/`implementer`. The bullet states it is always interactive (auto-confirm cannot skip it) and has **no command-execution permission**, with prototypes handed to `coder` (logic) or `designer` (UI).
+- **New capabilities:** one `## Featured Skills` bullet names the 5 scoping skills and `.agents/config/domain.md` as the `GLOSSARY.md` / `docs/adr/` locator. Detail stays in `AGENTS.md` (T12's file, untouched here).
+- **Version (FILE-18, CON-06):** `package.json` `1.45.0` → `1.46.0`, **minor only**, edited directly rather than via the bump script (DEP-03). `package-lock.json` recorded a stale root version (`1.34.0`) in two places — both synced to `1.46.0`.
+- **Verification:** `node -e "console.log(require('./package.json').version)"` → `1.46.0`; lock root + `packages[""].version` → `1.46.0`; `git diff --stat` → `README.md` +5/−2, `package.json` 1 line, `package-lock.json` 2 lines.
+- **Scope discipline:** no `AGENTS.md`, instruction-file, agent-spec, or code/test edits; no dependency changes; README structure unchanged beyond the four targeted edits.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — Scope-first ordering in the memory-bank "Plan Mode" section (T14, plan/feature-matt-skills-integration-v1.md)
+
+The memory-bank instructions now describe the scope-first ordering instead of implying that planning is the first step. `.agents/instructions/memory-bank.instructions.md` `### Plan Mode` opens with a four-step sequence, placed ahead of the existing mermaid flow (now introduced by "The flow below applies once the scope is settled:"):
+
+1. **Scope first** — `scope` (`.opencode/agents/scope.agent.md`) is the front door for underspecified requests: grilling rounds against a single draft file, then a terminal spike at `docs/spike-<feature>.md`.
+2. **Hand the spike to research** — the spike is the input `researcher.agent.md` expects; pass its path as the required spike argument.
+3. **Continue the pipeline** — to `implementer`, `architect`, or `coder`, following the spike's recommended next step.
+4. **Deep planning is optional** — `plan.agent.md` stays available for already-scoped work; demoted in the default flow, **not removed or deprecated** (REQ-17, D-04, CON-02).
+
+- **Artifact implication:** a following paragraph requires the spike document to be recorded in the memory bank (task entry and/or `activeContext.md`) **before** implementation planning begins, so settled and deferred decisions survive a reset.
+- **Style preserved:** prose + numbered list at the existing heading level; no new headings, no restructuring, no changes to the surrounding workflow sections.
+- **Verification:** `git diff` = a single hunk in the one target file (+11 lines); `node scripts/validate-memory-schema.js` → exit 0.
+- **Scope discipline:** `AGENTS.md` (T12), `README.md` (T13), `.opencode/agents/plan.agent.md`, and all code/test files untouched.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-24: Coder — Opt-in `--prune` for sync + TEST-02…05 (T10/T11, plan/feature-matt-skills-integration-v1.md)
+
+`scripts/sync.js` now has a **delete path**, but only when `--prune` is explicitly passed. Default behaviour is byte-for-byte unchanged: nothing is ever deleted unless the caller opts in.
+
+- **Resolution:** manifest keys map to the same package/consumer roots as the copy passes — `.agents/**` (bare keys), `__opencode__/`, `__scripts__/`, `__root__/`. Scaffold-only keys (`__memory-bank__/`, `__agents-instructions__/`) and unknown `__` namespaces are never prunable; paths are containment-checked (`isPathInside`) and the copy passes' exclusion sets (`openCodeExcluded`, `excludedRelativePaths`) are honoured.
+- **Four-case rule:** package still ships → never prune (CON-05/D-10); package absent + hash matches manifest → delete file + drop entry; package absent + hash differs (or no recorded hash) → keep file **and** entry, warn by path; consumer file already missing → drop the stale entry only.
+- **Snapshot guard:** only manifest keys present **before** the run are considered, so files copied/scaffolded in the same run (notably `opencode.json` from `opencode.mcp.example.json`, which also counts as a live package source for prune) can never be self-pruned.
+- **Files only:** `statSync(...).isFile()` gate; emptied directories are logged and left in place. `--dry-run` prints `Would prune:` lines and changes nothing (manifest write already gated off).
+- **Tests:** `scripts/sync.test.js` 7 → **15 tests** using temp fake-package fixtures (`spawnSync` + `INIT_CWD` pattern preserved; `sync.js` still executed at import time — no exported-main refactor). Covers TEST-02 (default leaves tree + entries), TEST-03 (unmodified+absent removed, entry dropped, empty dir reported), TEST-04 (modified survives, warning, entry retained), TEST-05 (shipped file never removed), dry-run, missing-consumer cleanup, scaffold-only entries survive, and `__scripts__`/`__root__` channel resolution.
+- **Verification:** `npx vitest run scripts/sync.test.js` → **15/15 passed**; `npx vitest run scripts/setup/ tests/spec-orchestrator-parity.test.js` → **8 files / 150 tests / 0 failures**.
+- **Coverage limitation:** `npx vitest run --coverage scripts/sync.test.js` reports **0% for every script** because tests spawn `sync.js` as a child process and the v8 provider does not instrument child processes. Pre-existing for all `scripts/` suites; no number chase.
+- **Still pending (T17, verification phase):** manual `npm pack` scratch-consumer run confirming `--prune` is a no-op when nothing is stale.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — Pinned-skills setup phase + gating (T8/T9, plan/feature-matt-skills-integration-v1.md)
+
+The setup pipeline now refreshes pinned upstream skills as **Phase 6** (`scripts/setup/skills-phase.js` + `scripts/setup/index.js`), between Sync and Knowledgebase. `bin/setup.js` remains a 26-line shim — the plan's "add to `bin/setup.js`" wording was satisfied by the module it delegates to.
+
+- **Install path:** `runSkillsPhase()` reads only lock entries that carry `ref` + `files` (the 8 caveman entries are ignored, not migrated), fetches each recorded file from `https://raw.githubusercontent.com/<source>/<ref>/<upstreamPath>` with global `fetch` + a 5 s `AbortSignal.timeout`, verifies SHA-256 per file, and writes to `<consumerRoot>/.agents/skills/<name>/`. No new dependencies.
+- **No partial skills:** upstream files are buffered and verified before any write; fallback files are all read before the first write. A missing/unreadable shipped file aborts that skill's write (warnings only), so a half-populated skill directory cannot be produced.
+- **Local edits:** any destination file that differs from the pin is reported by full path and then overwritten — on both the upstream and fallback paths (`REQ-14`, `D-09`). No prompt.
+- **Fallback:** network, timeout, non-200, unreadable body and hash-mismatch failures never throw; the phase copies from `<packageRoot>/.agents/skills/<name>/` (package root from `import.meta.url`), prints exactly one notice, and reports upstream-vs-fallback counts.
+- **Gating (`T9`):** the phase is inside the existing `if (!flags.skipSync)` block; no pinned entries is a zero-fetch/zero-write no-op; each case prints one status line. Phase errors degrade to a `warn` summary row instead of aborting setup.
+- **Dry run / idempotency:** `--dry-run` performs no fetch and no write (but reports would-be local-edit overwrites); a skill whose files already match the lock hash is skipped with zero fetches.
+- **CI:** no setup-level CI guard exists by design — CI only suppresses hook installation (`hooks.js` / `husky-init.js`); `pr-test.yml` runs unit tests only. The skills phase follows the sync-phase convention and runs in CI. No new guard was invented.
+- **Verification:** `npx vitest run scripts/setup/` → **7 files / 142 tests / 0 failures**; live fetch of `mattpocock/skills@v1.3.1` succeeded for all 5 skills (9/9 hashes); offline fallback + idempotency + local-edit overwrite smoke-tested. `skills-phase.js` coverage **99.42 / 97.34 / 100 / 100** (stmts/branch/funcs/lines).
+
+**Known issues (pre-existing / other tasks):** the `scripts/**` global coverage threshold (90%) was already failing at HEAD (48.05% → now 52.43%); `tests/spec-knowledge-retrieval.test.js` TEST-06 fails until **T15** adds `scope.agent.md` to the expected pipeline-agent list (322 passed / 1 failed full suite).
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — `skills-lock.json` upstream pin data for the 5 vendored skills (T7, plan/feature-matt-skills-integration-v1.md)
+
+Added upstream pin data for the 5 Matt Pocock skills to `skills-lock.json` (REQ-12, CON-07, D-08). **Additions only — 90 insertions, 0 deletions;** the 8 caveman entries are byte-identical.
+
+- **Schema:** each new entry preserves the caveman field shape (`source`, `sourceType`, `skillPath`, `computedHash`) and adds `ref: "v1.3.1"` (commit `24fe0ef7737efae15c87225755e9f6f5965e4888`) plus an ordered `files` array of `{ path, sha256, upstreamPath }`.
+- **`upstreamPath` (beyond the written plan):** upstream's categories are asymmetric (`grilling`/`grill-me` → `skills/productivity/`; the other three → `skills/engineering/`), so T8 cannot derive a pinned raw URL from the skill name alone. Each entry's `skillPath` mirrors the upstream `SKILL.md` path for the same reason.
+- **`computedHash`** = SHA-256 of that skill's `SKILL.md` (equals its `files[].sha256`), keeping structural parity with the caveman entries.
+- **Entries added (alphabetical):** `domain-modeling` (3 files), `grill-me` (1), `grill-with-docs` (1), `grilling` (1), `prototype` (3) — 9 file records total. File order follows the vendoring table (`SKILL.md` first, then sub-files).
+- **Verification:** all 9 hashes re-computed with `shasum -a 256` *before* writing → 9/9 matched the authoritative table (no STOP). After writing, a Node script re-hashed every `files[].sha256` and `computedHash` against disk → **14/14 MATCH**. `node -e "JSON.parse(...)"` → valid JSON; 2-space indent preserved.
+- **Coverage:** 5 of 13 entries pinned; the 21 pre-existing non-caveman skills stay unpinned by design (partial coverage per plan).
+- **Scope discipline:** only `skills-lock.json` (+ plan T7 row + memory-bank). `bin/setup.js` (T8) and `--skip-sync` handling (T9) untouched; no vendored file or caveman entry changed.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — Orchestrator `scope` wiring (T6, plan/feature-matt-skills-integration-v1.md)
+
+Wired the `scope` agent into `.opencode/agents/orchestrator/orchestrator.agent.md` (REQ-08/09/10/11), additive to all existing orchestration content.
+
+- **Sub-Agent Registry:** new first row — `scope` → `scope.agent.md`, `subagent_type: scope`, tools `read, search, edit, skill, question` (**no `execute`** — it never builds or runs anything), deployed for underspecified requests, vague/unmeasurable success criteria, unknown boundaries, or an explicit request to narrow scope.
+- **Step 2:** added the `Foggy feature: scope ⏸️ → researcher ⏸️ → implementer ⏸️ → architect → coder → unit-tester → e2e-tester → reviewer → deployer` pattern and a note that `scope` can be inserted at the front of any pattern.
+- **Step 2a (new):** insertion rule (REQ-09) with explicit do/don't conditions; always-interactive rule (REQ-10, D-06) — `autoConfirm: true` cannot skip scope, the orchestrator never answers for the user, and the `confirmationGates` default is now `["researcher", "implementer", "scope"]`; round-trip protocol (`draftPath` in; `Status: QUESTIONS (round N)` loops with the same draft; `Status: TERMINATED` hands `docs/spike-<feature>.md` to `researcher`, or `implementer` when no research is needed); prototype hand-off (REQ-11) — `prototype needed:` with branch **logic** → `coder`, **UI** → `designer`.
+- **Tests/constraints:** `tests/spec-orchestrator-parity.test.js` untouched and green — **8/8 passed**; occurrence counts unchanged (`knowledge-retrieval.instructions.md` = 2, `knowledgebase_knowledgebase_search` = 2).
+- **Scope discipline:** only `orchestrator.agent.md` edited (+ plan T6 row + memory-bank). T5's concurrent `scope.agent.md` edits, all test files, `AGENTS.md`, and `README.md` were not touched.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — `scope.agent.md` knowledge-retrieval protocol (T5, plan/feature-matt-skills-integration-v1.md)
+
+Added the 3-layer knowledge-retrieval protocol to `.opencode/agents/scope.agent.md` (REQ-16), so the scope agent carries the same knowledge wiring as the other 10 pipeline agents. Parity was established by diffing the existing specs (`researcher` 0a, `implementer` step 3, `coder` step 3, `reviewer` step 0, `unit-tester` step 1) and the shared 69-line protocol file, not by inventing new wording.
+
+- **New `## Check Knowledge` section** (lines 261–274), placed after `## Hard Boundaries` and before `## Question-Batch Sizing` / `## Return Format`, using the dominant sibling label and the same "mandatory to attempt, graceful to fail" contract. It instructs the agent to run retrieval first in every round, before Round Protocol step 1.
+- **Layer 1 — memory bank:** `memory_bank_memory_search` for semantic context plus `memory_bank_memory_get` for full-file reads; queries target prior scoping decisions, deferred questions, and spikes for the feature.
+- **Layer 2 — learned knowledge:** skim `.agents/instructions/learned-knowledge.instructions.md` for scoping, grilling, spike-authoring, and agent-tuning notes.
+- **Layer 3 — knowledgebase:** call `knowledgebase_knowledgebase_search` with a scoping-relevant query; success reports "knowledgebase_search accessed — N results returned", failure reports "knowledgebase_search skipped (PG vector unavailable)" and never blocks, fails, retries, or stalls the round.
+- **Disclosure:** the outcome is reported on a new `Knowledge:` line in the round's return summary (the only change to `## Return Format`, purely additive). Retrieval informs the frontier but never answers a question; findings are recorded under `## Evidence`.
+
+**Verification (direct file comparison only — T6 was editing the orchestrator concurrently, so the suite was not run):** `knowledge-retrieval`, `knowledgebase_search`, and `learned-knowledge` all present in the spec (satisfying TEST-01 and TEST-02 by grep); `grep -n "execute"` → 0 hits; frontmatter and all 283 pre-existing lines preserved (file now 299 lines). **Hand-off to T15:** TEST-06 still asserts exactly 10 pipeline agents, so it fails now that `scope.agent.md` is picked up by the directory scan (11) until T15 adds it to `EXPECTED_PIPELINE_AGENTS` — not fixable inside `scope.agent.md`, and the test file was not edited.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — `scope.agent.md` scoping front door (T4, plan/feature-matt-skills-integration-v1.md)
+
+Created `.opencode/agents/scope.agent.md` (283 lines), the front door for underspecified feature requests. It is invoked by the orchestrator, narrows the problem through grilling rounds, and terminates with a spike document that `researcher` accepts without translation (D-07).
+
+- **Permissions:** `read`, `search`, `edit`, `skill`, `question`, plus `"memory-bank/*"` / `"knowledgebase/*"` per sibling-agent convention. **No command-execution permission and no `agent` permission.** YAML parsed successfully; `grep -n "execute"` returns 0 hits.
+- **Round protocol:** read the draft → ground in `.agents/config/domain.md` (+ relevant `GLOSSARY.md` / `docs/adr/`) → load `grilling` directly (never the model-disabled `grill-me` / `grill-with-docs` wrappers) → resolve facts with `read`/`search` instead of delegating → emit the frontier as 3–7 numbered questions with recommended answers, or terminate → persist → stop. Each question is phrased so "yes" accepts the recommendation.
+- **Interactivity is non-negotiable:** the agent never answers its own questions, never treats silence as consent, and refuses `autoConfirm: true` / "assume defaults" (D-06).
+- **State model:** one draft file (`docs/spike-<feature>.draft.md`) holds everything — problem statement, evidence, append-only round-marked answers, the current frontier, deferrals, and prototype requests. The orchestrator carries only the path between rounds (REQ-06).
+- **Terminal artifact:** `docs/spike-<feature>.md` with frontmatter and six sections (problem statement; decisions settled with rationale and round; open/deferred questions; decision/recommendation naming the next step; external resources; decision trail + status history). Existing spikes are updated, never overwritten; the draft is marked `SUPERSEDED` in place (REQ-07).
+- **Prototype hand-off:** emits exactly `prototype needed: <question>`, then names the branch — **logic** → `coder`, **UI** → `designer` — and keeps asking independent questions in the same round. It never builds, runs, or tests code (REQ-11, D-05).
+- **Hard boundaries:** writes only the draft, the spike, and settled `GLOSSARY.md` / `docs/adr/` entries via `domain-modeling`. No source/test/config edits, no commands, no delegation.
+
+**Verification:** YAML frontmatter parsed (7 permission keys, no forbidden key); `grep -n "execute"` → 0 hits. Targeted `npx vitest run tests/spec-knowledge-retrieval.test.js` → **3 passed / 3 failed**, all expected: TEST-01/02 wait on the T5 knowledge-retrieval section, and TEST-06 still expects exactly 10 pipeline agents until T15 updates parity. **Scope discipline:** only the one agent file created; orchestrator (T6), tests (T15), docs (T12/T13) untouched. Plan T4 and sibling T2 marked ✅ 2026-10-23.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — `.agents/config/README.md` discovery pointer (T3, plan/feature-matt-skills-integration-v1.md)
+
+Created the consumer-facing discovery pointer that survives an edited `AGENTS.md`. Root-file sync skips locally modified files, so a consumer who customized `AGENTS.md` never receives the new `## Agent skills` section; `.agents/**` syncs unconditionally, so this file (43 lines) is the guaranteed path to the new capabilities (CON-04, REQ-03).
+
+- **Skill table** — the 5 vendored scoping skills, one row each, with a one-sentence "use it when": `grilling` (stress-test a vague request through numbered question rounds), `grill-me` (stateless wrapper, no repo context), `grill-with-docs` (interview plus glossary/ADR capture), `domain-modeling` (record or reconcile terminology and architectural decisions), `prototype` (throwaway code for logic or UI questions). Descriptions verified against the actual vendored `SKILL.md` frontmatter, including the `disable-model-invocation` wrappers.
+- **Scope agent pointer** — `.opencode/agents/scope.agent.md` described as the front door for underspecified feature requests: round protocol against a draft, terminal `docs/spike-<feature>.md`, `prototype needed: <question>` handoff to `coder`/`designer`, and the rule that it never builds or runs code.
+- **Domain-doc pointer** — `.agents/config/domain.md` for `GLOSSARY.md` (repo root) and `docs/adr/` locations, with the silent-proceed rule when absent.
+
+**Scope discipline:** only `.agents/config/README.md` created (plus this record and the plan's T3 row). `domain.md` (T2), `scope.agent.md` (T4/T5), and `AGENTS.md` / `README.md` (T12/T13) were not touched.
+
+**Knowledgebase outcome (per protocol): `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).**
+
+### 2026-10-23: Coder — Matt Pocock skills vendored, byte-identical (T1, plan/feature-matt-skills-integration-v1.md)
+
+Vendored the 5 scoping skills from `mattpocock/skills@v1.3.1` (commit `24fe0ef7737efae15c87225755e9f6f5965e4888`, tag verified via `git describe --tags --exact-match`) into `.agents/skills/` in the flat layout required by CON-12:
+
+| Skill | Files vendored | Upstream source path |
+|---|---|---|
+| `grilling` | SKILL.md | `skills/productivity/grilling/` |
+| `grill-me` | SKILL.md | `skills/productivity/grill-me/` |
+| `grill-with-docs` | SKILL.md | `skills/engineering/grill-with-docs/` |
+| `domain-modeling` | SKILL.md, GLOSSARY-FORMAT.md, ADR-FORMAT.md | `skills/engineering/domain-modeling/` |
+| `prototype` | SKILL.md, LOGIC.md, UI.md | `skills/engineering/prototype/` |
+
+- **Byte-identity proven:** `cmp -s` + `shasum -a 256` on all 9 source/destination pairs → 9/9 identical. CON-07 satisfied; no reformatting, frontmatter edits, or line-ending changes.
+- **Upstream `agents/openai.yaml` excluded** from every skill dir (task constraint: "do not copy extra files"). This is a deliberate deviation from a naive whole-directory copy and is recorded so T7's lock file lists exactly the 9 vendored files.
+- **Scope discipline:** no `.agents/config/` created (T2/T3), `skills-lock.json` untouched (T7), zero existing skill directories touched, no commit. Temp clone deleted after verification.
+- **Discovered dependency for T7:** file sizes range 157 B (`grill-me/SKILL.md`) to 6913 B (`prototype/UI.md`); the upstream category split is asymmetric (`grilling`/`grill-me` are *productivity*, the other three are *engineering*), so a lock generator must not derive paths from a single category prefix.
 
 ### 2026-09-14: Tracker — Pipeline 11 Final Polish (doc nits + version settle to 1.45.0 + `SKIP_BUMP` opt-out) fully documented
 
@@ -2400,3 +2639,40 @@ Completed all tracker documentation for the stale-path + hardcoded-CAVEMAN-model
 - **Appended Pipeline 11 entry to `docs/tracker-log.md`**, appended learned-knowledge Session 2026-09-14, updated `docs/TRACKER-INDEX.md`; memory bank + PG knowledgebase re-indexed under canonical `@abarcenas/ai-workflow-template`.
 - **Follow-ups (non-blocking)**: document `CAVEMAN_MODEL` in the caveman skill docs (`.agents/skills/compress/SKILL.md`, `.agents/skills/caveman-compress/SKILL.md`, `.agents/skills/caveman-compress/README.md`, `.agents/skills/caveman-compress/SECURITY.md`); add `__pycache__/` + `*.pyc` to `.gitignore`.
 - **No test-suite change** — docs + Python helper scripts only; Vitest suite (15 files / 285 tests) unaffected. `knowledgebase_search` executed — 5 results returned.
+
+### 2026-10-24: Tracker — Matt Pocock Skills Integration + Scope Agent Documented (Feature Pipeline 12)
+
+Completed all tracker documentation for `plan/feature-matt-skills-integration-v1.md` (17/17 tasks ✅).
+
+- **Pipeline:** implementer (bootstrap + read-only pre-flight) → coder ∥(T1,T2,T3) → coder(T4) → coder ∥(T5,T6) → coder(T7) → coder(T8+T9) → coder(T10+T11) → coder ∥(T12,T13,T14) → coder(T15) → coder ∥(T16,T17) → tracker (this entry)
+- **What now works:** five Matt Pocock scoping skills vendored byte-identically at `v1.3.1` (9 files); `.agents/config/{domain.md,README.md}` discovery layer; new `.opencode/agents/scope.agent.md` (299 lines, no `execute`) wired into `orchestrator.agent.md` with a registry row, "Foggy feature" pattern, and a Step 2a insertion/interactivity contract that `autoConfirm` cannot skip; `skills-lock.json` pin data (`ref` + per-file `sha256`/`upstreamPath`/`skillPath`); new `scripts/setup/skills-phase.js` upstream-fetch phase with shipped-copy fallback; opt-in `scripts/sync.js --prune`.
+- **Skills:** 29 → **34** (both `README.md` references); `AGENTS.md` gained `## Agent skills` and a scope-first Plan Mode; `plan.agent.md` untouched (byte-identical through the packaging check).
+- **Version:** `package.json` 1.45.0 → **1.46.0** (minor, CON-06); `package-lock.json` root corrected from stale 1.34.0.
+- **Verification:** `npx vitest run` → **16 files / 331 tests / 0 failures**; `scripts/sync.test.js` 15/15; `scripts/setup/` 142/142; `spec-orchestrator-parity` 8/8; `spec-knowledge-retrieval` 6/6; T17 end-to-end packaging matrix all PASS.
+- **Known issues (honest accounting):** repo-wide coverage threshold already failed at HEAD (48.05% → now ~50.69%; not a regression; CI gates on `test:unit`); `scripts/sync.js` reads 0% because v8 cannot instrument `spawnSync` children (structural); `--dry-run` prints "Would fetch 5 pinned skill(s)" but a first real install fetches nothing (cosmetic — the sync phase copies vendored files first, so hashes already match the pin).
+- **Deviations:** T8/T9 landed in `scripts/setup/` (not the 26-line `bin/setup.js` shim); new `scripts/setup/skills-phase.test.js` (FILE-19) required by the coverage gate; `scope.agent.md` added to `tests/spec-kb-consolidation.test.js` `CHECK_PATHS`; **DEF-01** fixed — `scripts/setup/sync-phase.js` swallowed sync stderr in non-verbose mode, hiding the CON-04 "Skipped locally modified root file" warning.
+- **Outstanding:** nothing is committed (branch `feat/mat-integration`; the plan file is untracked); the plan frontmatter still reads `status: Planned` despite 17/17 ✅; `docs/.orchestrator-log.md` has no T16/T17 rows or `FINAL STATUS` block.
+- `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); learned-knowledge re-indexing skipped for the same reason. Appended `docs/tracker-log.md` (Feature Pipeline 12), learned-knowledge Session 2026-10-24, and `docs/TRACKER-INDEX.md` rows.
+
+### 2026-10-25: Deployer — CI gate for Playwright + single commit for the Matt-skills feature
+
+**What now works:** CI runs the Playwright suite, not just Vitest. Previously both workflows ran only `npm run test:unit`, so the `TypeError: Cannot redefine property: Symbol($$jest-matchers-object)` crash (unset `testMatch`) was invisible to CI — a total `npm test` failure could ship.
+
+**Files modified:**
+
+| File | Change |
+|---|---|
+| `.github/workflows/pr-test.yml` | Existing `test` job unchanged; new parallel `playwright` job: checkout → setup-node 22 + npm cache → `npm ci` → `npx playwright install --with-deps chromium` → `npm test` → `actions/upload-artifact@v4` of `playwright-report/` on `if: failure()` |
+| `.github/workflows/npm-publish.yml` | Browser install + `npm test` inserted before `npm publish`, so a release is gated on Playwright; `npm run test:unit` kept |
+| `.gitignore` | `playwright-report/` + `test-results/` (generated artifacts) |
+
+**Key decisions:**
+- **Parallel job, not extra steps in `test`** — the unit suite stays fast/independent; a Playwright browser failure does not mask Vitest results.
+- **`CI: true`** — the config already keys `forbidOnly`, `retries: 2`, `workers: 1` off `process.env.CI`.
+- **`HEADLESS: 'true'`** — `playwright.config.ts` defaults to headed and GitHub-hosted runners have no display. Set via env rather than editing the config (which was out of scope and untouched).
+- **`BASE_URL` deliberately unset** — `tests/example.spec.ts` self-skips, as intended for this repo (no web app).
+- **`SKIP_BUMP=1` for the commit** — the version was already settled at 1.46.0; the pre-commit hook would otherwise bump per commit.
+
+**Verification:** both workflows parse (Ruby `YAML.load_file`; no js-yaml/PyYAML on this machine) — `pr-test.yml` jobs `test,playwright`; `npm-publish.yml` step order `Run unit tests` → `Install Playwright browsers` → `Run Playwright tests` → `Publish to npm`. No `package.json` dependency added. Post-commit: version still `1.46.0`, `npm test` exit 0 (7 passed / 1 skipped), `npx vitest run` 16 files / 331 tests passing, `git status` clean.
+
+**Notes / follow-ups:** (1) repo-wide coverage threshold remains pre-existing-failing (~50% vs 90%) — unchanged, and CI still does not run coverage; (2) the `pr-test.yml` workflow `name:` still reads "PR Unit Tests" although it now also runs Playwright — left unchanged to avoid disturbing the existing check identity; (3) nothing is pushed/tagged/published — local commit only, and this entry supersedes the "nothing is committed" note in the 2026-10-24 entry above. `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); memory-bank search executed.

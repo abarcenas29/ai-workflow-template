@@ -20,6 +20,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { search, rebuildIndex, incrementalUpdate, getFile, getStats } from './memory-index.js';
 
 const VALID_FILES = [
@@ -43,88 +45,92 @@ const server = new Server(
 
 // ── List tools ───────────────────────────────────────────────────────
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    {
-      name: 'memory_search',
-      description:
-        'Semantic search across the project memory bank (activeContext, systemPatterns, progress, decisions, tasks). ' +
-        'Returns ranked chunks with source file and similarity score. ' +
-        'Use this instead of reading all memory files to save tokens.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'Natural language query about project context, decisions, or status',
+export async function listTools() {
+  return {
+    tools: [
+      {
+        name: 'memory_search',
+        description:
+          'Semantic search across the project memory bank (activeContext, systemPatterns, progress, decisions, tasks). ' +
+          'Returns ranked chunks with source file and similarity score. ' +
+          'Use this instead of reading all memory files to save tokens.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Natural language query about project context, decisions, or status',
+            },
+            topK: {
+              type: 'number',
+              default: 5,
+              description: 'Number of results to return (1-20)',
+            },
+            sourceFile: {
+              type: 'string',
+              description: 'Optional: filter to a specific memory file (e.g., "activeContext", "systemPatterns")',
+            },
           },
-          topK: {
-            type: 'number',
-            default: 5,
-            description: 'Number of results to return (1-20)',
-          },
-          sourceFile: {
-            type: 'string',
-            description: 'Optional: filter to a specific memory file (e.g., "activeContext", "systemPatterns")',
-          },
+          required: ['query'],
         },
-        required: ['query'],
       },
-    },
-    {
-      name: 'memory_rebuild',
-      description:
-        'Full rebuild of the memory vector index from memory-bank/*.md and docs/*.md files. ' +
-        'Re-indexes every file regardless of change. ' +
-        'Use memory_update instead for faster incremental sync (only changed files). ' +
-        'The index is disposable — rebuilding is safe.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-      },
-    },
-    {
-      name: 'memory_update',
-      description:
-        'Incremental update — only re-indexes files whose content changed (SHA-256 content hash). ' +
-        'Much faster than memory_rebuild for daily use (~2 seconds vs minutes). ' +
-        'Run this after completing tasks, writing to memory-bank, or after git pull.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-      },
-    },
-    {
-      name: 'memory_get',
-      description:
-        'Read the full content of a specific memory file by name. ' +
-        'Use when you need the complete file, not just search snippets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          file: {
-            type: 'string',
-            description: 'File ID without extension. One of: ' + VALID_FILES.join(', '),
-            enum: VALID_FILES,
-          },
+      {
+        name: 'memory_rebuild',
+        description:
+          'Full rebuild of the memory vector index from memory-bank/*.md and docs/*.md files. ' +
+          'Re-indexes every file regardless of change. ' +
+          'Use memory_update instead for faster incremental sync (only changed files). ' +
+          'The index is disposable — rebuilding is safe.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-        required: ['file'],
       },
-    },
-    {
-      name: 'memory_stats',
-      description: 'Get statistics about the memory index (vector count, file count, database size).',
-      inputSchema: {
-        type: 'object',
-        properties: {},
+      {
+        name: 'memory_update',
+        description:
+          'Incremental update — only re-indexes files whose content changed (SHA-256 content hash). ' +
+          'Much faster than memory_rebuild for daily use (~2 seconds vs minutes). ' +
+          'Run this after completing tasks, writing to memory-bank, or after git pull.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
       },
-    },
-  ],
-}));
+      {
+        name: 'memory_get',
+        description:
+          'Read the full content of a specific memory file by name. ' +
+          'Use when you need the complete file, not just search snippets.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            file: {
+              type: 'string',
+              description: 'File ID without extension. One of: ' + VALID_FILES.join(', '),
+              enum: VALID_FILES,
+            },
+          },
+          required: ['file'],
+        },
+      },
+      {
+        name: 'memory_stats',
+        description: 'Get statistics about the memory index (vector count, file count, database size).',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    ],
+  };
+}
+
+server.setRequestHandler(ListToolsRequestSchema, listTools);
 
 // ── Handle tool calls ────────────────────────────────────────────────
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+export async function handleToolCall(request) {
   const { name, arguments: args } = request.params;
 
   try {
@@ -227,17 +233,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       isError: true,
     };
   }
-});
+}
+
+server.setRequestHandler(CallToolRequestSchema, handleToolCall);
 
 // ── Start server ─────────────────────────────────────────────────────
 
-async function main() {
+export async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('[memory-bank-mcp] Server started via stdio transport');
 }
 
-main().catch((err) => {
-  console.error('[memory-bank-mcp] Fatal error:', err);
-  process.exit(1);
-});
+export function bootstrap() {
+  return main().catch((err) => {
+    console.error('[memory-bank-mcp] Fatal error:', err);
+    process.exit(1);
+  });
+}
+
+const isDirectRun =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  bootstrap();
+}

@@ -11,9 +11,10 @@
 //   6. Phase 3 — Prepare (configure consumer package.json prepare script)
 //   7. Phase 4 — Husky Init (generate .husky/_/ shims, unless --skip-hooks)
 //   8. Phase 5 — Sync (spawn sync.js + normalize-memory.js, unless --skip-sync)
-//   9. Phase 6 — Knowledgebase (register with centralized knowledgebase, unless --skip-knowledgebase)
-//  10. Render summary table via ui.summary()
-//  11. Determine exit code and return it
+//   9. Phase 6 — Skills (refresh pinned skills from upstream, gated with --skip-sync)
+//  10. Phase 7 — Knowledgebase (register with centralized knowledgebase, unless --skip-knowledgebase)
+//  11. Render summary table via ui.summary()
+//  12. Determine exit code and return it
 //
 // Each phase is wrapped in try/catch. Only discovery failure is fatal.
 // All other phase errors are logged and the pipeline continues (REQ-04).
@@ -39,6 +40,7 @@ import { installHooks } from './hooks.js'
 import { handlePrepare } from './prepare.js'
 import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
+import { runSkillsPhase } from './skills-phase.js'
 import { registerKnowledgebase } from './knowledgebase.js'
 
 // ── Package version (lazy, cached) ───────────────────────────────────────────
@@ -343,10 +345,38 @@ export async function main(argv) {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
-  // Phase 6 — Knowledgebase (unless --skip-knowledgebase)
+  // Phase 6 — Skills (pinned upstream refresh; gated with the sync phase)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (!flags.skipSync) {
+    section('Phase 6: Skills')
+
+    try {
+      const skillsResult = await runSkillsPhase({ ...context, flags })
+      context.skillsResult = skillsResult
+      phases.push({
+        phase: 'skills',
+        status: actionStatus(skillsResult.action),
+        message: skillsResult.message,
+      })
+    } catch (err) {
+      // Never fatal — the pinned skills shipped in the package are already
+      // on disk, so a phase error only degrades to a warning.
+      stepWarn(`Skills phase skipped: ${err.message}`)
+      phases.push({
+        phase: 'skills',
+        status: 'warn',
+        message: `Skipped \u2014 ${err.message}`,
+      })
+    }
+  } else if (!flags.quiet) {
+    stepWarn('Skills: phase skipped (--skip-sync)')
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Phase 7 — Knowledgebase (unless --skip-knowledgebase)
   // ═════════════════════════════════════════════════════════════════════════
   if (!flags.skipKnowledgebase) {
-    section('Phase 6: Knowledgebase')
+    section('Phase 7: Knowledgebase')
 
     try {
       const kbResult = await registerKnowledgebase(context)
