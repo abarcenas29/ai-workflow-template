@@ -1,6 +1,6 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "1.46.0",
+  "version": "1.47.0",
   "description": "A comprehensive template repository for AI-assisted development workflows using GitHub Copilot. This template provides a structured approach to leveraging AI assistance through pre-configured skills, prompts, agents, and coding standards.",
   "main": "index.js",
   "bin": {
@@ -38,6 +38,7 @@
     "url": "https://github.com/abarcenas29/ai-workflow-template/issues"
   },
   "homepage": "https://github.com/abarcenas29/ai-workflow-template#readme",
+  "//": "Never add AGENTS.project.md or opencode.json to files: both are scaffolded create-if-absent at the consumer root and must not ship from the package.",
   "files": [
     "bin/",
     ".agents/",
@@ -49,6 +50,7 @@
     ".husky/",
     "memory-bank/.vocabulary.json",
     "AGENTS.md",
+    ".prettierignore",
     "opencode.mcp.example.json",
     "skills-lock.json",
     ".husky/post-merge",

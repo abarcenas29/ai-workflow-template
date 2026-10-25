@@ -1,0 +1,26 @@
+# Project-owned. Sync never overwrites this file.
+# Keep formatters away from files managed by @abarcenas/ai-workflow-template:
+# a formatting pass over managed files makes every future sync skip them.
+
+# Managed agent configuration
+.agents/
+.opencode/agents/
+.opencode/commands/
+
+# Managed root files
+AGENTS.md
+AGENTS.project.md
+skills-lock.json
+
+# Managed scripts (scripts/sync.js scriptsToSync)
+scripts/memory-cli.js
+scripts/memory-index.js
+scripts/bump-version.js
+scripts/validate-memory-schema.js
+scripts/vocab-sync.js
+scripts/mcp-memory-server.js
+scripts/mcp/playwright-mcp-launcher.js
+scripts/knowledgebase-cli.js
+scripts/knowledgebase-index.js
+scripts/mcp-knowledgebase-server.js
+scripts/knowledgebase-init.sql

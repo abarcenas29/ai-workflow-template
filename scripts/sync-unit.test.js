@@ -9,6 +9,7 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { spawnSync } from 'child_process'
 import { createHash } from 'crypto'
 import {
   chmodSync,
@@ -21,7 +22,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'fs'
-import { dirname, join } from 'path'
+import { dirname, join, resolve } from 'path'
 import { tmpdir } from 'os'
 import { fileURLToPath } from 'url'
 
@@ -35,12 +36,21 @@ import {
   isRegularFile,
   isUntouched,
   memoryBankStubs,
+  missingPrettierIgnorePatterns,
   parseArgs,
+  parsePrettierIgnoreRules,
+  projectOwnedPaths,
+  projectOwnedStubs,
   readManifest,
+  requiredPrettierIgnorePatterns,
   resolvePruneEntry,
+  rootFiles,
   runSync,
+  scriptsToSync,
   writeManifest,
 } from './sync.js'
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const tempDirs = []
 
@@ -588,22 +598,32 @@ describe('resolvePruneEntry', () => {
     )
   })
 
-  it('keeps opencode.json alive via the example fallback source', () => {
+  it('never resolves project-owned files as prune entries', () => {
     const ctx = context()
 
-    const entry = resolvePruneEntry('__root__/opencode.json', ctx)
-
-    expect(entry.packagePaths).toEqual([
-      join(ctx.packageRoot, 'opencode.json'),
-      join(ctx.packageRoot, 'opencode.mcp.example.json'),
-    ])
+    for (const key of [
+      '__root__/AGENTS.project.md',
+      '__root__/opencode.json',
+      '__root__/.prettierignore',
+      '__root__/.agents-sync-ignore',
+      'instructions/learned-knowledge.instructions.md',
+      '__project__/AGENTS.project.md',
+      '__project__/.prettierignore',
+    ]) {
+      expect(resolvePruneEntry(key, ctx), key).toBeNull()
+    }
   })
 
   it.each([
     ['unknown internal namespace', '__future__/thing.md'],
+    ['scaffold-only project namespace', '__project__/AGENTS.project.md'],
     ['scaffold-only memory-bank namespace', '__memory-bank__/projectbrief.md'],
     ['scaffold-only instructions namespace', '__agents-instructions__/x.md'],
     ['excluded learned-knowledge file', 'instructions/learned-knowledge.instructions.md'],
+    ['project-owned root AGENTS.project.md', '__root__/AGENTS.project.md'],
+    ['project-owned root opencode.json', '__root__/opencode.json'],
+    ['project-owned root .prettierignore', '__root__/.prettierignore'],
+    ['project-owned root .agents-sync-ignore', '__root__/.agents-sync-ignore'],
     ['excluded opencode node_modules path', '__opencode__/node_modules/dep.js'],
     ['excluded opencode package.json', '__opencode__/package.json'],
     ['empty opencode key', '__opencode__/'],
@@ -664,7 +684,7 @@ describe('runSync copy passes', () => {
     expect(result.exitCode).toBe(0)
     expect(result.copied).toBe(9)
     expect(result.added).toBe(9)
-    expect(result.scaffolded).toBe(8)
+    expect(result.scaffolded).toBe(10)
     expect(result.skipped).toBe(0)
     expect(errorSpy).not.toHaveBeenCalled()
 
@@ -757,12 +777,21 @@ describe('runSync copy passes', () => {
     expect(manifest.files['__root__/AGENTS.md']).toBe(
       sha256(ROOT_FILE_CONTENTS['AGENTS.md']),
     )
-    expect(manifest.files['__root__/opencode.json']).toBe(sha256(MCP_EXAMPLE))
+    expect(manifest.files['__project__/opencode.json']).toBe(sha256(MCP_EXAMPLE))
+    expect(manifest.files['__root__/opencode.json']).toBeUndefined()
     expect(
       manifest.files['__agents-instructions__/learned-knowledge.instructions.md'],
     ).toBe(
       sha256(agentInstructionsStubs['learned-knowledge.instructions.md']),
     )
+    expect(manifest.files['__project__/AGENTS.project.md']).toBe(
+      sha256(projectOwnedStubs['AGENTS.project.md']),
+    )
+    expect(manifest.files['__project__/.prettierignore']).toBe(
+      sha256(projectOwnedStubs['.prettierignore']),
+    )
+    expect(manifest.files['__root__/AGENTS.project.md']).toBeUndefined()
+    expect(manifest.files['__root__/.prettierignore']).toBeUndefined()
     for (const fileName of Object.keys(memoryBankStubs)) {
       expect(manifest.files[`__memory-bank__/${fileName}`]).toBeDefined()
     }
@@ -866,7 +895,7 @@ describe('runSync copy passes', () => {
     expect(outputOf(logSpy)).toContain('Mode: force.')
   })
 
-  it('prefers a package-shipped opencode.json over the example file', () => {
+  it('never adopts a package-shipped opencode.json: the example scaffold wins', () => {
     const packageRoot = createPackage({
       agents: {},
       root: { 'opencode.json': '{ "mcp": { "from": "package" } }\n' },
@@ -876,8 +905,10 @@ describe('runSync copy passes', () => {
 
     runSync({ packageRoot, consumerRoot })
 
+    // opencode.json is project-owned, so the root copy pass skips it and the
+    // create-if-absent scaffold from the shipped example is what lands.
     expect(readFileSync(join(consumerRoot, 'opencode.json'), 'utf8')).toBe(
-      '{ "mcp": { "from": "package" } }\n',
+      MCP_EXAMPLE,
     )
   })
 
@@ -979,6 +1010,514 @@ describe('runSync copy passes', () => {
         'utf8',
       ),
     ).toBe('deep\n')
+  })
+})
+
+// ── Project-owned files ──────────────────────────────────────────────────────
+
+const PROJECT_OWNED_LOCAL_CONTENT = {
+  'AGENTS.project.md': '# Local project rules\n\n- never overwrite this',
+  'opencode.json': '{ "local": true }\n',
+  '.prettierignore': 'my-build/\n',
+  '.agents-sync-ignore': '# local ignore rules\n',
+  '.agents/instructions/learned-knowledge.instructions.md': '# Local knowledge\n',
+}
+
+const LEGACY_PRETTIER_IGNORE =
+  '/dist\n/coverage\n/.nx/cache\n/.nx/workspace-data\n'
+
+const PRETTIER_IGNORE_WARNING =
+  '[ai-workflow-template] Existing .prettierignore does not protect managed files; merge the patterns from node_modules/@abarcenas/ai-workflow-template/.prettierignore'
+
+const COMPLETE_PRETTIER_IGNORE = [
+  '.agents/',
+  '.opencode/',
+  'scripts/',
+  'AGENTS.md',
+  'skills-lock.json',
+].join('\n')
+
+// B1 coverage matrix: parent-directory coverage, negation holes, strict
+// descendants, comments, inline literals, normalisation and ignore-all forms.
+const PRETTIER_IGNORE_MATRIX = [
+  ['exact shipped content', projectOwnedStubs['.prettierignore'], false],
+  ['parent directories cover descendants', COMPLETE_PRETTIER_IGNORE, false],
+  [
+    'shipped without AGENTS.md',
+    projectOwnedStubs['.prettierignore'].replace('\nAGENTS.md\n', '\n'),
+    true,
+  ],
+  [
+    'negation hole below .agents/',
+    [
+      '.agents/',
+      '!.agents/skills/**',
+      '.opencode/',
+      'scripts/',
+      'AGENTS.md',
+      'skills-lock.json',
+    ].join('\n'),
+    true,
+  ],
+  [
+    'later positive restores a negated subtree',
+    [
+      '.agents/',
+      '!.agents/skills/**',
+      '.agents/skills/',
+      '.opencode/',
+      'scripts/',
+      'AGENTS.md',
+      'skills-lock.json',
+    ].join('\n'),
+    false,
+  ],
+  [
+    'AGENTS.md/** does not cover the file',
+    COMPLETE_PRETTIER_IGNORE.replace('AGENTS.md', 'AGENTS.md/**'),
+    true,
+  ],
+  [
+    '.agents without a trailing slash',
+    COMPLETE_PRETTIER_IGNORE.replace('.agents/', '.agents'),
+    false,
+  ],
+  [
+    'commented-out .agents/',
+    COMPLETE_PRETTIER_IGNORE.replace('.agents/', '# .agents/'),
+    true,
+  ],
+  [
+    'leading **/ wildcard',
+    COMPLETE_PRETTIER_IGNORE.replace('AGENTS.md', '**/AGENTS.md'),
+    false,
+  ],
+  [
+    'inline hash is literal',
+    COMPLETE_PRETTIER_IGNORE.replace('AGENTS.md', 'AGENTS.md # managed'),
+    true,
+  ],
+  [
+    'CRLF and trailing spaces',
+    COMPLETE_PRETTIER_IGNORE.split('\n')
+      .map((line) => `${line}  `)
+      .join('\r\n'),
+    false,
+  ],
+  [
+    'leading-slash patterns (including /dist)',
+    ['/dist', '/.agents/', '/.opencode/', '/scripts/', '/AGENTS.md', '/skills-lock.json'].join(
+      '\n',
+    ),
+    false,
+  ],
+  ['* ignores everything', '*', false],
+  ['** ignores everything', '**', false],
+]
+
+function createProjectOwnedFixture() {
+  // The package ships competing copies at the project-owned paths. None may win.
+  const packageRoot = createPackage({
+    agents: {
+      'instructions/learned-knowledge.instructions.md': '# Package knowledge\n',
+    },
+    root: {
+      'AGENTS.project.md': '# Package rules\n',
+      'opencode.json': '{ "package": true }\n',
+      '.prettierignore': 'package-build/\n',
+      '.agents-sync-ignore': '# package ignore\n',
+    },
+    mcpExample: MCP_EXAMPLE,
+  })
+  const consumerRoot = createTempDir()
+
+  for (const [relativePath, contents] of Object.entries(
+    PROJECT_OWNED_LOCAL_CONTENT,
+  )) {
+    writeFixtureFile(consumerRoot, relativePath, contents)
+  }
+
+  return { packageRoot, consumerRoot }
+}
+
+describe('project-owned files', () => {
+  it('scaffolds AGENTS.project.md and .prettierignore create-if-absent', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+
+    const result = runSync({ packageRoot, consumerRoot })
+
+    expect(result.scaffolded).toBe(10)
+    expect(readFileSync(join(consumerRoot, 'AGENTS.project.md'), 'utf8')).toBe(
+      projectOwnedStubs['AGENTS.project.md'],
+    )
+    expect(readFileSync(join(consumerRoot, '.prettierignore'), 'utf8')).toBe(
+      projectOwnedStubs['.prettierignore'],
+    )
+
+    const manifest = readConsumerManifest(consumerRoot)
+    expect(manifest.files['__project__/AGENTS.project.md']).toBe(
+      sha256(projectOwnedStubs['AGENTS.project.md']),
+    )
+    expect(manifest.files['__project__/.prettierignore']).toBe(
+      sha256(projectOwnedStubs['.prettierignore']),
+    )
+    // Ownership is reported through __project__, never through a sync channel.
+    expect(manifest.files['__root__/AGENTS.project.md']).toBeUndefined()
+    expect(manifest.files['__root__/.prettierignore']).toBeUndefined()
+  })
+
+  it('does not overwrite existing project-owned files, even with --force', () => {
+    const { packageRoot, consumerRoot } = createProjectOwnedFixture()
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--force'],
+      env: {},
+    })
+
+    expect(result.skipped).toBe(0)
+    for (const [relativePath, contents] of Object.entries(
+      PROJECT_OWNED_LOCAL_CONTENT,
+    )) {
+      expect(
+        readFileSync(join(consumerRoot, relativePath), 'utf8'),
+        relativePath,
+      ).toBe(contents)
+    }
+
+    const manifest = readConsumerManifest(consumerRoot)
+    for (const key of [
+      '__root__/AGENTS.project.md',
+      '__root__/opencode.json',
+      '__root__/.prettierignore',
+      '__root__/.agents-sync-ignore',
+      '__project__/AGENTS.project.md',
+      '__project__/.prettierignore',
+      '__project__/opencode.json',
+    ]) {
+      expect(manifest.files[key], key).toBeUndefined()
+    }
+  })
+
+  it('preserves a local AGENTS.project.md edit byte-for-byte across a sync', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+
+    runSync({ packageRoot, consumerRoot })
+    const localEdit = '# Project rules\n\n- local edit, no trailing newline'
+    writeFixtureFile(consumerRoot, 'AGENTS.project.md', localEdit)
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--force'],
+      env: {},
+    })
+
+    expect(result.skipped).toBe(0)
+    expect(readFileSync(join(consumerRoot, 'AGENTS.project.md'), 'utf8')).toBe(
+      localEdit,
+    )
+  })
+
+  it('never clobbers an existing consumer .prettierignore', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+    const localIgnore = 'coverage/\nplaywright-report/\n'
+    writeFixtureFile(consumerRoot, '.prettierignore', localIgnore)
+
+    runSync({ packageRoot, consumerRoot })
+    runSync({ packageRoot, consumerRoot, argv: ['--force'], env: {} })
+
+    expect(readFileSync(join(consumerRoot, '.prettierignore'), 'utf8')).toBe(
+      localIgnore,
+    )
+    expect(
+      readConsumerManifest(consumerRoot).files['__project__/.prettierignore'],
+    ).toBeUndefined()
+  })
+
+  it('warns once when an existing .prettierignore does not protect managed files', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+    writeFixtureFile(consumerRoot, '.prettierignore', LEGACY_PRETTIER_IGNORE)
+
+    const result = runSync({ packageRoot, consumerRoot })
+
+    expect(result.scaffolded).toBe(9)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(outputOf(warnSpy)).toBe(PRETTIER_IGNORE_WARNING)
+    // Warning only: the consumer file is byte-for-byte unchanged.
+    expect(readFileSync(join(consumerRoot, '.prettierignore'), 'utf8')).toBe(
+      LEGACY_PRETTIER_IGNORE,
+    )
+  })
+
+  it.skipIf(process.getuid?.() === 0)(
+    'skips the advisory when .prettierignore cannot be read',
+    () => {
+      const { packageRoot, consumerRoot } = createCopyFixture()
+      const ignorePath = writeFixtureFile(
+        consumerRoot,
+        '.prettierignore',
+        LEGACY_PRETTIER_IGNORE,
+      )
+      chmodSync(ignorePath, 0o000)
+
+      try {
+        const result = runSync({ packageRoot, consumerRoot })
+
+        expect(result.exitCode).toBe(0)
+        expect(warnSpy).not.toHaveBeenCalled()
+        expect(existsSync(join(consumerRoot, '.agents-sync-manifest.json'))).toBe(
+          true,
+        )
+      } finally {
+        chmodSync(ignorePath, 0o644)
+      }
+    },
+  )
+
+  it('does not warn when an existing .prettierignore covers managed files', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+    writeFixtureFile(
+      consumerRoot,
+      '.prettierignore',
+      projectOwnedStubs['.prettierignore'],
+    )
+
+    runSync({ packageRoot, consumerRoot })
+
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not warn when .prettierignore was just scaffolded', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+
+    runSync({ packageRoot, consumerRoot })
+
+    expect(warnSpy).not.toHaveBeenCalled()
+    expect(readFileSync(join(consumerRoot, '.prettierignore'), 'utf8')).toBe(
+      projectOwnedStubs['.prettierignore'],
+    )
+  })
+
+  // Pins current behaviour: scaffolding is not gated by --dry-run. Update this
+  // test when scaffolding becomes dry-run aware.
+  it('documents that --dry-run still scaffolds missing project-owned files', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--dry-run'],
+      env: {},
+    })
+
+    expect(result.scaffolded).toBe(10)
+    expect(readFileSync(join(consumerRoot, 'AGENTS.project.md'), 'utf8')).toBe(
+      projectOwnedStubs['AGENTS.project.md'],
+    )
+    expect(readFileSync(join(consumerRoot, '.prettierignore'), 'utf8')).toBe(
+      projectOwnedStubs['.prettierignore'],
+    )
+    expect(existsSync(join(consumerRoot, '.agents-sync-manifest.json'))).toBe(
+      false,
+    )
+  })
+
+  it('does not refresh __project__ hashes after a consumer edit', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+
+    runSync({ packageRoot, consumerRoot })
+    const originalHash = readConsumerManifest(consumerRoot).files[
+      '__project__/AGENTS.project.md'
+    ]
+    writeFixtureFile(consumerRoot, 'AGENTS.project.md', '# edited locally\n')
+
+    runSync({ packageRoot, consumerRoot, argv: ['--force'], env: {} })
+
+    expect(
+      readConsumerManifest(consumerRoot).files['__project__/AGENTS.project.md'],
+    ).toBe(originalHash)
+  })
+
+  it('does not throw when a project-owned scaffold path is a directory', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+    mkdirSync(join(consumerRoot, 'AGENTS.project.md'), { recursive: true })
+    mkdirSync(join(consumerRoot, '.prettierignore'), { recursive: true })
+
+    const result = runSync({ packageRoot, consumerRoot })
+
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(join(consumerRoot, '.agents-sync-manifest.json'))).toBe(
+      true,
+    )
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('never prunes any project-owned path, including with --prune', () => {
+    const packageRoot = createPackage({ agents: {} })
+    const consumerRoot = createTempDir()
+
+    for (const [relativePath, contents] of Object.entries(
+      PROJECT_OWNED_LOCAL_CONTENT,
+    )) {
+      writeFixtureFile(consumerRoot, relativePath, contents)
+    }
+
+    const trackedKeys = {
+      '__root__/AGENTS.project.md': 'AGENTS.project.md',
+      '__root__/opencode.json': 'opencode.json',
+      '__root__/.prettierignore': '.prettierignore',
+      '__root__/.agents-sync-ignore': '.agents-sync-ignore',
+      'instructions/learned-knowledge.instructions.md':
+        '.agents/instructions/learned-knowledge.instructions.md',
+      '__project__/AGENTS.project.md': 'AGENTS.project.md',
+      '__project__/.prettierignore': '.prettierignore',
+    }
+    writeManifest(
+      join(consumerRoot, '.agents-sync-manifest.json'),
+      {
+        version: 1,
+        files: Object.fromEntries(
+          Object.entries(trackedKeys).map(([key, relativePath]) => [
+            key,
+            sha256(PROJECT_OWNED_LOCAL_CONTENT[relativePath]),
+          ]),
+        ),
+      },
+    )
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--prune', '--force'],
+      env: {},
+    })
+
+    expect(result.pruned).toBe(0)
+    for (const [relativePath, contents] of Object.entries(
+      PROJECT_OWNED_LOCAL_CONTENT,
+    )) {
+      expect(
+        readFileSync(join(consumerRoot, relativePath), 'utf8'),
+        relativePath,
+      ).toBe(contents)
+    }
+
+    const manifest = readConsumerManifest(consumerRoot)
+    for (const key of Object.keys(trackedKeys)) {
+      expect(manifest.files, key).toHaveProperty([key])
+    }
+  })
+
+  it('keeps the shipped .prettierignore covering every managed root file and script', () => {
+    const shipped = readFileSync(join(repoRoot, '.prettierignore'), 'utf8')
+
+    expect(shipped).toBe(projectOwnedStubs['.prettierignore'])
+    expect(missingPrettierIgnorePatterns(shipped)).toEqual([])
+
+    for (const rootFile of rootFiles) {
+      expect(
+        missingPrettierIgnorePatterns(shipped, [rootFile]),
+        rootFile,
+      ).toEqual([])
+    }
+    for (const script of scriptsToSync) {
+      const pattern = `scripts/${script}`
+      expect(
+        missingPrettierIgnorePatterns(shipped, [pattern]),
+        pattern,
+      ).toEqual([])
+    }
+  })
+
+  it.each(PRETTIER_IGNORE_MATRIX)(
+    'detects coverage correctly: %s',
+    (_label, contents, expectWarning) => {
+      const { packageRoot, consumerRoot } = createCopyFixture()
+      writeFixtureFile(consumerRoot, '.prettierignore', contents)
+
+      runSync({ packageRoot, consumerRoot })
+
+      expect(
+        missingPrettierIgnorePatterns(contents).length > 0,
+        'detector result',
+      ).toBe(expectWarning)
+      if (expectWarning) {
+        expect(warnSpy).toHaveBeenCalledTimes(1)
+        expect(outputOf(warnSpy)).toBe(PRETTIER_IGNORE_WARNING)
+      } else {
+        expect(warnSpy).not.toHaveBeenCalled()
+      }
+    },
+  )
+
+  it('parses gitignore comments, negations and escaped markers', () => {
+    expect(
+      parsePrettierIgnoreRules(
+        '# comment\n!AGENTS.md\n\\#literal\n\\!literal\nAGENTS.md # inline\n',
+      ),
+    ).toEqual([
+      { negated: true, pattern: 'AGENTS.md' },
+      { negated: false, pattern: '#literal' },
+      { negated: false, pattern: '!literal' },
+      { negated: false, pattern: 'AGENTS.md # inline' },
+    ])
+  })
+
+  it('ships an opencode example that loads AGENTS.project.md', () => {
+    const example = JSON.parse(
+      readFileSync(join(repoRoot, 'opencode.mcp.example.json'), 'utf8'),
+    )
+
+    expect(example.instructions).toEqual(['AGENTS.project.md'])
+  })
+
+  it('scaffolds opencode.json with the project instructions entry', () => {
+    const example = readFileSync(
+      join(repoRoot, 'opencode.mcp.example.json'),
+      'utf8',
+    )
+    const packageRoot = createPackage({ agents: {}, mcpExample: example })
+    const consumerRoot = createTempDir()
+
+    runSync({ packageRoot, consumerRoot })
+
+    const config = JSON.parse(
+      readFileSync(join(consumerRoot, 'opencode.json'), 'utf8'),
+    )
+    expect(config.instructions).toEqual(['AGENTS.project.md'])
+  })
+
+  it('does not ship project-owned files in the npm package', () => {
+    const packageManifest = JSON.parse(
+      readFileSync(join(repoRoot, 'package.json'), 'utf8'),
+    )
+    expect(packageManifest.files).not.toContain('AGENTS.project.md')
+    expect(packageManifest.files).not.toContain('opencode.json')
+    expect(packageManifest.files).toContain('.prettierignore')
+
+    const packed = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    })
+    expect(packed.status).toBe(0)
+    const files = JSON.parse(packed.stdout)[0].files.map((file) => file.path)
+    expect(files).toContain('.prettierignore')
+    expect(files).not.toContain('AGENTS.project.md')
+    expect(files).not.toContain('opencode.json')
+  })
+
+  it('reserves every documented project-owned path', () => {
+    for (const relativePath of [
+      'AGENTS.project.md',
+      'opencode.json',
+      '.prettierignore',
+      '.agents-sync-ignore',
+      'instructions/learned-knowledge.instructions.md',
+    ]) {
+      expect(projectOwnedPaths.has(relativePath), relativePath).toBe(true)
+    }
   })
 })
 

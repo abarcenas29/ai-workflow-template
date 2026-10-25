@@ -19,6 +19,27 @@ export const excludedRelativePaths = new Set([
   'instructions/learned-knowledge.instructions.md',
 ])
 
+// Files the consumer owns outright. Sync never copies, overwrites, or prunes
+// them — not even with --force — because local edits are the point, not drift.
+// Matching is channel-agnostic: every copy pass compares its own relative path
+// against this set, so a root entry such as "opencode.json" also protects
+// ".opencode/opencode.json" and ".agents/opencode.json". That over-match is
+// intentional and conservative. The original learned-knowledge exclusion is
+// spread in so there is one rule, not two parallel checks.
+export const projectOwnedPaths = new Set([
+  'AGENTS.project.md',
+  'opencode.json',
+  '.prettierignore',
+  // Reserved: sync protects this file from overwrite and prune, but it does
+  // NOT read or honour its globs yet. Do not present it as functional.
+  '.agents-sync-ignore',
+  ...excludedRelativePaths,
+])
+
+export function isProjectOwnedPath(relativePath) {
+  return projectOwnedPaths.has(relativePath)
+}
+
 export const openCodeExcluded = new Set([
   'node_modules',
   'package.json',
@@ -27,7 +48,10 @@ export const openCodeExcluded = new Set([
   '.gitignore',
 ])
 
-export const rootFiles = ['AGENTS.md', 'opencode.json', 'skills-lock.json']
+// Never add a project-owned file here (AGENTS.project.md, opencode.json,
+// .prettierignore): those are scaffolded create-if-absent and must not ship
+// from the package. opencode.json is governed solely by projectOwnedPaths.
+export const rootFiles = ['AGENTS.md', 'skills-lock.json']
 
 export const scriptsToSync = [
   'memory-cli.js',
@@ -43,6 +67,153 @@ export const scriptsToSync = [
   'mcp-knowledgebase-server.js',
   'knowledgebase-init.sql',
 ]
+
+// The hash-managed paths a consumer's .prettierignore must cover so a format
+// pass cannot freeze a sync. Directories carry a trailing slash so a pattern
+// can cover their subtree. AGENTS.project.md is deliberately absent: it is
+// project-owned, so formatting it cannot freeze a sync.
+export const requiredPrettierIgnorePatterns = [
+  '.agents/',
+  '.opencode/agents/',
+  '.opencode/commands/',
+  ...rootFiles,
+  ...scriptsToSync.map((script) => `scripts/${script}`),
+]
+
+const prettierIgnoreWarning =
+  '[ai-workflow-template] Existing .prettierignore does not protect managed files; merge the patterns from node_modules/@abarcenas/ai-workflow-template/.prettierignore'
+
+const ignoreAllPatterns = new Set(['', '.', '*', '**', '/'])
+
+function normalizeIgnorePattern(pattern) {
+  const trimmed = pattern.trim()
+  return trimmed === '/'
+    ? '/'
+    : trimmed.replace(/^\/+/, '').replace(/\/+$/, '')
+}
+
+// Gitignore lines, preserving negation and treating an inline "# ..." literally.
+// Escaped leading "#" or "!" are literals, not comments/negations.
+export function parsePrettierIgnoreRules(contents) {
+  const rules = []
+
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) {
+      continue
+    }
+
+    if (line.startsWith('\\#') || line.startsWith('\\!')) {
+      rules.push({
+        negated: false,
+        pattern: normalizeIgnorePattern(line.slice(1)),
+      })
+      continue
+    }
+
+    const negated = line.startsWith('!')
+    const pattern = normalizeIgnorePattern(negated ? line.slice(1) : line)
+    if (pattern) {
+      rules.push({ negated, pattern })
+    }
+  }
+
+  return rules
+}
+
+// True when a pattern ignores targetPath or one of its ancestors. A "base/**"
+// pattern ignores strict descendants only, so it never covers the file "base".
+function patternAppliesTo(pattern, targetPath) {
+  if (ignoreAllPatterns.has(pattern)) {
+    return true
+  }
+  if (pattern.endsWith('/**')) {
+    return targetPath.startsWith(`${pattern.slice(0, -3)}/`)
+  }
+  if (pattern.startsWith('**/')) {
+    const suffix = pattern.slice(3)
+    return targetPath === suffix || targetPath.endsWith(`/${suffix}`)
+  }
+  if (/[*?[]/.test(pattern)) {
+    return false
+  }
+  return targetPath === pattern || targetPath.startsWith(`${pattern}/`)
+}
+
+// A negation below a managed directory punches a hole in that directory's
+// subtree, so it removes coverage until a later positive restores the subtree.
+function ignorePatternBase(pattern) {
+  return normalizeIgnorePattern(
+    pattern.endsWith('/**') ? pattern.slice(0, -3) : pattern,
+  )
+}
+
+function patternAppliesBelow(pattern, directoryPath) {
+  if (ignoreAllPatterns.has(pattern)) {
+    return true
+  }
+
+  const base = ignorePatternBase(pattern)
+  return (
+    !/[*?[]/.test(base) &&
+    base.startsWith(directoryPath) &&
+    base !== normalizeIgnorePattern(directoryPath)
+  )
+}
+
+// Last-match-wins over the rule list, matching gitignore semantics. Required
+// directories also track negated subtrees so a later positive can restore them.
+function isCovered(requiredPath, rules) {
+  const isDirectory = requiredPath.endsWith('/')
+  let covered = false
+  const holes = new Set()
+
+  for (const { negated, pattern } of rules) {
+    if (!isDirectory) {
+      if (patternAppliesTo(pattern, requiredPath)) {
+        covered = !negated
+      }
+      continue
+    }
+
+    if (negated) {
+      if (patternAppliesTo(pattern, requiredPath)) {
+        covered = false
+        holes.clear()
+      } else if (patternAppliesBelow(pattern, requiredPath)) {
+        holes.add(ignorePatternBase(pattern))
+      }
+      continue
+    }
+
+    if (patternAppliesTo(pattern, requiredPath)) {
+      covered = true
+      holes.clear()
+      continue
+    }
+
+    if (patternAppliesBelow(pattern, requiredPath)) {
+      const base = ignorePatternBase(pattern)
+      for (const hole of holes) {
+        if (hole === base || hole.startsWith(`${base}/`)) {
+          holes.delete(hole)
+        }
+      }
+    }
+  }
+
+  return covered && holes.size === 0
+}
+
+export function missingPrettierIgnorePatterns(
+  contents,
+  requiredPatterns = requiredPrettierIgnorePatterns,
+) {
+  const rules = parsePrettierIgnoreRules(contents)
+  return requiredPatterns.filter(
+    (requiredPath) => !isCovered(requiredPath, rules),
+  )
+}
 
 export const memoryBankStubs = {
   'projectbrief.md': `# projectbrief
@@ -103,6 +274,49 @@ Cross-session knowledge accumulated by agent pipelines. Each session records dis
 
 ---
 
+`,
+}
+
+// Project-owned files are scaffolded create-if-absent and then left alone for
+// the lifetime of the consumer project (deleting one recreates it on the next
+// sync). The .prettierignore text here must stay byte-identical to the
+// repository's shipped .prettierignore (asserted in sync-unit.test.js) so the
+// tarball copy and the scaffold cannot drift.
+export const projectOwnedStubs = {
+  'AGENTS.project.md': `# Project Rules
+
+> Project-owned. This file is never overwritten or pruned by sync — edit it freely.
+
+## Project-specific agent rules
+
+- {{add project-specific rules here}}
+`,
+  '.prettierignore': `# Project-owned. Sync never overwrites this file.
+# Keep formatters away from files managed by @abarcenas/ai-workflow-template:
+# a formatting pass over managed files makes every future sync skip them.
+
+# Managed agent configuration
+.agents/
+.opencode/agents/
+.opencode/commands/
+
+# Managed root files
+AGENTS.md
+AGENTS.project.md
+skills-lock.json
+
+# Managed scripts (scripts/sync.js scriptsToSync)
+scripts/memory-cli.js
+scripts/memory-index.js
+scripts/bump-version.js
+scripts/validate-memory-schema.js
+scripts/vocab-sync.js
+scripts/mcp-memory-server.js
+scripts/mcp/playwright-mcp-launcher.js
+scripts/knowledgebase-cli.js
+scripts/knowledgebase-index.js
+scripts/mcp-knowledgebase-server.js
+scripts/knowledgebase-init.sql
 `,
 }
 
@@ -263,9 +477,15 @@ export function isPathInside(baseDir, candidatePath) {
 // Resolves a manifest key to its package path (for the "still shipped?" check)
 // and its consumer path (the prune candidate). Returns null for keys that the
 // sync layer does not own, and for paths that escape their channel root.
-export function resolvePruneEntry(manifestKey, { pruneChannels, packageRoot }) {
+export function resolvePruneEntry(manifestKey, { pruneChannels }) {
   let channel
   let relativePath
+
+  // Scaffold-only namespace for project-owned files. There is no package source
+  // to compare against and nothing here may ever be deleted.
+  if (manifestKey.startsWith('__project__/')) {
+    return null
+  }
 
   if (manifestKey.startsWith('__opencode__/')) {
     channel = pruneChannels.opencode
@@ -289,21 +509,19 @@ export function resolvePruneEntry(manifestKey, { pruneChannels, packageRoot }) {
   } else {
     channel = pruneChannels.agents
     relativePath = manifestKey
-    if (excludedRelativePaths.has(relativePath)) {
-      return null
-    }
   }
 
   if (!relativePath) {
     return null
   }
 
-  const packagePaths = [resolve(channel.packageDir, relativePath)]
-  if (channel === pruneChannels.root && relativePath === 'opencode.json') {
-    // opencode.json is scaffolded from the example when the package does not ship
-    // it directly (auto-copy pass above). Either source keeps the file alive.
-    packagePaths.push(resolve(packageRoot, 'opencode.mcp.example.json'))
+  // Project-owned files survive every prune, even when the package no longer
+  // ships a same-named path. This is the single check for all four channels.
+  if (isProjectOwnedPath(relativePath)) {
+    return null
   }
+
+  const packagePaths = [resolve(channel.packageDir, relativePath)]
 
   const consumerPath = resolve(channel.consumerDir, relativePath)
   if (!isPathInside(channel.packageDir, packagePaths[0])) {
@@ -356,9 +574,11 @@ export function syncProject(context) {
 
   /* ──  Sync .agents/ directory ────────────────────────────────── */
 
+  // Project ownership outranks every flag: these paths are skipped before the
+  // --force branch below, so --force can never replace consumer-owned content.
   for (const sourceFile of sourceFiles) {
     const relativePath = relative(sourceAgentsDir, sourceFile)
-    if (excludedRelativePaths.has(relativePath)) {
+    if (isProjectOwnedPath(relativePath)) {
       continue
     }
 
@@ -396,7 +616,11 @@ export function syncProject(context) {
 
     for (const sourceFile of openCodeFiles) {
       const relativePath = relative(sourceOpenCodeDir, sourceFile)
-      if (openCodeExcluded.has(relativePath) || openCodeExcluded.has(relativePath.split('/')[0])) {
+      if (
+        isProjectOwnedPath(relativePath) ||
+        openCodeExcluded.has(relativePath) ||
+        openCodeExcluded.has(relativePath.split('/')[0])
+      ) {
         continue
       }
 
@@ -434,6 +658,10 @@ export function syncProject(context) {
   let scriptsSkipped = 0
 
   for (const scriptRelPath of scriptsToSync) {
+    if (isProjectOwnedPath(scriptRelPath)) {
+      continue
+    }
+
     const sourceFile = resolve(sourceScriptsDir, scriptRelPath)
     const targetFile = resolve(targetScriptsDir, scriptRelPath)
 
@@ -473,6 +701,12 @@ export function syncProject(context) {
   /* ──  Sync root files ────────────────────────────────────────── */
 
   for (const rootFile of rootFiles) {
+    // Defense in depth: projectOwnedPaths wins if a project-owned name is ever
+    // added to rootFiles. opencode.json is no longer in this allowlist at all.
+    if (isProjectOwnedPath(rootFile)) {
+      continue
+    }
+
     const sourceFile = resolve(packageRoot, rootFile)
     if (!existsSync(sourceFile)) {
       continue
@@ -542,11 +776,60 @@ export function syncProject(context) {
     scaffolded += 1
   }
 
+  /* ──  Scaffold project-owned files ───────────────────────────── */
+
+  // Create-if-absent only. The __project__ namespace is reporting metadata
+  // written when a file is first created by sync; pre-existing consumer files
+  // are intentionally absent, because there is no managed baseline to report.
+  // It is never resolved by the copy or prune passes and never drives an
+  // overwrite. Not refreshing it on later runs keeps a consumer-owned file from
+  // producing manifest churn on every install.
+  const targetPrettierIgnore = resolve(consumerRoot, '.prettierignore')
+  const prettierIgnoreExisted = existsSync(targetPrettierIgnore)
+
+  for (const [fileName, fileContent] of Object.entries(projectOwnedStubs)) {
+    const targetFile = resolve(consumerRoot, fileName)
+    const trackedKey = `__project__/${fileName}`
+    let didScaffold = false
+
+    if (!existsSync(targetFile)) {
+      ensureParentDirectory(targetFile)
+      if (isVerbose) console.error(`  … scaffolding: ${fileName}`)
+      writeFileSync(targetFile, fileContent, 'utf8')
+      scaffolded += 1
+      didScaffold = true
+    }
+
+    // Only hash what this run created, and only if it is a regular file: a
+    // directory or unreadable path at this location must not abort the run.
+    if (didScaffold && isRegularFile(targetFile)) {
+      manifest.files[trackedKey] = hashFile(targetFile)
+    }
+  }
+
+  // An existing .prettierignore is project-owned and is never edited. Tell the
+  // consumer when it leaves managed files exposed, once and deterministically.
+  if (prettierIgnoreExisted) {
+    try {
+      const missingPatterns = missingPrettierIgnorePatterns(
+        readFileSync(targetPrettierIgnore, 'utf8'),
+      )
+      if (missingPatterns.length > 0) {
+        console.warn(prettierIgnoreWarning)
+      }
+    } catch {
+      // A directory or unreadable path at .prettierignore is project-owned
+      // state we cannot inspect. Skip the advisory rather than abort the run.
+    }
+  }
+
   /* ──  Auto-copy opencode.mcp.example.json → opencode.json ────── */
 
+  // Existing consumer configs are never rewritten. The example carries the
+  // `instructions` entry that loads AGENTS.project.md for fresh consumers.
   const exampleMcpFile = resolve(packageRoot, 'opencode.mcp.example.json')
   const targetMcpFile = resolve(consumerRoot, 'opencode.json')
-  const mcpTrackedKey = '__root__/opencode.json'
+  const mcpTrackedKey = '__project__/opencode.json'
 
   if (existsSync(exampleMcpFile) && !existsSync(targetMcpFile)) {
     if (isVerbose) console.error('  … scaffolding: opencode.json from example')
