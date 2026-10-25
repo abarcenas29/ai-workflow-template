@@ -12,7 +12,7 @@ This project includes AI-assisted development configuration distributed through 
 ## Core Workflow
 
 1. **Understand before acting** — Read relevant instructions from `.agents/instructions/` before working with specific technologies
-2. **Plan before implementing** — Use `.opencode/agents/plan.agent.md` or `.opencode/agents/implementer.agent.md` patterns for structured work
+2. **Plan before implementing** — Narrow underspecified work with the `scope` agent first, then use the `.opencode/agents/plan.agent.md` (optional deep planning) or `.opencode/agents/implementer.agent.md` patterns for structured work
 3. **Track progress** — Update `memory-bank/activeContext.md` and `memory-bank/progress.md` after each task (see `.agents/instructions/task-implementation.instructions.md`)
 4. **Maintain context** — Keep memory bank files updated (see `.agents/instructions/memory-bank.instructions.md`)
 
@@ -41,7 +41,7 @@ This project includes AI-assisted development configuration distributed through 
 
 ## Available Skills
 
-Skills in `.agents/skills/` provide structured workflows for common tasks. Load them when the task matches the skill's purpose:
+All 34 skills installed in `.agents/skills/` are listed below. Load one when the task matches its purpose. The five scoping skills (`domain-modeling`, `grill-me`, `grill-with-docs`, `grilling`, `prototype`) are described in detail in [`## Agent skills`](#agent-skills).
 
 - `architecture-blueprint-generator` — Generate project architecture blueprints
 - `conventional-commit` — Create conventional commit messages
@@ -69,6 +69,14 @@ Skills in `.agents/skills/` provide structured workflows for common tasks. Load 
 - `caveman-stats` — Tracking and statistics for caveman usage
 - `cavecrew` — Multi-agent coordination for caveman skills
 - `compress` — General compression utilities
+- `domain-modeling` — Build and sharpen the project's domain model (`GLOSSARY.md`, ADRs)
+- `graphify-framework-aware` — Exclude framework boilerplate from graphify knowledge graphs
+- `grill-me` — Human-invoked router for a relentless interview (calls `grilling`)
+- `grill-with-docs` — Human-invoked router for the interview plus glossary/ADR writing
+- `grilling` — Stress-test a plan or idea with rounds of numbered questions
+- `lighthouse-cli` — Run Lighthouse performance, accessibility, and SEO audits
+- `memory-search` — Semantic vector search over the memory bank
+- `prototype` — Build a throwaway prototype to answer a design question
 
 ## Available Prompts
 
@@ -79,13 +87,44 @@ Prompts in `.agents/prompts/` can be invoked directly:
 - `playwright-generate-test` — Generate Playwright tests
 - `documentation-writer` — Write documentation (Diataxis framework)
 
+## Agent skills
+
+Five skills installed from `mattpocock/skills` (pinned at `v1.3.1`) drive scoping and design work. They sit beside the other skills in `.agents/skills/`; this section explains when to reach for them and what they pair with.
+
+### Skills
+
+| Skill | Path | Use it when |
+|-------|------|-------------|
+| `grilling` | `.agents/skills/grilling/SKILL.md` | A plan, decision, or idea needs stress-testing, or a request is too vague to plan. Works a design tree in rounds: the current frontier is asked as numbered questions, each with a recommended answer. |
+| `grill-me` | `.agents/skills/grill-me/SKILL.md` | You want the same interview with no repository context and no document output — a stateless, one-shot entry point. |
+| `grill-with-docs` | `.agents/skills/grill-with-docs/SKILL.md` | You want the interview plus the written record — the glossary and ADRs are created as decisions settle. |
+| `domain-modeling` | `.agents/skills/domain-modeling/SKILL.md` | Project terminology or an architectural decision is being introduced or changed and `GLOSSARY.md` or an ADR needs to capture it. |
+| `prototype` | `.agents/skills/prototype/SKILL.md` | A design question can only be settled by running throwaway code — the logic branch for state models and data flow, the UI branch for look and feel. |
+
+`grill-me` and `grill-with-docs` are **human-invoked routers**: both set `disable-model-invocation: true`, so an agent cannot load them. Agents invoke `grilling` directly, plus `domain-modeling` when a term or decision actually settles.
+
+### Scope agent
+
+`.opencode/agents/scope.agent.md` is the front door for underspecified work. It runs `grilling` in rounds against a single draft file, emits each round's frontier as numbered questions with a recommended answer per question, and stops when the frontier is empty or the remaining unknowns are explicitly deferred.
+
+It terminates by writing `docs/spike-<feature>.md` — the spike document `.opencode/agents/researcher.agent.md` already expects as its input. From there the work continues to `researcher` (open questions need evidence), `implementer` (scope settled, planning remains), or `architect` (the shape of the system is the open problem).
+
+The agent has no command-execution permission: it never builds, runs, or tests code. When a question can only be settled empirically it emits `prototype needed: <question>` with a branch, and that work is handed off to `coder` (logic) or `designer` (UI).
+
+### Domain docs
+
+`.agents/config/domain.md` declares where domain documentation lives: `GLOSSARY.md` at the repository root and ADRs in `docs/adr/`, numbered `0001-slug.md` onwards — the single-context layout.
+The `domain-modeling` skill reads it before exploring the codebase; when the file or the docs it names are absent, the skill proceeds silently and creates them lazily, only once a term or decision has actually been settled.
+
 ## Available Agent Workflows
 
 These agent workflows (from `.opencode/agents/`) define specialized modes of operation. Invoke the relevant workflow at the start of a task by stating which mode you want to activate.
 
 ### Plan Mode — Strategic Planning & Architecture
 
-Use this when starting a new feature, refactoring, or any non-trivial change. Follow this sequence:
+Underspecified work does not start here. The default front door is the **`scope` agent** (see [`## Agent skills`](#agent-skills)): it narrows the request through grilling rounds and writes `docs/spike-<feature>.md`, which is handed to `researcher` when open questions need evidence, or to `implementer` when only planning remains.
+
+`.opencode/agents/plan.agent.md` remains available as an **optional deep-planning mode** for work that is already scoped but needs a step-by-step plan. It is not deleted and not deprecated — it is demoted in the default flow only. When you use it, follow this sequence:
 
 1. **Understand the Goal** — Ask clarifying questions about requirements and goals
 2. **Explore Context** — Examine relevant files, components, and systems that will be affected

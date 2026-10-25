@@ -134,6 +134,17 @@ All `memory-bank/**/*.md` files must have YAML frontmatter for search indexing. 
 
 ### Plan Mode
 
+Scope comes before planning. Underspecified work enters through the `scope` agent; planning starts only once the request is narrowed.
+
+1. **Scope first** — for an underspecified request, the front door is the `scope` agent (`.opencode/agents/scope.agent.md`). It runs grilling rounds against a single draft file, then writes a terminal spike document at `docs/spike-<feature>.md`.
+2. **Hand the spike to research** — that spike document is the input `researcher.agent.md` expects; pass its path as the required spike argument.
+3. **Continue the pipeline** — after research (or directly, when no research is needed), the work continues to `implementer`, `architect`, or `coder`, following the recommended next step recorded in the spike.
+4. **Deep planning is optional** — `plan.agent.md` remains available as an optional deep-planning mode for work that is already scoped. It is demoted in the default flow, not removed or deprecated.
+
+When scope runs, record the spike document in the memory bank (a task entry in `tasks/` and/or `activeContext.md`) before implementation planning begins, so the settled and deferred decisions survive a session reset.
+
+The flow below applies once the scope is settled:
+
 ```mermaid
 flowchart TD
     Start[Start] --> CheckGraph{graphify-out/graph.json exists?}

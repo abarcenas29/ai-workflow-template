@@ -48,6 +48,96 @@
       "sourceType": "github",
       "skillPath": "skills/compress/SKILL.md",
       "computedHash": "c91bdf427a68b686ee9d6f63766c72d164b16915434736edfedf13e24dae0e8c"
+    },
+    "domain-modeling": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
+      "ref": "v1.3.1",
+      "computedHash": "7b925d7b1e341a2eeae33ad68a8a8c0ab889a38ddd22a7598e4c240e5a7556a3",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "7b925d7b1e341a2eeae33ad68a8a8c0ab889a38ddd22a7598e4c240e5a7556a3",
+          "upstreamPath": "skills/engineering/domain-modeling/SKILL.md"
+        },
+        {
+          "path": "GLOSSARY-FORMAT.md",
+          "sha256": "21dcc40cdec8e151a829b98ab1517c1867bc444e3665134a98c6983411996801",
+          "upstreamPath": "skills/engineering/domain-modeling/GLOSSARY-FORMAT.md"
+        },
+        {
+          "path": "ADR-FORMAT.md",
+          "sha256": "944c92aa790e8fbdc9199640b170979abb8a34ba8d0fe18c2a01a63bce140ca0",
+          "upstreamPath": "skills/engineering/domain-modeling/ADR-FORMAT.md"
+        }
+      ]
+    },
+    "grill-me": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grill-me/SKILL.md",
+      "ref": "v1.3.1",
+      "computedHash": "caaf8b8de1684f96e26b28f3c29189db5c89cce4b73e1c93d86164f66ef88637",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "caaf8b8de1684f96e26b28f3c29189db5c89cce4b73e1c93d86164f66ef88637",
+          "upstreamPath": "skills/productivity/grill-me/SKILL.md"
+        }
+      ]
+    },
+    "grill-with-docs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
+      "ref": "v1.3.1",
+      "computedHash": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
+          "upstreamPath": "skills/engineering/grill-with-docs/SKILL.md"
+        }
+      ]
+    },
+    "grilling": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grilling/SKILL.md",
+      "ref": "v1.3.1",
+      "computedHash": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+          "upstreamPath": "skills/productivity/grilling/SKILL.md"
+        }
+      ]
+    },
+    "prototype": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/prototype/SKILL.md",
+      "ref": "v1.3.1",
+      "computedHash": "714de632d116bb73f65cdb5a882db15b9369a6713b9a47c0fad827848f0bfbe3",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "714de632d116bb73f65cdb5a882db15b9369a6713b9a47c0fad827848f0bfbe3",
+          "upstreamPath": "skills/engineering/prototype/SKILL.md"
+        },
+        {
+          "path": "LOGIC.md",
+          "sha256": "f61c7d249e786a79ef289018901c348271e1798dd0b0bc5607b5c6f4d4a01ab9",
+          "upstreamPath": "skills/engineering/prototype/LOGIC.md"
+        },
+        {
+          "path": "UI.md",
+          "sha256": "723211e878acbc7b6ff09755263f3295cde724ba902ff0064da41eed51d45ad3",
+          "upstreamPath": "skills/engineering/prototype/UI.md"
+        }
+      ]
     }
   }
 }

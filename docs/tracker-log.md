@@ -1605,3 +1605,142 @@ Closed the last two non-blocking reviewer wording nits from the Pipeline 11 foll
 - **🔵 M-5 (non-blocking, documentation):** the prior tracker entry's "`1.49.0`" narrative now reads stale relative to the settled `1.45.0` — historical record intentionally left frozen; this entry documents the settle.
 - **No push** — all 4 commits are local to `feat/utilize-pg-vector-db`; no remote/PR action taken.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-09-14 ("Pipeline 11 Final Polish") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Feature Pipeline 12: Matt Pocock Skills Integration + Scope Agent
+
+**Plan:** `plan/feature-matt-skills-integration-v1.md` (v1)
+**Date:** 2026-10-24
+**Status:** ✅ SUCCESS — 17/17 tasks complete; `npx vitest run` → 16 files / 331 tests / 0 failures. Work is **uncommitted** on branch `feat/mat-integration` (working tree dirty by design; this tracker entry is part of it).
+**Pipeline:** implementer (bootstrap + read-only pre-flight) → coder ∥(T1,T2,T3) → coder(T4) → coder ∥(T5,T6) → coder(T7) → coder(T8+T9) → coder(T10+T11) → coder ∥(T12,T13,T14) → coder(T15) → coder ∥(T16,T17) → tracker (this entry)
+
+### Summary
+
+Vendored five Matt Pocock scoping skills (`grilling`, `grill-me`, `grill-with-docs`,
+`domain-modeling`, `prototype`) byte-identically at `v1.3.1`, added a `.agents/config/`
+discovery layer, and introduced a new `scope` pipeline agent that narrows underspecified
+requests through numbered-question rounds and terminates in a `docs/spike-<feature>.md`
+document that `researcher`/`implementer` already accept as input. The orchestrator now has a
+`scope` registry row, a "Foggy feature" pipeline pattern, and a Step 2a
+insertion/interactivity contract (`autoConfirm` cannot skip it). Distribution is pinned and
+backward-compatible: `skills-lock.json` records a tag ref plus per-file
+`sha256`/`upstreamPath`, a new setup phase fetches from upstream with a shipped-copy
+fallback, and `scripts/sync.js` gained opt-in `--prune`. No existing skill, agent,
+instruction, or prompt was deleted or renamed; `plan.agent.md` is untouched and demoted only
+in documentation.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 0 | implementer | ✅ | Bootstrap not needed (`docs/.architecture-context.md` + memory bank already populated). A **read-only pre-flight** produced 9 corrections to the plan before any implementation batch ran (wrong file target, coverage gate, inverted dependency, parity-test trap, incomplete lock schema, and others). |
+| A | coder ∥ | ✅ | T1, T2, T3 — disjoint files, no collisions. |
+| B | coder | ✅ | T4 then T5 (same file, sequential). T5 deliberately left the spec-knowledge-retrieval count change to T15. |
+| C | coder | ✅ | T6 — orchestrator wiring; `spec-orchestrator-parity` stayed 8/8 with phrase counts unchanged. |
+| D | coder | ✅ | T8 + T9 combined (both touch the setup phase surface). T7 landed first. |
+| E | coder | ✅ | T10 + T11 combined (implementation + its tests). |
+| F | coder ∥ | ✅ | T12, T13, T14 — three disjoint documentation files. |
+| G | coder ∥ | ✅ | T15 first (test unblock), then T16 and T17. |
+| — | tracker | ✅ | This entry; no source/test/plan changes. |
+
+### Task Results (T1–T17)
+
+| Task | Status | Artifacts / Result |
+|---|---|---|
+| T1 | ✅ | `.agents/skills/{grilling,grill-me,grill-with-docs,domain-modeling,prototype}/` — 5 directories / **9 files**, byte-identical to upstream `v1.3.1` @ `24fe0ef7` (CON-07). |
+| T2 | ✅ | `.agents/config/domain.md` (37 lines) — single-context layout: `GLOSSARY.md` at root, ADRs in `docs/adr/`; proceeds silently when absent; flags ADR conflicts. |
+| T3 | ✅ | `.agents/config/README.md` (43 lines) — five skills + `scope` agent pointer; states it is the discovery path when consumer `AGENTS.md` is locally edited (CON-04 backstop). |
+| T4 | ✅ | `.opencode/agents/scope.agent.md` created — permissions `read, search, edit, skill, question`; **zero** `execute` hits; draft-state round protocol, numbered questions with recommended answers, terminal spike artifact, prototype hand-off. |
+| T5 | ✅ | `scope.agent.md` +15 lines — `## Check Knowledge` section + `Knowledge:` line in the return format; 4/4 knowledge-retrieval token assertions satisfied (TEST-01/02). |
+| T6 | ✅ | `orchestrator.agent.md` — `scope` registry row, `Foggy feature: scope ⏸️ → researcher ⏸️ → implementer ⏸️ → …` pattern, Step 2a insertion rule (REQ-09), always-interactive override (REQ-10), round-trip protocol, prototype hand-off (REQ-11), `scope` added to `confirmationGates`. `spec-orchestrator-parity` 8/8; literal phrase counts unchanged (2× / 2×). |
+| T7 | ✅ | `skills-lock.json` — `ref: "v1.3.1"` + per-file `{ path, sha256, upstreamPath }` for all 9 vendored files, plus `skillPath`; caveman entries untouched. **90 insertions / 0 deletions.** |
+| T8 | ✅ | `scripts/setup/skills-phase.js` (new) + `scripts/setup/index.js` Phase 6 wiring — reads pinned entries, fetches pinned raw URLs, verifies `sha256`, buffer-then-write, local-edit warning, one fallback notice, `--dry-run`, idempotent. |
+| T9 | ✅ | Fetch phase gated by the existing `!flags.skipSync`; no-op when zero pinned entries; one-line status in all three cases. **No new CI guard invented** — no setup-level CI guard exists (CI skips hooks only). |
+| T10 | ✅ | `scripts/sync.js` — opt-in `--prune` (off by default), pre-run manifest snapshot (only pre-existing keys considered), channel resolution, path containment; non-regular files and unknown `__` namespaces never pruned. |
+| T11 | ✅ | `scripts/sync.test.js` 7 → **15 tests**; TEST-02..05 covered (default inert, unmodified-only removal, modified survives, package-owned never removed). |
+| T12 | ✅ | `AGENTS.md` — new `## Agent skills` (Skills table, Scope agent, Domain docs), Plan Mode rewritten (scope first, `plan.agent.md` optional deep planning), Core Workflow step 2 updated, skill inventory reconciled to 34/34. `plan.agent.md` untouched. |
+| T13 | ✅ | `README.md` both counts 29 → 34, scope row in the sub-agent table, How-to-Use bullet, Featured Skills. `package.json` 1.45.0 → 1.46.0 (minor, CON-06); `package-lock.json` root version corrected from stale 1.34.0. |
+| T14 | ✅ | `.agents/instructions/memory-bank.instructions.md` — 4-step scope-first ordering + spike tracking note (11 insertions, 0 deletions). |
+| T15 | ✅ | `tests/spec-knowledge-retrieval.test.js` — `scope` added to `EXPECTED_PIPELINE_AGENTS` (10 → 11), `plan.agent.md` still excluded. Bonus: `scope.agent.md` added to `CHECK_PATHS` in `tests/spec-kb-consolidation.test.js` (stale enumeration found here). |
+| T16 | ✅ | `npx vitest run` → 16 files / **331 tests** / 0 failures; `validate-memory-schema.js` exit 0; coverage run green for all tests. See Known Issues for the repo-wide threshold. |
+| T17 | ✅ | End-to-end packaging matrix on a scratch consumer (`npm pack` → install → setup → sync → prune) — all steps PASS; **DEF-01** found and fixed. Scratch dir + tarball deleted; repo untouched. |
+
+### Files Created
+
+| File | Description |
+|---|---|
+| `.agents/skills/grilling/SKILL.md` | Vendored v1.3.1 skill (1 file). |
+| `.agents/skills/grill-me/SKILL.md` | Vendored router skill (157 bytes, `disable-model-invocation`). |
+| `.agents/skills/grill-with-docs/SKILL.md` | Vendored router skill (247 bytes, `disable-model-invocation`). |
+| `.agents/skills/domain-modeling/{SKILL.md,GLOSSARY-FORMAT.md,ADR-FORMAT.md}` | Vendored skill + 2 format references. |
+| `.agents/skills/prototype/{SKILL.md,LOGIC.md,UI.md}` | Vendored skill + 2 branch references. |
+| `.agents/config/domain.md` | Domain-docs location contract for `domain-modeling`. |
+| `.agents/config/README.md` | Discovery pointer that survives an edited consumer `AGENTS.md`. |
+| `.opencode/agents/scope.agent.md` | New pipeline agent (299 lines) — grilling rounds → spike doc; no `execute`. |
+| `scripts/setup/skills-phase.js` | Pinned upstream install phase with shipped-copy fallback. |
+| `scripts/setup/skills-phase.test.js` | Unit + wiring tests for the phase (FILE-19). |
+
+Total: **9 vendored skill files**, 2 config files, 1 agent spec, 2 setup scripts/tests.
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `.opencode/agents/orchestrator/orchestrator.agent.md` | Registry row, Foggy-feature pattern, Step 2a insertion + interactivity rules, `confirmationGates`. |
+| `skills-lock.json` | +90 lines: tag ref and per-file hashes/`upstreamPath` for the 5 skills; caveman entries unchanged. |
+| `scripts/setup/index.js` | Phase 6 — skills phase wired into the setup pipeline. |
+| `scripts/setup/sync-phase.js` | **DEF-01 fix** — forwards captured child stderr to `process.stderr` in non-verbose mode (CON-04 warning now visible). |
+| `scripts/sync.js` | Opt-in `--prune` (pre-run snapshot + containment). |
+| `scripts/sync.test.js` | 7 → 15 tests (prune matrix). |
+| `AGENTS.md` | New `## Agent skills`; Plan Mode rewritten; 34/34 skills inventory. |
+| `README.md` | Skill counts 29 → 34; scope agent surfaced. |
+| `package.json` | Version 1.45.0 → 1.46.0 (minor). |
+| `package-lock.json` | Root version corrected 1.34.0 → 1.46.0. |
+| `.agents/instructions/memory-bank.instructions.md` | Scope-first Plan Mode ordering (+11 lines). |
+| `tests/spec-knowledge-retrieval.test.js` | `scope` in the parity set (10 → 11). |
+| `tests/spec-kb-consolidation.test.js` | `scope.agent.md` added to `CHECK_PATHS` (+1 line). |
+
+**Explicitly unchanged:** `.opencode/agents/plan.agent.md` (byte-identical through the packaging check), all pre-existing skill directories, `.agents/prompts/`, and all `docs/` distribution behavior (CON-09).
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` (full suite) | ✅ **16 files / 331 tests / 0 failures** (~1.8s; no skipped/todo) |
+| `npx vitest run scripts/sync.test.js` | ✅ 15/15 |
+| `npx vitest run scripts/setup/` | ✅ 7 files / **142/142** |
+| `tests/spec-orchestrator-parity.test.js` | ✅ 8/8 (literal phrase counts unchanged) |
+| `tests/spec-knowledge-retrieval.test.js` | ✅ 6/6 (11 in-scope agents, `plan.agent.md` still excluded) |
+| `node scripts/validate-memory-schema.js` | ✅ exit 0 |
+| T17 packaging matrix | ✅ **all PASS** — 156-file tarball, version 1.46.0, 9 skill files + 2 config files + `scope.agent.md` present, `plan.agent.md` byte-identical, zero `docs/`/`tests/`/`plan/` entries, edited `AGENTS.md` warned + skipped unchanged, `--prune` deleted 0 of a 125-file snapshot, upstream fetch + drift overwrite + fallback all exercised |
+| Per-file coverage — `scripts/setup/skills-phase.js` | ✅ 99.42% stmts / 97.34% branch / 100% funcs / 100% lines |
+| Repo-wide coverage threshold | ⚠️ **pre-existing failure**, see Known Issues — not a regression |
+
+### Known Issues / Honest Accounting
+
+- **Repo-wide coverage threshold was already failing at HEAD.** `vitest.config.ts` enforces 90% over `scripts/**`; the baseline at HEAD measured **48.05% statements** before this work, and the tree now measures **~50.69%** (50.69 / 50.51 / 51.1 / 51.18). This is **not a regression** — coverage rose. CI gates on `test:unit`, not `npm run test:unit:coverage`, so the threshold is not a merge gate. It was deliberately not "fixed" opportunistically: no thresholds or exclusions were changed.
+- **`scripts/sync.js` reports 0% coverage structurally.** Its tests spawn it as a child process (`spawnSync('node', ['scripts/sync.js', ...])`), and the v8 provider cannot instrument child processes. The 0% is meaningless — behavioural assertions in `scripts/sync.test.js` are the real guard. Pre-existing condition.
+- **`--dry-run` message is cosmetic-only.** It prints `Would fetch 5 pinned skill(s) from upstream`, but a real first install fetches nothing: the sync phase copies the vendored files first, so their hashes already match the pin and the fetch phase correctly reports `5 already up to date`. No functional impact; the wording invites a small follow-up.
+
+### Deviations From the Written Plan
+
+| ID | Deviation | Rationale / Outcome |
+|---|---|---|
+| DEV-01 | T8/T9 implemented in `scripts/setup/` (`skills-phase.js` + a phase in `scripts/setup/index.js`), **not** `bin/setup.js`. | `bin/setup.js` is a 26-line shim that only imports `main()`; all phases live in `scripts/setup/`. Plan rows were annotated in place. |
+| DEV-02 | The plan's generic "per-file hash" schema became `{ path, sha256, upstreamPath }` + `skillPath`. | Upstream categories are **asymmetric** (`skills/productivity/` for `grilling`/`grill-me`, `skills/engineering/` for the other three), so a URL cannot be derived from a skill name. Caveman entries untouched (90 insertions / 0 deletions). |
+| DEV-03 | New test file `scripts/setup/skills-phase.test.js` added, not in the original task table. | Required by the `scripts/**` 90% coverage gate — every setup module has a sibling `.test.js`. Recorded as FILE-19 in the plan. |
+| DEV-04 | `tests/spec-kb-consolidation.test.js` also needed `scope.agent.md` in `CHECK_PATHS`. | A second, independent agent-spec enumeration — stale once the 11th agent landed. Found during T15. |
+| DEV-05 | `package-lock.json` root version corrected 1.34.0 → 1.46.0 alongside the `package.json` minor bump. | The lockfile was separately stale; leaving it would have re-introduced drift the plan explicitly wanted settled. |
+| DEV-06 | `csv` row: n/a — no CSV artifact exists in this feature. | Superseded by DEV-02's `upstreamPath` schema note. |
+| DEF-01 | **Defect found in T17 and fixed.** `scripts/setup/sync-phase.js` swallowed sync stderr in non-verbose mode, so the CON-04 "Skipped locally modified root file" warning never reached the consumer. | Fixed by forwarding each stderr chunk to `process.stderr` while still capturing it (stdout remains capture-only). Re-verified on a fresh consumer: warning appears, file unchanged. |
+
+### Notes / Follow-up
+
+- **Plan frontmatter is stale.** All 17 task rows are ✅ (dated 2026-10-23/24), but `status: Planned` and the `![Status: Planned]` badge were never updated. Recorded here rather than edited — the tracker does not modify plan files.
+- **`docs/.orchestrator-log.md` is incomplete for this session.** Its status table stops at `G-T15` and has no T16/T17 rows and no `FINAL STATUS` block; the T16/T17 outcomes exist only in the plan rows and in this entry (reconciled here from the pipeline summaries).
+- **Nothing is committed.** Branch `feat/mat-integration`; the plan file itself is untracked (`?? plan/feature-matt-skills-integration-v1.md`). A deployer step is still outstanding if this is to ship.
+- **`grill-me` is vendored but unused by design** — `disable-model-invocation: true` and stateless; agents must invoke `grilling` (plus `domain-modeling`) directly. `grill-with-docs` is the router for the interview + glossary/ADR record.
+- **Only the 5 new skills are pin-covered** in `skills-lock.json`; the other 29 skills remain unpinned (pre-existing, documented as intentional).
+- `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` is not configured in this session); per the graceful-failure contract this is reported, not retried. Learned-knowledge re-indexing was likewise skipped.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-24 ("Matt Pocock Skills Integration") entry appended to `.agents/instructions/learned-knowledge.instructions.md`.

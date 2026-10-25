@@ -22,6 +22,16 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npm test
+        env:
+          CI: true
+          # The config defaults to headed mode; CI runners have no display.
+          HEADLESS: 'true'
+
       - name: Publish to npm
         run: npm publish --access public
         env:

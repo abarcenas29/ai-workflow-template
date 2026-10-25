@@ -467,3 +467,69 @@
 - **reviewer**: Verify the opt-out guard is placed BEFORE any read/write (additive, default unchanged) and probe the truthy-string edge — `SKIP_BUMP=0`/`false` also skip (M-1). Confirm comment-only changes leave duplicate files byte-identical and runtime unchanged. Distinguish pre-existing drift (`package-lock.json` at `1.34.0`; missing `architecture-context` vocab entity) from issues introduced by the change; a historical tracker entry referencing the pre-settle version is a frozen-record artifact, not a defect.
 - **deployer**: Use the newly added `SKIP_BUMP=1` on the commits that introduce it, rather than `--no-verify` — the guard is the targeted mitigation and keeps the other hooks (memory-schema validation, vocab-sync) running. After a version settle, verify the manifest version at HEAD and that it was committed exactly once (no re-bump), and confirm the hook logged the skip.
 - **tracker**: Record the `SKIP_BUMP` guard as IMPLEMENTED (closing the 2026-08-02 / 2026-09-14 recommendation) with the exact settle delta (`1.49.0 → 1.45.0`), and carry the non-blocking minors forward (M-1 truthy string, M-2 missing SDK qualifier in README, M-3 lockfile drift, M-4 vocab entity gap, M-5 stale historical "1.49.0" narrative). Reuse the canonical `projectId` from `require('./package.json').name` (`@abarcenas/ai-workflow-template`) when re-indexing this session.
+
+## Session: 2026-10-24 — Matt Pocock Skills Integration + Scope Agent (pinned vendored skills + new setup phase)
+
+**Pipeline:** implementer (bootstrap + read-only pre-flight) → coder ∥(T1,T2,T3) → coder(T4) → coder ∥(T5,T6) → coder(T7) → coder(T8+T9) → coder(T10+T11) → coder ∥(T12,T13,T14) → coder(T15) → coder ∥(T16,T17) → tracker
+**Coverage:** 16 files / 331 tests, 0 failures; `scripts/setup/` 7 files / 142 tests; `scripts/sync.test.js` 15/15; `spec-orchestrator-parity` 8/8; `spec-knowledge-retrieval` 6/6; `scripts/setup/skills-phase.js` 99.42% stmts / 97.34% branch / 100% funcs / 100% lines
+**TDD Iterations:** 0 (feature pipeline, not TDD)
+
+**New knowledge:**
+- **`bin/setup.js` is a 26-line shim — every setup phase lives in `scripts/setup/`.** `index.js` orchestrates; siblings are `sync-phase.js`, `prepare.js`, `husky-init.js`,
+  `knowledgebase.js`, `constants.js`, `ui.js`.
+  The plan targeted `bin/setup.js` for a new install phase; the correct home was a new `skills-phase.js` module plus a step in `index.js`'s Phase 6. **Universal pattern:** before
+  planning an edit to an entry-point file, check whether it is a shim that delegates to a phase directory — targeting the entry point produces a feature that lives in the wrong
+  layer and is untestable in the project's established style.
+- **`vitest.config.ts` enforces 90% coverage over `scripts/**`, and every setup module has a sibling `.test.js` — but the GLOBAL threshold already fails at HEAD.** New `scripts/`
+  code must ship with tests (the per-file numbers matter), yet the repo-wide number was **48.05% statements at HEAD** and **~50.69%** after this feature. **Universal pattern:**
+  distinguish the *per-file* coverage contract from the *repo-wide* threshold.
+  A pre-existing global failure is not a regression and must not be "fixed" opportunistically by changing thresholds or exclusions; record the baseline you measured at HEAD so the
+  delta is auditable.
+- **The v8 coverage provider reads 0% for code exercised only through `spawnSync` child processes.** `scripts/sync.js` executes at import (no exported `main`), so its tests spawn
+  it as a child; v8 cannot instrument across the process boundary.
+  Its 0% coverage is structural and pre-existing. **Universal pattern:** for child-process entry points, rely on behavioural assertions (exit code, stdout/stderr, filesystem/tree
+  diffs) and state in the record that the coverage number is meaningless — never chase it by refactoring the entry point purely for coverage.
+- **`tests/spec-orchestrator-parity.test.js` asserts EXACT OCCURRENCE COUNTS of literal phrases** (2× `knowledge-retrieval`, 2× `knowledgebase`) in `orchestrator.agent.md`.
+  **Universal pattern:** before editing an orchestrator spec, grep the parity test for occurrence-count guards; an edit that quotes the same literal a third time fails the suite
+  even though the change is correct.
+  Either avoid duplicating the string or update the counts deliberately and say so.
+- **`tests/spec-knowledge-retrieval.test.js` derives the pipeline agent set by scanning `.opencode/agents/*.agent.md` minus `plan.agent.md` and asserts an exact length.** Adding
+  `scope.agent.md` broke it until `EXPECTED_PIPELINE_AGENTS` went 10 → 11. **Universal pattern:** a new agent file is a two-part change — the spec plus every enumeration of agents
+  (this one, `CHECK_PATHS`, docs tables, registry rows).
+  Grep for the expected count, not just the file list.
+- **`tests/spec-kb-consolidation.test.js` holds a SEPARATE `CHECK_PATHS` enumeration of every agent spec** — the second place that must be updated when an agent is added.
+  It was discovered only during the verification phase. **Universal pattern:** after adding an agent/skill/instruction, grep the whole test tree for the old count and for
+  enumerations of sibling paths; two independent lists drifting is the normal failure mode, not the exception.
+- **The pre-commit hook runs `bump-version` → `vocab-sync` → `validate-memory-schema`, and the auto-bump is PRE-commit, not post-commit.** `SKIP_BUMP=1` is honored at
+  `scripts/bump-version.js:9-15` (the guard sits before any read/write).
+  The plan's DEP-03 stated the opposite ordering; the read-only pre-flight caught it. **Universal pattern:** read the hook file itself before planning version strategy.
+  Edit the version ONCE by hand per PR and commit with `SKIP_BUMP=1`; do not let N commits produce N minor bumps, and do not use `--no-verify` (it also skips memory-schema
+  validation).
+- **Upstream `mattpocock/skills` has ASYMMETRIC category paths** — `skills/productivity/` for `grilling` and `grill-me`, `skills/engineering/` for
+  `grill-with-docs`/`domain-modeling`/`prototype` — so a raw URL must **never** be derived from a skill name. **Universal pattern:** when pinning remote files, record the full
+  upstream path per file in the lock (`upstreamPath`) and build URLs from the lock alone; deriving paths from names silently 404s for exactly the entries whose category differs.
+- **`grill-me` and `grill-with-docs` are `disable-model-invocation: true`** — they are human-invoked routers, not agent-loadable skills.
+  Agents must invoke `grilling` directly (plus `domain-modeling` when a term or decision settles) and must never delegate to the wrappers. **Universal pattern:** check
+  `disable-model-invocation` on every vendored skill before wiring it into an agent; a router that only a human can start cannot be a pipeline step (the same reason `wayfinder` was
+  dropped).
+- **`docs/` is neither in `package.json` `files` nor in `scripts/sync.js`'s root-file list (CON-09).** Configuration placed under `docs/agents/` would never reach consumers, no
+  matter how correct it is. **Universal pattern:** before choosing a location for distributed configuration, verify the path is actually packaged AND synced — pick
+  `.agents/config/` (synced recursively) over a conventional `docs/` location.
+- **Root-file sync (`AGENTS.md`, `opencode.json`, `skills-lock.json`) SKIPS locally modified consumer files.** A consumer who edited `AGENTS.md` will never receive a new section.
+  **Universal pattern:** every user-facing instruction added to a root-synced file needs a backstop under `.agents/` (here `.agents/config/README.md`) plus a visible install-time
+  warning.
+  The warning itself must be printed in non-verbose mode — see DEF-01.
+- **`scripts/sync.js` executes at import (no exported `main`); tests use `spawnSync('node', ['scripts/sync.js', ...])` with `INIT_CWD`.** Prune iterates only manifest keys that
+  existed **before** the run, so it never deletes files the same run just scaffolded. **Universal pattern:** a newly added destructive path must snapshot its input set at
+  start-of-run; otherwise "prune what the package no longer ships" deletes the files the current install just created (all of which are absent from the pre-run manifest).
+
+**Agent tuning notes:**
+- **implementer / orchestrator (pre-flight)**: One read-only pre-flight before dispatching any implementation batch is high-value and should be standard whenever a plan references
+  specific files.
+  Here it caught **9 plan errors** — wrong file target (`bin/setup.js`), the coverage gate's sibling-test requirement, an inverted dependency (DEP-03), the parity-test
+  occurrence-count trap, an incomplete lock schema (per-file `upstreamPath`), and others — each of which would have cost a full rework cycle.
+  It must stay read-only (no edits, no builds) so it cannot invalidate the plan before the gate is approved.
+- **orchestrator (parallel batches)**: Parallel subagents that each append to `memory-bank/activeContext.md` / `progress.md` cause write races. Parallel batches should either skip memory-bank updates (and say so explicitly in the delegation) or the orchestrator must serialize that write. Disjoint source files are not sufficient — the shared documentation sink is the collision point.
+- **orchestrator (interruption recovery)**: Subagents that mark their own plan checkboxes are reliable, but an interrupted subagent leaves the work done and the rows unmarked. Always re-verify disk state after an interruption (grep for the artifact, run the targeted test) before re-dispatching; re-dispatching an interrupted-but-complete task duplicates work and risks conflicting edits.
+- **orchestrator (concurrent verification)**: Verify-by-diff beats verify-by-test when two agents edit related files concurrently — have one agent diff against sibling files instead of running a suite the other agent is about to change. Tests are a moving target during a parallel batch; diffs against a stable sibling are not.
+- **all agents (knowledgebase_search)**: `knowledgebase_search` was unavailable repo-wide (`DATABASE_URL` unset). Every agent should report it as "NOT executed (PG vector unavailable)" and continue — never retry, never treat it as a task failure, and never block the pipeline on it. The explicit report is the accountability mechanism that keeps a graceful degradation from becoming a silent one.
