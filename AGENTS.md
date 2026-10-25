@@ -9,6 +9,10 @@ This project includes AI-assisted development configuration distributed through 
 - `.opencode/agents/` — Specialized agent definitions for planning, research, and implementation
 - `.agents/prompts/` — Reusable prompt templates
 
+## Project-Specific Rules
+
+Put project-specific agent rules in `AGENTS.project.md` at the repository root. That file is project-owned: sync never overwrites or prunes it, and `--force` cannot replace it. New projects load it automatically through the `instructions` entry in `opencode.json`.
+
 ## Core Workflow
 
 1. **Understand before acting** — Read relevant instructions from `.agents/instructions/` before working with specific technologies

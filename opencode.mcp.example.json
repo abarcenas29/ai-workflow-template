@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.project.md"],
   "mcp": {
     "chrome-devtools": {
       "type": "local",

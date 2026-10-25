@@ -75,7 +75,28 @@ npm run sync                # Normal sync
 - New files are copied automatically
 - Unmodified files are refreshed from the package
 - Locally edited files are preserved (skipped by default)
+- Project-owned files are never overwritten or pruned after creation, and `--force` cannot replace them
 - GitHub Actions workflows are excluded from consumer sync (`.github/workflows/`)
+
+> `--dry-run` previews copies and prunes, but missing scaffold files (memory-bank stubs, `opencode.json`, `AGENTS.project.md`, `.prettierignore`) are still created. This matches the pre-existing scaffold behaviour.
+
+### Project-owned files
+
+`AGENTS.project.md` is the supported home for project-specific agent rules. It is created if absent, then treated as project-owned: sync never overwrites or prunes it, `--force` cannot replace it, and deleting it recreates it on the next sync. New projects load it through `"instructions": ["AGENTS.project.md"]` in `opencode.json`; a project created before that entry existed must add it once, because sync never rewrites an existing `opencode.json`.
+
+The same ownership rule protects `opencode.json`, `.prettierignore`, and `.agents/instructions/learned-knowledge.instructions.md`. `.agents-sync-ignore` is also protected from overwrite and deletion, but sync does **not** read or honour its contents yet — do not rely on it.
+
+`__project__/<file>` entries in `.agents-sync-manifest.json` are reporting metadata written only when sync creates the file. Files that already existed before the upgrade are intentionally absent, because sync has no managed baseline for them.
+
+The package ships a `.prettierignore` and scaffolds it when absent. New projects get coverage automatically for `.agents/`, `.opencode/agents/`, `.opencode/commands/`, `AGENTS.md`, `skills-lock.json`, and every synced script; the shipped file also ignores `AGENTS.project.md`, though that file is not hash-managed. Existing projects keep their own `.prettierignore` untouched (it is project-owned), so if it does not cover every managed path sync prints one warning:
+
+```text
+[ai-workflow-template] Existing .prettierignore does not protect managed files; merge the patterns from node_modules/@abarcenas/ai-workflow-template/.prettierignore
+```
+
+Merge those patterns manually — sync never edits the file. Template-side additions to `rootFiles` or `scriptsToSync` also require a matching manual line in an existing project; the shipped file only updates the defaults for new projects. A formatter run over managed files rewrites their hashes, so every later sync skips them and the consumer stops receiving template updates.
+
+If sync warns `Skipped locally modified root file: AGENTS.md`, move those local rules into `AGENTS.project.md`, restore the managed file from `node_modules/@abarcenas/ai-workflow-template/AGENTS.md`, then re-run sync.
 
 ## Core Structure
 
@@ -90,6 +111,7 @@ Post-install, your project receives this structure:
 .github/workflows/  # CI/CD automation (excluded from sync)
 docs/               # Guides (e.g. playwright-mcp-configuration.md)
 AGENTS.md           # Master instruction file with agent guidance
+AGENTS.project.md   # Project-owned rules (recreated if deleted, never overwritten)
 ```
 
 ## Multi-Agent Orchestrator
@@ -286,6 +308,8 @@ npm run memory:normalize   # Normalize frontmatter (runs automatically on instal
 
 - Uses `INIT_CWD` to install against the consuming project (not the package dir)
 - Local changes are always preserved unless `--force` is used
+- Project-owned files (`AGENTS.project.md`, `opencode.json`, `.prettierignore`, learned knowledge) are created if absent and never overwritten or pruned after that, even with `--force`
+- Do not add `AGENTS.project.md` or `opencode.json` to `package.json` `files`: both are scaffolded create-if-absent and must never ship from the package
 - `AGENTS.md` is the main instruction file agents should read
 - Package assumes the public npm registry
 - Playwright MCP integration is documented in `docs/`

@@ -1897,3 +1897,77 @@ Seven tests were written **first** and failed with the predicted messages before
 - **No behavioural change to `search` semantics** — result shape, ordering, and filters are untouched; the fix removes rows that search could never legitimately return (orphans) and rows it should never have returned (deleted files).
 - **No push** — one local commit; no remote, tag, or publish action taken.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 (`vec_memory` orphans) appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+---
+
+## Feature Pipeline: Project-Owned Layer for the Sync
+
+**Date:** 2026-10-25
+**Status:** ✅ SUCCESS — `npx vitest run` → **26 files / 790 tests / 0 failures**; `npx vitest run --coverage` → exit 0 (**96.88 / 94.9 / 96.87 / 97.09**); `npm pack --dry-run` ships `.prettierignore` and excludes `AGENTS.project.md` and `opencode.json`; both consumer repositories left untouched. **Uncommitted** — no commit, tag, publish, or consumer rollout.
+**Pipeline:** implementer → coder → reviewer (round 1: APPROVE WITH CHANGES) → coder → reviewer (round 2: BLOCK) → coder (round 3 fixes) → tracker (this entry)
+
+### Summary
+
+Consumers had no safe place for project-specific agent rules. `AGENTS.md` is hash-managed by `scripts/sync.js`, so a locally edited copy is skipped **permanently** while a pristine copy is silently overwritten on the next `npm install` — both failure modes were observed in real consumers. This work adds a first-class project-owned layer: a set of paths that sync will never copy over, overwrite, or prune (not even with `--force`), created if absent so projects still get a starting point.
+
+### Context / Problem
+
+- **Frozen path:** a locally edited `AGENTS.md` is skipped forever once its hash stops matching. Verified frozen in **apmc-cms** across 52 `.agents` files, 19 `.opencode` files, 10 scripts and `AGENTS.md` after a cosmetic formatter run — the consumer had stopped receiving template updates with no signal.
+- **Silent overwrite path:** a pristine `AGENTS.md` is replaced on the next `npm install`. Verified in **apmc-v2** (commit `bc11276`), where the v1.44→v1.45 upstream delta landed inside an unrelated feature commit.
+- Before this change there was **no project-owned path, override directory, marker convention, or documented extension point** — project rules had no durable home.
+
+### What Was Built
+
+| Area | Change |
+|---|---|
+| Ownership set | `projectOwnedPaths` (exported `Set`, sibling to `excludedRelativePaths`) covering `AGENTS.project.md`, `opencode.json`, `.prettierignore`, `.agents-sync-ignore`, and `instructions/learned-knowledge.instructions.md` (via the pre-existing exclusion). Matching is channel-agnostic, so a root entry also protects its nested counterparts — an intentional, conservative over-match. |
+| Copy guards | All four copy loops check ownership **before** the `forceOverwrite \|\| isUntouched` branch, so `--force` cannot replace a project-owned file. |
+| Prune guards | Prune short-circuits on ownership before hashing, so a project-owned file is never deleted even if it appears in a stale manifest. |
+| Scaffolds | `AGENTS.project.md` and `.prettierignore` are created if absent; the `opencode.json` scaffold now carries `"instructions": ["AGENTS.project.md"]`. An existing `opencode.json` is never rewritten. |
+| Documentation | Pointer paragraph in the shipped `AGENTS.md`; README "Project-owned files" section plus a recovery path for a frozen `AGENTS.md`; shipped `.prettierignore`. |
+| Advisory | Coverage detector (`requiredPrettierIgnorePatterns`) warns once when an existing consumer `.prettierignore` does not protect the hash-managed paths. |
+
+### Files Produced / Modified
+
+| File | Change |
+|---|---|
+| `scripts/sync.js` | `projectOwnedPaths` / `isProjectOwnedPath`, four pre-force copy guards, prune short-circuit, two create-if-absent scaffolds, `instructions` entry in the `opencode.json` scaffold, `.prettierignore` coverage detector. |
+| `scripts/sync-unit.test.js` | +563 lines: 14-row table-driven detector matrix, parser test, unreadable-file handling, npm-pack integration test, end-to-end fixtures. |
+| `.prettierignore` | **New** shipped file protecting every hash-managed path (`.agents/`, `.opencode/agents/`, `.opencode/commands/`, `AGENTS.md`, `skills-lock.json`, all synced scripts). |
+| `AGENTS.md` | `## Project-Specific Rules` pointer to `AGENTS.project.md`. |
+| `README.md` | +24 lines: "Project-owned files", detector warning, frozen-`AGENTS.md` recovery procedure. |
+| `opencode.mcp.example.json` | `"instructions": ["AGENTS.project.md"]`. |
+| `package.json` | Ships `.prettierignore`; `files` comment forbidding `AGENTS.project.md` / `opencode.json` from the tarball. |
+| `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks/_index.md` | Implementation record. |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npx vitest run` | ✅ 26 files / **790 tests** / 0 failures |
+| `npx vitest run --coverage` | ✅ exit 0 — **96.88 / 94.9 / 96.87 / 97.09** |
+| `npm pack --dry-run` | ✅ 167 files — ships `.prettierignore`, excludes `AGENTS.project.md` and `opencode.json` |
+| apmc-cms working tree | ✅ untouched — exactly its three pre-existing modified files, no new changes |
+| apmc-v2 working tree | ✅ clean |
+
+### Deferred
+
+`.agents-sync-ignore` is **protected** (never overwritten or pruned) but its globs are **not honoured**. This is stated plainly in the README and in code comments. A correct implementation needs gitignore semantics (`**`, directory suffixes, negation) threaded through all four copy loops and prune; a partial matcher that silently skips or deletes the wrong files would be worse than no feature.
+
+### Review History
+
+| Round | Verdict | Findings |
+|---|---|---|
+| 1 | APPROVE WITH CHANGES | **M1** — `.prettierignore` guard was a no-op for apmc-cms; **M2** — coverage incomplete; **M3** — inert ignore file undocumented; **M4** — no frozen-`AGENTS.md` recovery path. |
+| 2 | BLOCK | New coverage detector used exact-line membership rather than coverage: false alarms on parent-directory-protected repos, false all-clear on negated holes. |
+| 3 | ✅ Resolved | Last-match-wins coverage; `AGENTS.project.md` dropped from the required set (formatting it cannot freeze sync); 14-row table-driven matrix; 3 end-to-end fixtures. |
+
+### Known Residual Risk
+
+The coverage detector is ~75 lines of bounded heuristic, not a full gitignore engine. It is correct for the tested matrix (both directions: no false alarm, no false all-clear). If it proves noisy in the field, the fallback — a single unconditional advisory — is a small, isolated swap.
+
+### Notes / Follow-up
+
+- **Not yet done, outside this work unit:** no commit, no publish, no consumer rollout.
+- **apmc-cms** will need a manual `"instructions": ["AGENTS.project.md"]` entry (its `opencode.json` is scaffold-once and already exists) and a manual merge of the managed patterns into its own `.prettierignore`; it will also need the documented `AGENTS.md` restore procedure because its copy is frozen.
+- The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 (project-owned sync layer) appended to `.agents/instructions/learned-knowledge.instructions.md`.
