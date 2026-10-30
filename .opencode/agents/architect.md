@@ -1,11 +1,10 @@
 ---
 description: "System architecture and design specialist. Designs component architecture, data flow, module boundaries, and technical strategy. Produces architecture decision records and design documents."
-name: "Architect - System Design"
-permission:
-  read: allow
-  search: allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # Architect - System Design

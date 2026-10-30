@@ -16,7 +16,7 @@ Put project-specific agent rules in `AGENTS.project.md` at the repository root. 
 ## Core Workflow
 
 1. **Understand before acting** — Read relevant instructions from `.agents/instructions/` before working with specific technologies
-2. **Plan before implementing** — Narrow underspecified work with the `scope` agent first, then use the `.opencode/agents/plan.agent.md` (optional deep planning) or `.opencode/agents/implementer.agent.md` patterns for structured work
+2. **Plan before implementing** — Narrow underspecified work with the `scope` agent first, then use the `.opencode/agents/planner.md` (optional deep planning) or `.opencode/agents/implementer.md` patterns for structured work
 3. **Track progress** — Update `memory-bank/activeContext.md` and `memory-bank/progress.md` after each task (see `.agents/instructions/task-implementation.instructions.md`)
 4. **Maintain context** — Keep memory bank files updated (see `.agents/instructions/memory-bank.instructions.md`)
 
@@ -109,9 +109,9 @@ Five skills installed from `mattpocock/skills` (pinned at `v1.3.1`) drive scopin
 
 ### Scope agent
 
-`.opencode/agents/scope.agent.md` is the front door for underspecified work. It runs `grilling` in rounds against a single draft file, emits each round's frontier as numbered questions with a recommended answer per question, and stops when the frontier is empty or the remaining unknowns are explicitly deferred.
+`.opencode/agents/scope.md` is the front door for underspecified work. It runs `grilling` in rounds against a single draft file, emits each round's frontier as numbered questions with a recommended answer per question, and stops when the frontier is empty or the remaining unknowns are explicitly deferred.
 
-It terminates by writing `docs/spike-<feature>.md` — the spike document `.opencode/agents/researcher.agent.md` already expects as its input. From there the work continues to `researcher` (open questions need evidence), `implementer` (scope settled, planning remains), or `architect` (the shape of the system is the open problem).
+It terminates by writing `docs/spike-<feature>.md` — the spike document `.opencode/agents/researcher.md` already expects as its input. From there the work continues to `researcher` (open questions need evidence), `implementer` (scope settled, planning remains), or `architect` (the shape of the system is the open problem).
 
 The agent has no command-execution permission: it never builds, runs, or tests code. When a question can only be settled empirically it emits `prototype needed: <question>` with a branch, and that work is handed off to `coder` (logic) or `designer` (UI).
 
@@ -128,7 +128,7 @@ These agent workflows (from `.opencode/agents/`) define specialized modes of ope
 
 Underspecified work does not start here. The default front door is the **`scope` agent** (see [`## Agent skills`](#agent-skills)): it narrows the request through grilling rounds and writes `docs/spike-<feature>.md`, which is handed to `researcher` when open questions need evidence, or to `implementer` when only planning remains.
 
-`.opencode/agents/plan.agent.md` remains available as an **optional deep-planning mode** for work that is already scoped but needs a step-by-step plan. It is not deleted and not deprecated — it is demoted in the default flow only. When you use it, follow this sequence:
+`.opencode/agents/planner.md` remains available as an **optional deep-planning mode** for work that is already scoped but needs a step-by-step plan. It is not deleted and not deprecated — it is demoted in the default flow only. When you use it, follow this sequence:
 
 1. **Understand the Goal** — Ask clarifying questions about requirements and goals
 2. **Explore Context** — Examine relevant files, components, and systems that will be affected
@@ -180,7 +180,7 @@ Always ask user permission before: creating files, running commands, modifying t
 
 Use this when you want a fixed, opinionated pipeline: **implementer → designer → coder → tracker**. It bootstraps architecture context, supports step-by-step confirmation, logs progress, and persists lessons learned.
 
-The agent file is at `.opencode/agents/orchestrator/feature-pipeline.agent.md`.
+The agent file is at `.opencode/agents/orchestrator/feature-pipeline.md`.
 
 **When to use:** You want a predictable, four-step feature pipeline without dynamic agent selection. The orchestrator agent is more flexible; this is more opinionated.
 
@@ -201,7 +201,7 @@ implementer (PLAN) → unit-tester∥ (RED) → coder∥ (GREEN) → unit-tester
 | 5 | REVIEW | reviewer | Audits tests + code for quality, security, patterns |
 | 6 | DOCUMENT | tracker | Records results to `docs/tracker-log.md` |
 
-The agent file is at `.opencode/agents/orchestrator/tdd-orchestrator.agent.md`.
+The agent file is at `.opencode/agents/orchestrator/tdd-orchestrator.md`.
 
 **When to use:** Any feature, bug fix, or refactor where tests should be written first. The orchestrator automatically selects this pipeline when testable code changes are requested.
 

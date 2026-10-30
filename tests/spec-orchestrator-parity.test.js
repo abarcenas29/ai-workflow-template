@@ -6,13 +6,13 @@
 // that the three orchestrator delegation templates are symmetric with respect to
 // the knowledge-retrieval protocol injection:
 //
-//   (a) orchestrator.agent.md   — BOTH standard and parallel-coder delegation
+//   (a) orchestrator.md   — BOTH standard and parallel-coder delegation
 //       prompt templates contain the `knowledge-retrieval` reference.
-//   (b) feature-pipeline.agent.md — BOTH standard AND parallel-coder delegation
+//   (b) feature-pipeline.md — BOTH standard AND parallel-coder delegation
 //       contain `learned-knowledge` AND `architecture-context` AND `knowledgebase`
 //       (the parallel-coder delegation was previously asymmetric — it only had
 //       memory-bank; T14 made it match the standard).
-//   (c) tdd-orchestrator.agent.md — ALL SIX Phase delegation blocks contain the
+//   (c) tdd-orchestrator.md — ALL SIX Phase delegation blocks contain the
 //       `knowledge-retrieval` reference (including Phase 5 reviewer, which
 //       previously had ZERO knowledge injection).
 //
@@ -40,9 +40,9 @@ function readRepoFile(relativePath) {
   return readFileSync(join(REPO_ROOT, relativePath), 'utf8')
 }
 
-const ORCHESTRATOR_PATH = '.opencode/agents/orchestrator/orchestrator.agent.md'
-const FEATURE_PIPELINE_PATH = '.opencode/agents/orchestrator/feature-pipeline.agent.md'
-const TDD_ORCHESTRATOR_PATH = '.opencode/agents/orchestrator/tdd-orchestrator.agent.md'
+const ORCHESTRATOR_PATH = '.opencode/agents/orchestrator/orchestrator.md'
+const FEATURE_PIPELINE_PATH = '.opencode/agents/orchestrator/feature-pipeline.md'
+const TDD_ORCHESTRATOR_PATH = '.opencode/agents/orchestrator/tdd-orchestrator.md'
 
 // ── Fenced-block extraction (robust to indented fences) ─────────────────────
 
@@ -102,7 +102,7 @@ function countOccurrences(content, substring) {
 // TEST-07 / TEST-08 — main orchestrator: standard + parallel-coder delegations
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe('orchestrator.agent.md delegation parity (plan T17 / TEST-07, TEST-08)', () => {
+describe('orchestrator.md delegation parity (plan T17 / TEST-07, TEST-08)', () => {
   const content = readRepoFile(ORCHESTRATOR_PATH)
   const delegationBlocks = findDelegationBlocks(extractFencedBlocks(content))
 
@@ -141,7 +141,7 @@ describe('orchestrator.agent.md delegation parity (plan T17 / TEST-07, TEST-08)'
     // stray copies should exist elsewhere in the file.
     expect(
       countOccurrences(content, 'knowledge-retrieval.instructions.md'),
-      'orchestrator.agent.md must reference the shared protocol exactly twice (standard + parallel-coder)'
+      'orchestrator.md must reference the shared protocol exactly twice (standard + parallel-coder)'
     ).toBe(2)
   })
 })
@@ -150,7 +150,7 @@ describe('orchestrator.agent.md delegation parity (plan T17 / TEST-07, TEST-08)'
 // TEST-09 — feature-pipeline: BOTH delegations carry the full context set
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe('feature-pipeline.agent.md delegation parity (plan T17 / TEST-09)', () => {
+describe('feature-pipeline.md delegation parity (plan T17 / TEST-09)', () => {
   const content = readRepoFile(FEATURE_PIPELINE_PATH)
   const delegationBlocks = findDelegationBlocks(extractFencedBlocks(content))
 
@@ -185,7 +185,7 @@ describe('feature-pipeline.agent.md delegation parity (plan T17 / TEST-09)', () 
     // The knowledgebase injection marker appears once per delegation template.
     expect(
       countOccurrences(content, 'knowledgebase_knowledgebase_search'),
-      'feature-pipeline.agent.md must call knowledgebase_knowledgebase_search exactly twice (standard + parallel-coder)'
+      'feature-pipeline.md must call knowledgebase_knowledgebase_search exactly twice (standard + parallel-coder)'
     ).toBe(2)
   })
 })
@@ -194,7 +194,7 @@ describe('feature-pipeline.agent.md delegation parity (plan T17 / TEST-09)', () 
 // TEST-10 — TDD orchestrator: all SIX Phase delegation blocks carry the protocol
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe('tdd-orchestrator.agent.md phase delegation parity (plan T17 / TEST-10)', () => {
+describe('tdd-orchestrator.md phase delegation parity (plan T17 / TEST-10)', () => {
   const content = readRepoFile(TDD_ORCHESTRATOR_PATH)
   const delegationBlocks = findDelegationBlocks(extractFencedBlocks(content))
 
@@ -248,7 +248,7 @@ describe('tdd-orchestrator.agent.md phase delegation parity (plan T17 / TEST-10)
   it('occurrence count: exactly 6 knowledge-retrieval references (one per phase)', () => {
     expect(
       countOccurrences(content, 'knowledge-retrieval.instructions.md'),
-      'tdd-orchestrator.agent.md must reference the shared protocol exactly six times (one per Phase delegation)'
+      'tdd-orchestrator.md must reference the shared protocol exactly six times (one per Phase delegation)'
     ).toBe(6)
   })
 })

@@ -6,7 +6,7 @@
 // KB consolidation standardization points are all wired into the agent specs and
 // instruction files:
 //
-//   (a) tracker.agent.md derives `knowledgebase_index` projectId from
+//   (a) tracker.md derives `knowledgebase_index` projectId from
 //       `package.json` `name` (the canonical scoped name) — TEST-05.
 //   (b) knowledge-retrieval.instructions.md carries the "Canonical projectId"
 //       subsection with a package.json mention — TEST-06.
@@ -47,14 +47,14 @@ function readRepoFile(relativePath) {
   return readFileSync(join(REPO_ROOT, relativePath), 'utf8')
 }
 
-const TRACKER_PATH = '.opencode/agents/tracker.agent.md'
+const TRACKER_PATH = '.opencode/agents/tracker.md'
 const KNOWLEDGE_RETRIEVAL_PATH = '.agents/instructions/knowledge-retrieval.instructions.md'
 const KNOWLEDGEBASE_INSTRUCTIONS_PATH = '.agents/instructions/knowledgebase.instructions.md'
 
 const ORCHESTRATOR_PATHS = [
-  '.opencode/agents/orchestrator/orchestrator.agent.md',
-  '.opencode/agents/orchestrator/feature-pipeline.agent.md',
-  '.opencode/agents/orchestrator/tdd-orchestrator.agent.md',
+  '.opencode/agents/orchestrator/orchestrator.md',
+  '.opencode/agents/orchestrator/feature-pipeline.md',
+  '.opencode/agents/orchestrator/tdd-orchestrator.md',
 ]
 
 // ── Line helpers (scoped, case-tolerant matching) ────────────────────────
@@ -73,10 +73,10 @@ function findTableRow(content, cell) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TEST-05 — tracker.agent.md projectId derivation guidance
+// TEST-05 — tracker.md projectId derivation guidance
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe('tracker.agent.md projectId derivation (plan T9 / TEST-05)', () => {
+describe('tracker.md projectId derivation (plan T9 / TEST-05)', () => {
   const content = readRepoFile(TRACKER_PATH)
 
   it('TEST-05: references knowledgebase_index with package.json name as the projectId source', () => {
@@ -114,21 +114,21 @@ describe('tracker.agent.md projectId derivation (plan T9 / TEST-05)', () => {
     // Pipeline 7 duplicate or the reviewer's minor).
     const CHECK_PATHS = [
       // .opencode/ agent specs
-      '.opencode/agents/architect.agent.md',
-      '.opencode/agents/coder.agent.md',
-      '.opencode/agents/deployer.agent.md',
-      '.opencode/agents/designer.agent.md',
-      '.opencode/agents/e2e-tester.agent.md',
-      '.opencode/agents/implementer.agent.md',
-      '.opencode/agents/plan.agent.md',
-      '.opencode/agents/researcher.agent.md',
-      '.opencode/agents/reviewer.agent.md',
-      '.opencode/agents/scope.agent.md',
-      '.opencode/agents/tracker.agent.md',
-      '.opencode/agents/unit-tester.agent.md',
-      '.opencode/agents/orchestrator/orchestrator.agent.md',
-      '.opencode/agents/orchestrator/feature-pipeline.agent.md',
-      '.opencode/agents/orchestrator/tdd-orchestrator.agent.md',
+      '.opencode/agents/architect.md',
+      '.opencode/agents/coder.md',
+      '.opencode/agents/deployer.md',
+      '.opencode/agents/designer.md',
+      '.opencode/agents/e2e-tester.md',
+      '.opencode/agents/implementer.md',
+      '.opencode/agents/planner.md',
+      '.opencode/agents/researcher.md',
+      '.opencode/agents/reviewer.md',
+      '.opencode/agents/scope.md',
+      '.opencode/agents/tracker.md',
+      '.opencode/agents/unit-tester.md',
+      '.opencode/agents/orchestrator/orchestrator.md',
+      '.opencode/agents/orchestrator/feature-pipeline.md',
+      '.opencode/agents/orchestrator/tdd-orchestrator.md',
       // .agents/ instructions (projectId convention + memory-bank operations)
       '.agents/instructions/knowledge-retrieval.instructions.md',
       '.agents/instructions/knowledgebase.instructions.md',

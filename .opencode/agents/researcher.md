@@ -1,14 +1,10 @@
 ---
 description: "Deep-dive research and investigation specialist. Handles technical unknowns, library evaluation, spike validation, and information gathering from documentation, codebases, and web sources."
-name: "Researcher - Technical Investigation"
-permission:
-  read: allow
-  search: allow
-  web: allow
-  "ddg-search/*": allow
-  "context7/*": allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # Technical spike research mode

@@ -1,6 +1,6 @@
 ---
 description: "Guidelines for creating custom agent files for opencode"
-applyTo: "**/*.agent.md"
+applyTo: "**/agents/**/*.md"
 ---
 
 # Custom Agent File Guidelines
@@ -11,7 +11,7 @@ Instructions for creating effective and maintainable custom agent files that pro
 
 - Target audience: Developers creating custom agents for opencode
 - File format: Markdown with YAML frontmatter
-- File naming convention: lowercase with hyphens (e.g., `test-specialist.agent.md`)
+- File naming convention: lowercase with hyphens (e.g., `test-specialist.md`)
 - Location: `.opencode/agents/` directory (repository-level)
 - Purpose: Define specialized agents with tailored expertise, tools, and instructions for specific tasks
 - Official documentation: [opencode.ai](https://opencode.ai)
@@ -39,7 +39,7 @@ tools: ["Read", "Edit", "Grep"]
 #### **name** (OPTIONAL)
 
 - Display name for the agent
-- If omitted, defaults to filename (without `.md` or `.agent.md`)
+- If omitted, defaults to filename (without `.md`)
 - Use title case and be descriptive
 - Example: `'Testing Specialist'`
 
@@ -123,7 +123,7 @@ The recommended approach is **prompt-based orchestration**:
 
 - The orchestrator defines a step-by-step workflow in natural language.
 - Each step is delegated to a specialized agent.
-- The orchestrator passes only the essential context (e.g., base path, identifiers) and requires each sub-agent to read its own `.agent.md` spec for tools/constraints.
+- The orchestrator passes only the essential context (e.g., base path, identifiers) and requires each sub-agent to read its own `.md` spec for tools/constraints.
 
 ### How It Works
 
@@ -136,7 +136,7 @@ tools: ["Read", "Edit", "Grep", "Task"]
 2. For each step, invoke a sub-agent by providing:
 
 - **Agent name** (the identifier users select/invoke)
-- **Agent spec path** (the `.agent.md` file to read and follow)
+- **Agent spec path** (the `.md` file to read and follow)
 - **Minimal shared context** (e.g., base path, project name, log file)
 
 ### Prompt Pattern (Recommended)
@@ -147,7 +147,7 @@ Use a consistent "wrapper prompt" for every step so sub-agents behave predictabl
 This phase must be performed as the agent "<AGENT_NAME>" defined in "<AGENT_SPEC_PATH>".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - Work on "<WORK_UNIT_NAME>" with base path: "<BASE_PATH>".
 - Perform the necessary reads/writes under this base path.
 - Return a clear summary (actions taken + files produced/modified + issues).
@@ -191,7 +191,7 @@ Structure each step invocation with:
 ```text
 Step 1: Transform raw input data
 Agent: data-processor
-Spec: .opencode/agents/data-processor.agent.md
+Spec: .opencode/agents/data-processor.md
 Context: projectName, basePath
 Input: basePath/raw/
 Output: basePath/processed/
@@ -199,7 +199,7 @@ Expected: write basePath/processed/summary.md
 
 Step 2: Analyze processed data (depends on Step 1 output)
 Agent: data-analyst
-Spec: .opencode/agents/data-analyst.agent.md
+Spec: .opencode/agents/data-analyst.md
 Context: projectName, basePath
 Input: basePath/processed/
 Output: basePath/analysis/
@@ -363,10 +363,10 @@ When invoking a sub-agent, pass all context through descriptive instructions in 
 Example (prompt template):
 
 ```text
-This phase must be performed as the agent "documentation-writer" defined in ".opencode/agents/documentation-writer.agent.md".
+This phase must be performed as the agent "documentation-writer" defined in ".opencode/agents/documentation-writer.md".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec.
+- Read and apply the entire agent spec file.
 - Project: [project name]
 - Base path: [base path]
 - Input: [input path]
@@ -389,24 +389,24 @@ Example of a simple orchestrator that validates code through multiple specialize
    - Repository name, PR number
    - Base path
 
-2. Invoke specialized agents sequentially (each agent reads its own `.agent.md` spec):
+2. Invoke specialized agents sequentially (each agent reads its own `.md` spec):
 
 ```text
 Step 1: Security Review
 Agent: security-reviewer
-Spec: .opencode/agents/security-reviewer.agent.md
+Spec: .opencode/agents/security-reviewer.md
 Context: repository name, PR number, base path
 Output: security-review.md
 
 Step 2: Test Coverage
 Agent: test-coverage
-Spec: .opencode/agents/test-coverage.agent.md
+Spec: .opencode/agents/test-coverage.md
 Context: repository name, PR number, base path
 Output: coverage-report.md
 
 Step 3: Aggregate
 Agent: review-aggregator
-Spec: .opencode/agents/review-aggregator.agent.md
+Spec: .opencode/agents/review-aggregator.md
 Context: repository name, PR number, base path
 Output: final-review.md
 ```
@@ -462,7 +462,7 @@ Use consistent variable naming conventions:
 
 ### Naming Conventions
 
-- Use lowercase with hyphens: `test-specialist.agent.md`
+- Use lowercase with hyphens: `test-specialist.md`
 - Name should reflect agent purpose
 - Filename becomes default agent name (if `name` not specified)
 - Allowed characters: `.`, `-`, `_`, `a-z`, `A-Z`, `0-9`
@@ -493,7 +493,7 @@ Use consistent variable naming conventions:
 - [ ] Filename follows lowercase-with-hyphens convention
 - [ ] File placed in correct directory (`.opencode/agents/`)
 - [ ] Filename uses only allowed characters
-- [ ] File extension is `.agent.md`
+- [ ] File extension is `.md`
 
 ### Quality Assurance
 

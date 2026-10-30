@@ -1,14 +1,10 @@
 ---
 description: "Feature scoping specialist. Narrows underspecified feature requests through rounds of numbered questions with recommended answers, then writes a spike document that researcher and implementer can consume."
-name: "Scope - Feature Scoping"
-permission:
-  read: allow
-  search: allow
-  edit: allow
-  skill: allow
-  question: allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # Scope - Feature Scoping

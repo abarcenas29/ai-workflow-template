@@ -107,3 +107,43 @@ If Context7 cannot find a reliable source:
 
 - Never request or echo API keys. If configuration requires a key, instruct storing it in environment variables.
 - Treat retrieved docs as **helpful but not infallible**; for security-sensitive code, prefer official vendor docs and add an explicit verification step.
+
+## Configuration & troubleshooting (opencode)
+
+opencode substitutes only two forms inside config files:
+
+- `{env:VARIABLE_NAME}` — an **unset variable becomes an empty string**, which fails silently
+- `{file:path/to/file}` — file contents; `~` is supported
+
+It does **not** understand shell-style `$VARIABLE`. Writing `"CONTEXT7_API_KEY": "$CONTEXT7_TOKEN"` sends the literal text `$CONTEXT7_TOKEN` as the header value. The server accepts it at `initialize` and only rejects it at the first tool call, so the MCP reports as *connected* while every tool fails with an invalid-key error.
+
+A valid remote entry:
+
+```json
+"context7": {
+  "type": "remote",
+  "url": "https://mcp.context7.com/mcp",
+  "headers": { "CONTEXT7_API_KEY": "{env:CONTEXT7_TOKEN}" },
+  "enabled": true
+}
+```
+
+### Local servers differ in shape
+
+`McpLocalConfig` requires `command` to be an **array** and the env object to be named `environment`. There is no `args` key and no `env` key — using either makes opencode log `skipped malformed recognized value` and the server never appears in the tool list at all.
+
+```json
+"github": {
+  "type": "local",
+  "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+  "environment": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}" },
+  "enabled": true
+}
+```
+
+### Diagnosing a dead server
+
+1. Test the credential directly before touching config — `curl` the endpoint, or run the CLI that owns the token. This separates "bad key" from "key never arrived".
+2. Read `~/.local/share/opencode/log/opencode.log` and look for `mcp connected server=<name>` versus `skipped malformed`.
+3. Prefer `{file:~/.config/opencode/secrets/<name>}` when opencode may not be launched from an interactive shell: variables exported in `~/.zshrc` are visible only to interactive zsh sessions, so GUI-launched sessions see nothing.
+4. A private-repo 404 (GitHub) or a 422 from search usually means the MCP is running **anonymous**, not that the resource is missing.

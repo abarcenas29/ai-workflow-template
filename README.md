@@ -120,18 +120,18 @@ AGENTS.project.md   # Project-owned rules (recreated if deleted, never overwritt
 
 | Agent | File | Role |
 | --- | --- | --- |
-| Orchestrator | `.opencode/agents/orchestrator/orchestrator.agent.md` | Master — analyzes requests, builds pipelines, delegates |
-| Scope | `.opencode/agents/scope.agent.md` | Conditional front door for underspecified requests — grilling rounds, then a spike doc |
-| Researcher | `.opencode/agents/researcher.agent.md` | Technical investigation, library evaluation |
-| Architect | `.opencode/agents/architect.agent.md` | System design, component architecture |
-| Implementer | `.opencode/agents/implementer.agent.md` | Translates designs into implementation plans |
-| Designer | `.opencode/agents/designer.agent.md` | UI/UX, styling, responsive design |
-| Coder | `.opencode/agents/coder.agent.md` | Production code implementation |
-| Unit Tester | `.opencode/agents/unit-tester.agent.md` | Unit and integration tests |
-| E2E Tester | `.opencode/agents/e2e-tester.agent.md` | Playwright browser tests |
-| Reviewer | `.opencode/agents/reviewer.agent.md` | Code review, security audit |
-| Deployer | `.opencode/agents/deployer.agent.md` | CI/CD, deployment scripts |
-| Tracker | `.opencode/agents/tracker.agent.md` | Documentation recorder |
+| Orchestrator | `.opencode/agents/orchestrator/orchestrator.md` | Master — analyzes requests, builds pipelines, delegates |
+| Scope | `.opencode/agents/scope.md` | Conditional front door for underspecified requests — grilling rounds, then a spike doc |
+| Researcher | `.opencode/agents/researcher.md` | Technical investigation, library evaluation |
+| Architect | `.opencode/agents/architect.md` | System design, component architecture |
+| Implementer | `.opencode/agents/implementer.md` | Translates designs into implementation plans |
+| Designer | `.opencode/agents/designer.md` | UI/UX, styling, responsive design |
+| Coder | `.opencode/agents/coder.md` | Production code implementation |
+| Unit Tester | `.opencode/agents/unit-tester.md` | Unit and integration tests |
+| E2E Tester | `.opencode/agents/e2e-tester.md` | Playwright browser tests |
+| Reviewer | `.opencode/agents/reviewer.md` | Code review, security audit |
+| Deployer | `.opencode/agents/deployer.md` | CI/CD, deployment scripts |
+| Tracker | `.opencode/agents/tracker.md` | Documentation recorder |
 
 ### How to Use
 

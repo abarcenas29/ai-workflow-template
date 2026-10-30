@@ -1,13 +1,9 @@
 ---
 description: "Unit and integration testing specialist. Writes comprehensive tests, improves coverage, validates edge cases, and ensures code quality through automated testing."
-name: "Unit Tester - Test Coverage"
-permission:
-  read: allow
-  search: allow
-  edit: allow
-  execute: allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # Unit Tester - Test Coverage
