@@ -2,7 +2,9 @@
 description: "Implementation planning specialist. Translates architecture and design documents into detailed, actionable implementation plans with task breakdowns, file-level specifications, and execution ordering."
 mode: all
 permissions:
-  - { action: edit,  resource: "*",    effect: allow }
+  # Plans only — the implementer writes task breakdowns under plan/, never source.
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
   - { action: shell, resource: "*",    effect: allow }
 ---
 

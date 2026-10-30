@@ -2,8 +2,27 @@
 description: "Unit and integration testing specialist. Writes comprehensive tests, improves coverage, validates edge cases, and ensures code quality through automated testing."
 mode: all
 permissions:
-  - { action: edit,  resource: "*",    effect: allow }
-  - { action: shell, resource: "*",    effect: allow }
+  # Tests only. One allow rule per test-file convention; this template is
+  # polyglot, so the list covers the stacks it documents (TS/JS, Go) plus the
+  # common ones. A consumer whose convention is absent adds a rule here or in
+  # its own agent override — it must not widen this back to "*".
+  - { action: edit,  resource: "*",          effect: deny }
+  - { action: edit,  resource: "*.spec.ts",  effect: allow }
+  - { action: edit,  resource: "*.test.ts",  effect: allow }
+  - { action: edit,  resource: "*.spec.tsx", effect: allow }
+  - { action: edit,  resource: "*.test.tsx", effect: allow }
+  - { action: edit,  resource: "*.spec.js",  effect: allow }
+  - { action: edit,  resource: "*.test.js",  effect: allow }
+  - { action: edit,  resource: "*.spec.jsx", effect: allow }
+  - { action: edit,  resource: "*.test.jsx", effect: allow }
+  - { action: edit,  resource: "*.spec.mts", effect: allow }
+  - { action: edit,  resource: "*.test.mts", effect: allow }
+  - { action: edit,  resource: "*_test.go",  effect: allow }
+  - { action: edit,  resource: "test_*.py",  effect: allow }
+  - { action: edit,  resource: "*_test.py",  effect: allow }
+  - { action: edit,  resource: "*Tests.cs",  effect: allow }
+  - { action: edit,  resource: "*Test.java", effect: allow }
+  - { action: shell, resource: "*",          effect: allow }
 ---
 
 # Unit Tester - Test Coverage
