@@ -1,13 +1,10 @@
 ---
 description: "Test-Driven Development orchestrator that enforces a RED-GREEN-REFACTOR pipeline. Writes tests first via unit-tester, then implements code via coder, verifies coverage ≥90%, and returns to test-writing if thresholds are not met. Tracks all test suites in memory-bank."
-name: "TDD Orchestrator - Test-Driven Development"
-permission:
-  search: allow
-  read: allow
-  agent: allow
-  todo: allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: primary
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # TDD Orchestrator - Test-Driven Development
@@ -28,11 +25,11 @@ You are a Test-Driven Development orchestration agent that enforces a strict RED
 
 | Role | Agent File | subagent_type | Typical Tools | When to Deploy |
 |---|---|---|---|---|---|
-| implementer | `implementer.agent.md` | `implementer` | read, search, edit, execute | Translating requirements into implementation plans with test/code batch tables |
-| unit-tester | `unit-tester.agent.md` | `unit-tester` | read, search, edit (test files only), execute | RED phase: write failing tests. VERIFY phase: run tests + check coverage |
-| coder | `coder.agent.md` | `coder` | read, search, edit, execute | GREEN phase: write minimal production code to pass tests |
-| reviewer | `reviewer.agent.md` | `reviewer` | read, search, github/* | Code review, security audit, quality gates on both tests and implementation |
-| tracker | `tracker.agent.md` | `tracker` | read, search | Doc recording — runs after pipeline to log finished work |
+| implementer | `implementer.md` | `implementer` | read, search, edit, execute | Translating requirements into implementation plans with test/code batch tables |
+| unit-tester | `unit-tester.md` | `unit-tester` | read, search, edit (test files only), execute | RED phase: write failing tests. VERIFY phase: run tests + check coverage |
+| coder | `coder.md` | `coder` | read, search, edit, execute | GREEN phase: write minimal production code to pass tests |
+| reviewer | `reviewer.md` | `reviewer` | read, search, github/* | Code review, security audit, quality gates on both tests and implementation |
+| tracker | `tracker.md` | `tracker` | read, search | Doc recording — runs after pipeline to log finished work |
 
 ## TDD Pipeline Overview
 
@@ -63,12 +60,12 @@ Delegate bootstrap checks to a sub-agent. Do NOT read or check any files yoursel
 Invoke a sub-agent (use `subagent_type "implementer"`) to check and bootstrap the project:
 
 ```
-This phase must be performed as the agent "Implementer - Implementation Planning" defined in ".opencode/agents/implementer.agent.md".
+This phase must be performed as the agent "Implementer - Implementation Planning" defined in ".opencode/agents/implementer.md".
 
 BOOTSTRAP CONTEXT - Check and initialize project scaffolding:
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - Base path: "{basePath}".
 - Check if `docs/.architecture-context.md` exists with real content.
 - If missing or template-only, run the architecture-blueprint-generator skill by reading ".agents/skills/architecture-blueprint-generator/SKILL.md" and following its instructions to analyze the codebase and generate architecture context.
@@ -120,10 +117,10 @@ The implementer creates the plan document with **two separate batch tables** for
 3. Invoke the sub-agent using the Task tool with `subagent_type "implementer"`:
 
 ```
-This phase must be performed as the agent "Implementation Plan Generation" defined in ".opencode/agents/implementer.agent.md".
+This phase must be performed as the agent "Implementation Plan Generation" defined in ".opencode/agents/implementer.md".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - Work on "{work_unit}" with base path: "{basePath}".
 - Produce a plan file in /plan/ with TWO separate batch execution tables:
   1. **Test Batch Summary** — tasks for writing tests (unit-tester work). Each test task must specify: the test file to create, the component/function under test, expected behaviors to cover, and dependencies on other test tasks.
@@ -153,10 +150,10 @@ IMPORTANT:
    b. Log: `"Test Batch {letter}: launching {N} parallel unit-tester tasks — {task_ids}"`
    c. Launch **one Task tool invocation per test task**, all concurrently, using `subagent_type "unit-tester"`:
    ```
-   This phase must be performed as the agent "Unit Tester - Test Coverage" defined in ".opencode/agents/unit-tester.agent.md".
+   This phase must be performed as the agent "Unit Tester - Test Coverage" defined in ".opencode/agents/unit-tester.md".
 
    IMPORTANT:
-   - Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+   - Read and apply the entire agent spec file (tools, constraints, quality standards).
    - TDD CONTEXT: This is the RED phase. You are writing tests that define expected behavior BEFORE any implementation code exists. These tests SHOULD fail when run — that is correct and expected in TDD.
    - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
    - Work on "Write tests for task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
@@ -197,10 +194,10 @@ IMPORTANT:
    b. Log: `"Impl Batch {letter}: launching {N} parallel coder tasks — {task_ids}"`
    c. Launch **one Task tool invocation per implementation task**, all concurrently, using `subagent_type "coder"`:
    ```
-   This phase must be performed as the agent "Coder - Implementation" defined in ".opencode/agents/coder.agent.md".
+   This phase must be performed as the agent "Coder - Implementation" defined in ".opencode/agents/coder.md".
 
    IMPORTANT:
-   - Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+   - Read and apply the entire agent spec file (tools, constraints, quality standards).
    - TDD CONTEXT: This is the GREEN phase. Write the MINIMAL production code necessary to pass all existing tests. Do NOT add features beyond what the tests specify. The tests were written first and define the contract you must fulfill.
    - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
    - Work on "Implement task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
@@ -236,10 +233,10 @@ IMPORTANT:
 3. Invoke the sub-agent using the Task tool with `subagent_type "unit-tester"`:
 
 ```
-This phase must be performed as the agent "Unit Tester - Test Coverage" defined in ".opencode/agents/unit-tester.agent.md".
+This phase must be performed as the agent "Unit Tester - Test Coverage" defined in ".opencode/agents/unit-tester.md".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - TDD CONTEXT: This is the VERIFY phase. Run ALL test files in the project. Report:
   - Total tests: {count}
   - Passed: {count}
@@ -276,10 +273,10 @@ Review both test code and implementation code for quality, correctness, and adhe
 3. Invoke the sub-agent using the Task tool with `subagent_type "reviewer"`:
 
 ```
-This phase must be performed as the agent "Reviewer - Code Quality" defined in ".opencode/agents/reviewer.agent.md".
+This phase must be performed as the agent "Reviewer - Code Quality" defined in ".opencode/agents/reviewer.md".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - TDD CONTEXT: Review BOTH the test files and the implementation files. Verify that:
   - Tests are comprehensive and meaningful (not just mocks returning canned values).
   - Implementation is minimal and does not contain untested code paths.
@@ -304,10 +301,10 @@ After the pipeline finishes executing, delegate to the tracker agent to document
 1. Invoke the tracker using the Task tool with subagent_type "tracker":
 
 ```
-This phase must be performed as the agent "Tracker - Documentation Recorder" defined in ".opencode/agents/tracker.agent.md".
+This phase must be performed as the agent "Tracker - Documentation Recorder" defined in ".opencode/agents/tracker.md".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - Base path: "{basePath}".
 - Read the orchestrator log at "docs/.orchestrator-log.md" for the full pipeline record.
 - Read any artifact files referenced in the log.
@@ -338,12 +335,12 @@ After every pipeline (or at the user's request), delegate to a sub-agent to pers
 Invoke the tracker (use `subagent_type "tracker"`) with the pipeline context:
 
 ```
-This phase must be performed as the agent "Tracker - Documentation Recorder" defined in ".opencode/agents/tracker.agent.md".
+This phase must be performed as the agent "Tracker - Documentation Recorder" defined in ".opencode/agents/tracker.md".
 
 PERSIST LESSONS - Record pipeline knowledge:
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec.
+- Read and apply the entire agent spec file.
 - Base path: "{basePath}".
 - Read the orchestrator log at "docs/.orchestrator-log.md" for the full pipeline record.
 - Append a new "Session" entry to ".agents/instructions/learned-knowledge.instructions.md" with:

@@ -19,10 +19,9 @@
      },
     "github": {
       "type": "local",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}"
       },
       "enabled": true
     },
@@ -30,19 +29,19 @@
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
       "headers": {
-        "CONTEXT7_API_KEY": "YOUR_API_KEY"
+        "CONTEXT7_API_KEY": "{env:CONTEXT7_TOKEN}"
       },
       "enabled": true
     },
     "playwright": {
       "type": "local",
-      "command": "node",
-      "args": ["scripts/mcp/playwright-mcp-launcher.js"],
-      "env": {
-        "HEADLESS": "$HEADLESS",
-        "SLOW_MO": "$SLOW_MO",
-        "VIEWPORT": "$VIEWPORT"
+      "command": ["node", "scripts/mcp/playwright-mcp-launcher.js"],
+      "environment": {
+        "HEADLESS": "{env:HEADLESS}",
+        "SLOW_MO": "{env:SLOW_MO}",
+        "VIEWPORT": "{env:VIEWPORT}"
       },
+      "timeout": 120000,
       "enabled": true
     },
     "example-server": {
@@ -67,6 +66,7 @@
     "mcp-everything_*": "allow",
     "angular-cli_*": "allow",
     "playwright_*": "allow",
+    "context7_*": "allow",
     "memory-bank_*": "allow"
   }
 }

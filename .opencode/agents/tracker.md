@@ -1,14 +1,10 @@
 ---
 description: "Documentation recorder that reads completed agent outputs and appends structured documentation to docs/<feature>/<agent>.md. Runs once after a pipeline finishes to produce a human-readable record of what was accomplished."
-name: "Tracker - Documentation Recorder"
-permission:
-  read: allow
-  search: allow
-  glob: allow
-  edit: allow
-  write: allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # Tracker - Documentation Recorder

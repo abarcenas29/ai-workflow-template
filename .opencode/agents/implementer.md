@@ -1,13 +1,9 @@
 ---
 description: "Implementation planning specialist. Translates architecture and design documents into detailed, actionable implementation plans with task breakdowns, file-level specifications, and execution ordering."
-name: "Implementer - Implementation Planning"
-permission:
-   read: allow
-   search: allow
-   edit: allow
-   execute: allow
-   "memory-bank/*": allow
-   "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # Implementer - Implementation Planning

@@ -1,12 +1,9 @@
 ---
 description: "Browser debugging and exploration specialist. Inspects pages, analyzes network, takes screenshots, and investigates UI behavior using Chrome DevTools. Read-only — no code or test creation."
-name: "E2E Tester - Browser Automation"
-permission:
-  read: allow
-  search: allow
-  "chrome-devtools/*": allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # E2E Tester - Browser Automation

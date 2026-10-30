@@ -1,14 +1,9 @@
 ---
 description: "Deployment and release engineering specialist. Handles CI/CD configuration, deployment scripts, release management, infrastructure as code, and environment setup."
-name: "Deployer - Release Engineering"
-permission:
-  read: allow
-  search: allow
-  edit: allow
-  execute: allow
-  "github/*": allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # Deployer - Release Engineering

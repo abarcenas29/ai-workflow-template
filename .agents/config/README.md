@@ -27,10 +27,10 @@ the second calls `grilling` and `domain-modeling` together.
 
 ## Scope agent
 
-`.opencode/agents/scope.agent.md` is the front door for underspecified feature requests. It
+`.opencode/agents/scope.md` is the front door for underspecified feature requests. It
 runs grilling in rounds against a draft file, emits the current frontier as numbered questions,
 and finishes by writing a spike document at `docs/spike-<feature>.md` — the input
-`researcher.agent.md` already expects.
+`researcher.md` already expects.
 
 It never builds or runs code. When a question needs a prototype it emits
 `prototype needed: <question>`, and the orchestrator delegates the work to `coder` (logic) or

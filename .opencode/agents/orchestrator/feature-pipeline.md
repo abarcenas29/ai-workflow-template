@@ -1,13 +1,10 @@
 ---
 description: "Stripped-down feature pipeline orchestrator that runs implementer, designer, coder, and tracker sequentially. Bootstraps architecture context, supports step-by-step confirmation, logs progress, and persists lessons learned."
-name: "Feature Pipeline"
-permission:
-  search: allow
-  read: allow
-  agent: allow
-  todo: allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: primary
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # Feature Pipeline
@@ -26,10 +23,10 @@ You are a lightweight orchestration agent that runs a fixed sequential pipeline:
 
 | Step | Role | Agent File | subagent_type | Purpose |
 |---|---|---|---|---|---|
-| 1 | implementer | `implementer.agent.md` | `implementer` | Translate architecture/design into detailed implementation plans |
-| 2 | designer | `designer.agent.md` | `designer` | UI/UX design specs, component layout — no code |
-| 3 | coder | `coder.agent.md` | `coder` | Write production code, implement features |
-| 4 | tracker | `tracker.agent.md` | `tracker` | Document completed work to `docs/tracker-log.md` |
+| 1 | implementer | `implementer.md` | `implementer` | Translate architecture/design into detailed implementation plans |
+| 2 | designer | `designer.md` | `designer` | UI/UX design specs, component layout — no code |
+| 3 | coder | `coder.md` | `coder` | Write production code, implement features |
+| 4 | tracker | `tracker.md` | `tracker` | Document completed work to `docs/tracker-log.md` |
 
 ## Workflow
 
@@ -40,12 +37,12 @@ Delegate bootstrap checks to a sub-agent. Do NOT read or check any files yoursel
 Invoke a sub-agent (use `subagent_type "implementer"`) to check and bootstrap the project:
 
 ```
-This phase must be performed as the agent "Implementer - Implementation Planning" defined in ".opencode/agents/implementer.agent.md".
+This phase must be performed as the agent "Implementer - Implementation Planning" defined in ".opencode/agents/implementer.md".
 
 BOOTSTRAP CONTEXT - Check and initialize project scaffolding:
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - Base path: "{basePath}".
 - Check if `docs/.architecture-context.md` exists with real content.
 - If missing or template-only, run the architecture-blueprint-generator skill by reading ".agents/skills/architecture-blueprint-generator/SKILL.md" and following its instructions to analyze the codebase and generate architecture context.
@@ -96,7 +93,7 @@ For each step:
 This phase must be performed as the agent "{agent_name}" defined in ".opencode/agents/{agent_file}".
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (tools, constraints, quality standards).
 - Work on "{work_unit}" with base path: "{basePath}".
 - Perform the necessary reads/writes under this base path.
 - Previous step context: {previous_step_summary}
@@ -129,10 +126,10 @@ When the pipeline reaches the "coder" step and the latest implementer plan has p
    b. Log: `"Batch {letter}: launching {N} parallel coder tasks — {task_ids}"`
    c. Launch **one Task tool invocation per task**, all concurrently, using `subagent_type "coder"`:
       ```
-      This phase must be performed as the agent "Coder - Implementation" defined in ".opencode/agents/coder.agent.md".
+      This phase must be performed as the agent "Coder - Implementation" defined in ".opencode/agents/coder.md".
 
       IMPORTANT:
-      - Read and apply the entire .agent.md spec (tools, constraints, quality standards).
+      - Read and apply the entire agent spec file (tools, constraints, quality standards).
       - Work on "Implement task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
       - Perform the necessary reads/writes under this base path.
       - Previous step context: {previous_step_summary}
@@ -199,12 +196,12 @@ After every pipeline (or at the user's request), delegate to a sub-agent to pers
 Invoke the tracker (use `subagent_type "tracker"`) with the pipeline context:
 
 ```
-This phase must be performed as the agent "Tracker - Documentation Recorder" defined in ".opencode/agents/tracker.agent.md".
+This phase must be performed as the agent "Tracker - Documentation Recorder" defined in ".opencode/agents/tracker.md".
 
 PERSIST LESSONS - Record pipeline knowledge:
 
 IMPORTANT:
-- Read and apply the entire .agent.md spec.
+- Read and apply the entire agent spec file.
 - Base path: "{basePath}".
 - Read the orchestrator log at "docs/.orchestrator-log.md" for the full pipeline record.
 - Append a new "Session" entry to ".agents/instructions/learned-knowledge.instructions.md" with:

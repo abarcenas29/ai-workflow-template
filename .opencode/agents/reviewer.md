@@ -1,13 +1,10 @@
 ---
 description: "Code review and quality assurance specialist. Reviews code for correctness, security vulnerabilities, performance issues, maintainability, and adherence to project standards."
-name: "Reviewer - Code Quality"
-permission:
-  read: allow
-  search: allow
-  edit: allow
-  "github/*": allow
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # Reviewer - Code Quality

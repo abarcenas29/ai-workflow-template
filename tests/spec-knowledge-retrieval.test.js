@@ -34,31 +34,31 @@ function readRepoFile(relativePath) {
   return readFileSync(join(REPO_ROOT, relativePath), 'utf8')
 }
 
-// Every pipeline agent spec under .opencode/agents/*.agent.md EXCEPT
-// plan.agent.md (out of scope — see ALT-01 in the plan).
+// Every pipeline agent spec under .opencode/agents/*.md EXCEPT
+// planner.md (out of scope — see ALT-01 in the plan).
 const PIPELINE_AGENT_DIR = join(REPO_ROOT, '.opencode/agents')
 const ORCHESTRATOR_DIR = join(REPO_ROOT, '.opencode/agents/orchestrator')
 
 const pipelineAgentSpecs = readdirSync(PIPELINE_AGENT_DIR)
-  .filter((file) => file.endsWith('.agent.md') && file !== 'plan.agent.md')
+  .filter((file) => file.endsWith('.md') && file !== 'planner.md')
   .sort()
 
 const orchestratorTemplates = readdirSync(ORCHESTRATOR_DIR)
-  .filter((file) => file.endsWith('.agent.md'))
+  .filter((file) => file.endsWith('.md'))
   .sort()
 
 const EXPECTED_PIPELINE_AGENTS = [
-  'architect.agent.md',
-  'coder.agent.md',
-  'deployer.agent.md',
-  'designer.agent.md',
-  'e2e-tester.agent.md',
-  'implementer.agent.md',
-  'researcher.agent.md',
-  'reviewer.agent.md',
-  'scope.agent.md',
-  'tracker.agent.md',
-  'unit-tester.agent.md',
+  'architect.md',
+  'coder.md',
+  'deployer.md',
+  'designer.md',
+  'e2e-tester.md',
+  'implementer.md',
+  'researcher.md',
+  'reviewer.md',
+  'scope.md',
+  'tracker.md',
+  'unit-tester.md',
 ]
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -96,11 +96,11 @@ describe('pipeline agent specs reference the knowledge-retrieval protocol (plan 
     ).toEqual([])
   })
 
-  it('TEST-06: plan.agent.md is correctly excluded from the pipeline agent list (no false positive)', () => {
-    // The pipeline list must be exactly the 11 in-scope agents — plan.agent.md
+  it('TEST-06: planner.md is correctly excluded from the pipeline agent list (no false positive)', () => {
+    // The pipeline list must be exactly the 11 in-scope agents — planner.md
     // is a standalone pre-pipeline agent and must never be checked (ALT-01).
     expect(pipelineAgentSpecs).toHaveLength(11)
-    expect(pipelineAgentSpecs).not.toContain('plan.agent.md')
+    expect(pipelineAgentSpecs).not.toContain('planner.md')
     expect(pipelineAgentSpecs).toEqual(EXPECTED_PIPELINE_AGENTS)
   })
 })

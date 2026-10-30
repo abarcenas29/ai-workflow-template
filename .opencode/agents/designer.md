@@ -1,11 +1,10 @@
 ---
 description: "UI/UX design specialist. Handles component layout, visual styling, responsive design, design systems, and user experience considerations."
-name: "Designer - UI/UX"
-permission:
-  read: "allow"
-  search: "allow"
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: deny }
 ---
 
 # Designer - UI/UX

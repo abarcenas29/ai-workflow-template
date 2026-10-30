@@ -1,14 +1,9 @@
 ---
 description: "Strategic planning and architecture assistant focused on thoughtful analysis before implementation. Helps developers understand codebases, clarify requirements, and develop comprehensive implementation strategies."
-name: "Plan Mode - Strategic Planning & Architecture"
-permission:
-  read: allow
-  search: allow
-  edit: allow
-  skill: allow
-  question: allow
-  webfetch: allow
-  websearch: allow
+mode: primary
+permissions:
+  - { action: edit,  resource: "*",    effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # Plan Mode - Strategic Planning & Architecture Assistant

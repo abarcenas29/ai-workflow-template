@@ -1,13 +1,9 @@
 ---
 description: "Production code implementation specialist. Writes clean, maintainable, well-tested code following project conventions. Implements features, fixes bugs, and refactors existing code."
-name: "Coder - Implementation"
-permission:
-  read: "allow"
-  search: "allow"
-  edit: "allow"
-  execute: "allow"
-  "memory-bank/*": allow
-  "knowledgebase/*": allow
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 
 # Coder - Implementation
