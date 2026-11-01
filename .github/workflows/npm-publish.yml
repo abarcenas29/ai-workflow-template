@@ -21,11 +21,31 @@ permissions:
   contents: read
   id-token: write
 
+# Serialize publishes: two quick merges must not both clear the preflight guard
+# and race each other at the registry. Never cancel — an in-flight publish should
+# be allowed to finish rather than be killed mid-upload.
+concurrency:
+  group: npm-publish-main
+  cancel-in-progress: false
+
 jobs:
   publish:
+    # This file is distributed to consumers, who may adapt it for their own
+    # package. Keep it inert anywhere but the upstream repo.
+    if: github.repository == 'abarcenas29/ai-workflow-template'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # A manual run may be started against any ref, and it would publish that
+      # ref's tree with the real NPM_TOKEN and a provenance attestation. Only
+      # main is releasable.
+      - name: Require main for manual runs
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Manual publishes must run against refs/heads/main (got ${GITHUB_REF})."
+          exit 1
 
       - uses: actions/setup-node@v4
         with:
@@ -55,28 +75,26 @@ jobs:
         run: |
           NAME="$(node -p "require('./package.json').name")"
           VERSION="$(node -p "require('./package.json').version")"
+
+          # The version must be a plain X.Y.Z: no ranges, no pre-release tags.
+          case "$VERSION" in
+            *[!0-9.]*|*..*|.*|*.) echo "::error::package.json version '${VERSION}' is not a plain X.Y.Z"; exit 1 ;;
+          esac
+
           echo "Checking ${NAME}@${VERSION} on the registry..."
-
-          # `npm view` exits non-zero both for "version not found" (E404) and for
-          # real failures (auth, network, registry 5xx). Only E404 means the
-          # version is genuinely unpublished, so the error text is inspected
-          # rather than the exit code alone.
-          if OUTPUT="$(npm view "${NAME}@${VERSION}" version 2>&1)"; then
-            echo "::error::Version ${VERSION} is already published to npm. Bump the version in package.json before merging to main."
+          # One deterministic read of the published version list. Its exit status
+          # — not the text of an error message — decides whether the registry
+          # answered, so an auth/network/registry failure fails closed.
+          VERSIONS="$(npm view "${NAME}" versions --json)" || {
+            echo "::error::Registry read failed for ${NAME}. Refusing to publish."
             exit 1
-          fi
+          }
 
-          if ! printf '%s' "$OUTPUT" | grep -q 'E404'; then
-            echo "::error::Could not determine whether ${NAME}@${VERSION} is published — npm view failed without an E404. Refusing to publish."
-            printf '%s\n' "$OUTPUT"
-            exit 1
-          fi
-
-          # A 404 on the version is expected. A 404 on the package itself means the
-          # name or registry is wrong, and publishing would create a brand-new
-          # package instead of releasing a version of this one.
-          if ! npm view "${NAME}" version >/dev/null 2>&1; then
-            echo "::error::Package ${NAME} does not resolve on the registry. Check the package name and registry-url before publishing."
+          # `-F` keeps the dots in the version literal instead of regex wildcards,
+          # and the surrounding quotes anchor the match to a whole JSON string, so
+          # "2.0.0" cannot match inside "2.0.0-rc.1" or "12.0.0".
+          if printf '%s' "$VERSIONS" | grep -qF "\"${VERSION}\""; then
+            echo "::error::Version ${VERSION} is already published to npm. Bump package.json before merging to main."
             exit 1
           fi
 

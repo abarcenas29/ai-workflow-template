@@ -13,8 +13,10 @@
 
 ### Other changes
 
-- Publishing is now tag-triggered with npm provenance
-  (`.github/workflows/npm-publish.yml`). A tag/`package.json` version mismatch
-  fails the workflow, and each release carries a signed attestation.
+- **Publishing is now triggered by merging to `main`** with npm provenance
+  (`.github/workflows/npm-publish.yml`). The version comes from `package.json`,
+  not from a git tag or workflow input, and each release carries a signed
+  attestation. A version that is already on the registry fails the run rather
+  than being republished.
 - The published tarball no longer ships test files (`*.test.*` / `*.spec.*`
   under `scripts/`).

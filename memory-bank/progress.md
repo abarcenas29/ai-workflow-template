@@ -53,11 +53,11 @@ The published artifact is now honest about being a CLI/scaffold.
 - **Entry point:** `main: "index.js"` removed (it pointed at a file that never existed); no `exports`/`types` added — the only supported entry point is the `ai-workflow-setup` bin.
 - **Install behaviour:** `postinstall` removed. `scripts/setup/index.js` Phase 5 already runs `sync.js` + `normalize-memory.js` in consumer root, so `npx ai-workflow-setup` is the single, explicit, idempotent setup path (`--skip-sync` / `--force` / `--dry-run` still meaningful).
 - **Tarball:** `npm pack --dry-run` → **145 files / 341,382 B packed / 1,124,121 B unpacked** (was 167 / 434,846 / 1,677,865). 23 `*.test.js` files no longer ship; `LICENSE` now does. `CONTRIBUTING.md`, `plan/`, and `docs/` do not ship.
-- **Publishing:** `publishConfig {access: public, provenance: true}`, `engines.node ">=22"`, and a tag-gated workflow (`v*` or `workflow_dispatch`) with a tag-vs-package.json guard and `--provenance`.
+- **Publishing:** `publishConfig {access: public, provenance: true}`, `engines.node ">=22"`, and a publish-on-merge workflow (push to `main`, or a `workflow_dispatch` run against `main`) that takes the version from `package.json`, refuses to publish a version already on the registry, and publishes with `--provenance`.
 - **Versioning:** `2.0.0` (major, because install-time sync behaviour changed); `package-lock.json` synced to the same version.
 - **README:** install/setup text, structure tree, publish flow, and the Playwright MCP link all corrected.
 - **Verification:** `npm run test:unit` → 26 files / **799 tests** / 0 failures. Temp-consumer run scaffolded 134 files; a second run produced an identical file set.
-- **Left alone deliberately:** no commit, no tag, no publish (`npm publish` was forbidden for this unit). The tag must be pushed to trigger a release.
+- **Left alone deliberately:** no commit, no tag, no publish (`npm publish` was forbidden for this unit). A merge to `main` is what triggers a release.
 - `memory_search` executed; `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured).
 
 ### 2026-10-25: Tracker — Project-Owned Layer for the Sync Documented (Feature Pipeline 15)
