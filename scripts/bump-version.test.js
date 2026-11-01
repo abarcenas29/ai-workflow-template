@@ -24,6 +24,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 vi.mock('fs', () => ({
+  existsSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
 }))

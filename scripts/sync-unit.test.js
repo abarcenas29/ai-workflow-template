@@ -51,6 +51,8 @@ import {
 } from './sync.js'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+// npm ships as npm.cmd on Windows; spawnSync does not resolve .cmd shims.
+const NPM_BIN = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const tempDirs = []
 
@@ -1497,15 +1499,46 @@ describe('project-owned files', () => {
     expect(packageManifest.files).not.toContain('opencode.json')
     expect(packageManifest.files).toContain('.prettierignore')
 
-    const packed = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+    // This package is a scaffold, not a library: no dangling entry point and
+    // no install-time lifecycle script.
+    expect(packageManifest.main).toBeUndefined()
+    expect(packageManifest.scripts.postinstall).toBeUndefined()
+    expect(packageManifest['//']).toBeUndefined()
+
+    const packed = spawnSync(NPM_BIN, ['pack', '--dry-run', '--json'], {
       cwd: repoRoot,
       encoding: 'utf8',
     })
     expect(packed.status).toBe(0)
     const files = JSON.parse(packed.stdout)[0].files.map((file) => file.path)
     expect(files).toContain('.prettierignore')
+    expect(files).toContain('LICENSE')
     expect(files).not.toContain('AGENTS.project.md')
     expect(files).not.toContain('opencode.json')
+    expect(files).not.toContain('CONTRIBUTING.md')
+    // Test files are development-only and must not ship in the tarball. Match
+    // the whole family vitest can pick up (scripts/**/*.test.{js,ts}), not just
+    // the .test.js literal, so a .test.ts test cannot slip past the filter.
+    expect(
+      files.filter((file) => /\.(test|spec)\.[cm]?[jt]s$/.test(file)),
+    ).toEqual([])
+  })
+
+  it('ships the setup binary as the package entry point', () => {
+    const packageManifest = JSON.parse(
+      readFileSync(join(repoRoot, 'package.json'), 'utf8'),
+    )
+    // main is intentionally gone, so the CLI bin is the only entry point a
+    // consumer can execute: it must resolve and it must be in the tarball.
+    expect(packageManifest.bin['ai-workflow-setup']).toBe('./bin/setup.js')
+
+    const packed = spawnSync(NPM_BIN, ['pack', '--dry-run', '--json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    })
+    expect(packed.status).toBe(0)
+    const files = JSON.parse(packed.stdout)[0].files.map((file) => file.path)
+    expect(files).toContain('bin/setup.js')
   })
 
   it('reserves every documented project-owned path', () => {

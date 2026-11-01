@@ -1,9 +1,9 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-10-25"
+updated: "2026-11-01"
 
-tags: [architect, coder, implementer, deployer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, agents]
+tags: [architect, coder, implementer, deployer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, agents, env-var-shadowing, mcp-config, restart]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
 category: "progress"
 ---
@@ -20,6 +20,45 @@ category: "progress"
 - **KB Consolidation + Standardization — `plan/process-kb-consolidation-1.md` — STATUS: ✅ COMPLETED 2026-08-03 (ALL 10 TASKS / 4 PHASES DONE — T10 docs/status finalized in Phase 4)** — 10 tasks / 4 phases. Consolidate duplicate KB projects (re-index `@abarcenas/ai-workflow-template` from source → delete `ai-workflow-template`) and standardize projectId derivation (always use `package.json` `name`). **T1 ✅ 2026-08-03**: canonical scoped project re-indexed (16 chunks, +1). **T3 ✅ 2026-08-03**: `.opencode/agents/tracker.agent.md` "Check Knowledge" step gained projectId derivation guidance (line 30) — `knowledgebase_index` `projectId` SHALL be `require('./package.json').name` (scoped `@abarcenas/ai-workflow-template`), NOT orchestrator `projectName`; 14/14 existing spec-wiring tests pass. **T4 ✅ 2026-08-03**: `knowledge-retrieval.instructions.md` gained `### Canonical projectId` subsection (package.json name = single source of truth). **T5 ✅ 2026-08-03**: `knowledgebase.instructions.md` `knowledgebase_index` row `projectId` now "(required — from `package.json` `name` field)" + tool-detail sentence (scoped package name, single canonical project); **T7 (restart note) ✅ 2026-08-03** (dispatched with T5 — same FILE-03): added `### MCP Server Restart After Configuration Changes` subsection (after graceful-degradation section) + "Restart OpenCode after code changes" cross-reference in the `knowledgebase_search` tool description. **T6 (re-batched) ✅ 2026-08-03**: all 3 orchestrator `projectName` descriptions now read `(extracted from user request (prefer package.json "name" for the canonical scoped projectId))` — `orchestrator.agent.md:25` by the T6 agent; `feature-pipeline.agent.md:20` + `tdd-orchestrator.agent.md:20` by the "T7" coder instance (satisfies T9 spec test #4). **T8 ✅ 2026-08-03**: full Vitest suite `npx vitest run` → **14 files / 273 tests / 0 failures** (REQ-06 exact match); setup sub-suite `npx vitest run scripts/setup` → **6 files / 104 tests / 0 failures** — zero regressions from the additive doc changes (VALIDATION ONLY, no files edited). Remaining: T9 (spec test, Batch B parallel), T10 (memory bank + plan complete). No production code changes.
 
 ## What Works
+
+### 2026-11-01: Coder — `github` MCP entry no longer shadows `GITHUB_PERSONAL_ACCESS_TOKEN`
+
+Both remaining `{env:…}`-in-`environment` blocks are gone; no MCP entry in `opencode.json` passes an interpolated variable through `environment` any more.
+
+- **Defect (same class as the `knowledgebase` one):** the `github` entry — `type: local`, `npx -y @modelcontextprotocol/server-github`, **no `headers`**, so `environment` was that server's only auth path — declared `"environment": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}" }`. With the variable absent in the parent, OpenCode resolves `{env:…}` to `""` and the child gets an empty token instead of an absent one.
+- **Fix:** the block is deleted; the entry is `{ type, command, enabled }` (`opencode.json:19-23`, 2-space indent preserved). Children inherit the parent environment, which is where `@modelcontextprotocol/server-github` reads the token from.
+- **Validation:** `require("./opencode.json")` → `JSON_OK`; **11 servers, count unchanged** (`ddg-search, chrome-devtools, angular-cli, github, context7, playwright, playwright-firefox, example-server, example-remote, memory-bank, knowledgebase`); zero `environment` keys in the whole `mcp` map; `github` and `knowledgebase` keys both `[type, command, enabled]`. `opencode mcp list` → 9 connected / 2 disabled, `github` and `knowledgebase` both `connected`.
+- **Sweep:** the only remaining interpolation in `opencode.json` is `context7` `headers.CONTEXT7_API_KEY: "{env:CONTEXT7_TOKEN}"` — a remote server whose auth path *is* the header, deliberately untouched. `opencode.mcp.example.json` (shipped scaffold, different file) still contains the `github` `environment` block plus `HEADLESS`/`SLOW_MO`/`VIEWPORT` interpolations; reported only, not edited.
+- **Live environment finding (values never printed):** the running `opencode serve --service` (pid 26325) **already has** `GITHUB_PERSONAL_ACCESS_TOKEN` (93 chars, identical to the shell value) and `CONTEXT7_TOKEN` (43), while `DATABASE_URL` is absent. So the github token was reaching children correctly; the defect was latent (only bites when the parent lacks the var). One older `github` child held a differing 40-char value — stale per-session children exist.
+- **Restart guidance:** the service, not the TUI, owns both the loaded config and the inherited environment, and it is not launchd-managed — `opencode service restart` from an interactive shell (or a full quit + relaunch from one) is required; `opencode reload` alone cannot change the process environment.
+- **Not changed:** no `.env` created, no token rotated, nothing committed (`opencode.json` is gitignored and project-owned), no other config or project touched.
+- `memory_search` executed; `knowledgebase_search` attempted → "Knowledgebase not available: DATABASE_URL is not configured" (PG vector unavailable until the restart).
+
+### 2026-11-01: Coder — `knowledgebase` MCP entry no longer shadows `DATABASE_URL`
+
+The MCP server can reach PostgreSQL again as soon as OpenCode is restarted from an interactive shell.
+
+- **Defect:** `opencode.json` passed `"DATABASE_URL": "{env:DATABASE_URL}"` to the `knowledgebase` child. With the variable absent in the parent, OpenCode injects `""`, and dotenv (which never overwrites existing keys) cannot recover — so `getPool()` returned `null` and every tool reported "not configured".
+- **Fix:** the `environment` block is gone; the entry is `{ type, command, enabled }`. The child inherits the parent env, and `import 'dotenv/config'` in `scripts/mcp-knowledgebase-server.js` remains as the `.env` fallback.
+- **Why the export never reached the parent:** `~/.zshrc:8` exports `DATABASE_URL` unconditionally, but `.zshrc` is only read by **interactive** shells. `zsh -c` → unset; `zsh -ic` → set. `opencode serve` runs outside an interactive shell.
+- **Verification:** `JSON.parse` OK, `knowledgebase` keys `type/command/enabled`, no `environment`; `zsh -ic 'npm run kb:stats'` → 4 projects / 56 chunks / 8703 kB / last sync 2026-10-31. Non-interactive and `DATABASE_URL=` variants both report "not set" (reproduces the injected-empty-string path).
+- **Superseded:** the `github` server's analogous `environment` block was removed on 2026-11-01 by the follow-up fix below (it is no longer "out of scope").
+- **Action left for the user:** restart OpenCode from a shell with `.zshrc` sourced — the running children (pids 50430, 55767, 58594 under `opencode serve` 26325) still hold the stale empty value. No commit, no `.env` created, no credentials touched.
+- `memory_search` executed; `knowledgebase_search` executed but returned "Knowledgebase not available" (stale MCP child — expected pre-restart).
+
+### 2026-10-31: Coder — Clean npm scaffold at 2.0.0 (no dead library surface, no postinstall)
+
+The published artifact is now honest about being a CLI/scaffold.
+
+- **Entry point:** `main: "index.js"` removed (it pointed at a file that never existed); no `exports`/`types` added — the only supported entry point is the `ai-workflow-setup` bin.
+- **Install behaviour:** `postinstall` removed. `scripts/setup/index.js` Phase 5 already runs `sync.js` + `normalize-memory.js` in consumer root, so `npx ai-workflow-setup` is the single, explicit, idempotent setup path (`--skip-sync` / `--force` / `--dry-run` still meaningful).
+- **Tarball:** `npm pack --dry-run` → **145 files / 341,382 B packed / 1,124,121 B unpacked** (was 167 / 434,846 / 1,677,865). 23 `*.test.js` files no longer ship; `LICENSE` now does. `CONTRIBUTING.md`, `plan/`, and `docs/` do not ship.
+- **Publishing:** `publishConfig {access: public, provenance: true}`, `engines.node ">=22"`, and a tag-gated workflow (`v*` or `workflow_dispatch`) with a tag-vs-package.json guard and `--provenance`.
+- **Versioning:** `2.0.0` (major, because install-time sync behaviour changed); `package-lock.json` synced to the same version.
+- **README:** install/setup text, structure tree, publish flow, and the Playwright MCP link all corrected.
+- **Verification:** `npm run test:unit` → 26 files / **799 tests** / 0 failures. Temp-consumer run scaffolded 134 files; a second run produced an identical file set.
+- **Left alone deliberately:** no commit, no tag, no publish (`npm publish` was forbidden for this unit). The tag must be pushed to trigger a release.
+- `memory_search` executed; `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured).
 
 ### 2026-10-25: Tracker — Project-Owned Layer for the Sync Documented (Feature Pipeline 15)
 
@@ -2727,3 +2766,78 @@ Completed all tracker documentation for `plan/feature-matt-skills-integration-v1
 **Verification:** both workflows parse (Ruby `YAML.load_file`; no js-yaml/PyYAML on this machine) — `pr-test.yml` jobs `test,playwright`; `npm-publish.yml` step order `Run unit tests` → `Install Playwright browsers` → `Run Playwright tests` → `Publish to npm`. No `package.json` dependency added. Post-commit: version still `1.46.0`, `npm test` exit 0 (7 passed / 1 skipped), `npx vitest run` 16 files / 331 tests passing, `git status` clean.
 
 **Notes / follow-ups:** (1) repo-wide coverage threshold remains pre-existing-failing (~50% vs 90%) — unchanged, and CI still does not run coverage; (2) the `pr-test.yml` workflow `name:` still reads "PR Unit Tests" although it now also runs Playwright — left unchanged to avoid disturbing the existing check identity; (3) nothing is pushed/tagged/published — local commit only, and this entry supersedes the "nothing is committed" note in the 2026-10-24 entry above. `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); memory-bank search executed.
+
+---
+
+### 2026-10-31 — Playwright MCP: Firefox parity (`playwright-firefox`)
+
+**What now works:** Two Playwright MCP servers are configured side by side — `playwright` (Google Chrome via the `chrome` channel — corrected in the follow-up entry below, previously mislabelled Chromium; entry otherwise unchanged) and `playwright-firefox` (`--browser firefox --isolated`). Agents granted `playwright-firefox_*` can drive Firefox; the Chromium server is unaffected. The launcher now forwards `BROWSER` → `--browser` and `ISOLATED=true` → `--isolated`, which is what lets the template route both servers through one script while keeping `HEADLESS`/`VIEWPORT` shared.
+
+**Bug fixed:** `scripts/mcp/playwright-mcp-launcher.js` was passing `--viewport <WxH>`, a flag `@playwright/mcp` does not define (the documented flag is `--viewport-size`). Any consumer setting `VIEWPORT` was passing an invalid argument. Now correct, with tests updated.
+
+**Files modified:**
+
+| File | Change |
+|---|---|
+| `opencode.json` | `playwright-firefox` server entry + `playwright-firefox_*` permission |
+| `opencode.mcp.example.json` | Same server via `scripts/mcp/playwright-mcp-launcher.js` (`BROWSER`/`ISOLATED`/`HEADLESS`/`VIEWPORT`) + permission |
+| `scripts/mcp/playwright-mcp-launcher.js` | `buildArgs`: `--browser`, `--isolated`, `--viewport-size` (was `--viewport`); `SLOW_MO` documented as intentionally unused |
+| `scripts/mcp/playwright-mcp-launcher.test.js` | 19 tests — new `BROWSER`/`ISOLATED`/order/`SLOW_MO` cases, viewport flag corrected |
+| `docs/playwright-mcp-configuration.md` | Browser selection + Firefox install sections; `opencode.mcp` → `opencode.json`; corrected config schema, `SLOW_MO`/`VIEWPORT` scope, removed `npm start` |
+| `README.md` | MCP Tooling: `opencode.json` + two-server note |
+
+**Verification:** `npx vitest run` → 26 files / 795 tests pass. Both JSON files parse. Real-server stdio smoke test with the launcher's argv: initialize OK, 25 tools, Firefox selected (fails only at "browser not installed" before install, then at browser launch — see below).
+
+**Known issue (environment, not config):** Firefox will not launch from inside this agent's sandboxed shell. Firefox 1511 / 1522 fail with `sandbox_extension_issue_file_to_process failed ... (Operation not permitted)`; 1553 / 1555 start and then report `Could not find profile folder` with an empty profile dir. Reproduced with the raw `firefox` binary and a pre-created `-profile` directory, so it is not a Playwright or launcher defect. Chromium launches normally in the same shell. The requested Firefox user-agent smoke test therefore could not be completed in-session and remains unverified end-to-end.
+
+**Follow-ups:** (1) confirm Firefox end-to-end on an unsandboxed host — `npx playwright install firefox` then the UA check; (2) note that `@playwright/mcp` bundles its own Playwright, so `npx @playwright/mcp install-browser firefox` is the reliable installer when the project's Playwright version differs; (3) `e2e-tester` still uses chrome-devtools MCP and was deliberately left untouched — decide separately whether it should use `playwright-firefox_*`.
+
+---
+
+### 2026-10-31 — Playwright MCP: Firefox parity review fixes
+
+**What now works:** the `playwright-firefox` documentation now matches how `@playwright/mcp@0.0.83` actually behaves. The default browser is documented as **Google Chrome** (the `chrome` channel — requires Google Chrome installed; missing Chrome fails with `Chromium distribution 'chrome' is not found`), with a verified config-file escape hatch for bundled Chromium (`{"browser":{"browserName":"chromium"}}` + `--config`). The `--isolated` rationale is corrected: profiles are `mcp-{channel}-{workspace-hash}`, so channels never contend — the real risk is a second *same-channel* client in one workspace — and `--isolated` is described as recommended, not required. `USER_DATA_DIR` is now a real launcher opt-out (`--user-data-dir`, skipped when `ISOLATED=true`), so the documented alternative is reachable without hand-editing the command. Users upgrading an existing project are told that sync never rewrites `opencode.json` and that they must add the server block and `playwright-firefox_*` permission themselves.
+
+**Launcher hardening:** `BROWSER` is validated against `['chrome','firefox','webkit','msedge']` and throws `Invalid BROWSER "<value>"…` otherwise (previously any typo reached the CLI); `env | grep`-style values can no longer be split or injected because `shell: true` became `shell: process.platform === 'win32'` (POSIX resolves the `npx` shim from PATH — verified: `spawn('npx', ['--version'], { shell: false })` exits 0).
+
+**Files modified:** `scripts/mcp/playwright-mcp-launcher.js`, `scripts/mcp/playwright-mcp-launcher.test.js`, `docs/playwright-mcp-configuration.md`, `README.md`, `.env.example`, `memory-bank/activeContext.md`, `memory-bank/progress.md`.
+
+**Verification:** `npx vitest run scripts/mcp/playwright-mcp-launcher.test.js` → **23/23 pass**; both JSON configs parse; `buildArgs({})` → `['@playwright/mcp@latest']`.
+
+**Known issues / follow-ups:** (1) Firefox still cannot launch from this agent's sandboxed shell — end-to-end Firefox verification remains outstanding on an unsandboxed host; (2) the bundled-Chromium route is verified from source/config schema only, not by launching on a Chrome-less machine; (3) `npx @playwright/mcp install-browser firefox` remains an undocumented passthrough — re-check it against future `@playwright/mcp` releases.
+
+---
+
+### 2026-10-31 — 2.0.0 packaging review findings applied
+
+**What now works:** the 2.0.0 artifact is release-documented and packaging-consistent. `CHANGELOG.md` records the breaking changes; `README.md` explains the upgrade path and distinguishes consumer sync (`npx ai-workflow-setup`) from the maintainer-only `npm run sync`; `CONTRIBUTING.md` documents the tag-triggered/provenance release flow, the intentionally-impossible local publish, the emergency escape hatch, and the planned `1.49.0` deprecation; `package.json` metadata now describes the OpenCode scaffold with author/keywords; `scripts/.npmignore` keeps test files out of the tarball while `scripts/` stays in `files`; `.opencode/plugins/` is shipped; manual workflow dispatches are restricted to `main`; `bump-version.js` keeps `package-lock.json` in sync; the packaging test resolves `npm.cmd` on Windows.
+
+**Verification:** `npm run test:unit` → 26 files / 800 tests; `npm pack --dry-run --json` → 146 entries / 342,477 B packed, 0 test files, required payload present and repo-only docs absent; `npx js-yaml .github/workflows/npm-publish.yml` → ok.
+
+**Known issue:** a repo-wide `git grep postinstall` is not empty because intentional negative README wording ("ships no `postinstall`"), the regression assertion `scripts.postinstall` in `scripts/sync-unit.test.js`, and historical design/feature docs still contain the term. No live lifecycle hook exists. `knowledgebase_search` was NOT executed (PG vector unavailable — `DATABASE_URL` not configured); memory-bank semantic search executed.
+
+---
+
+### 2026-11-01 — Tracker: KB MCP `DATABASE_URL` empty-string injection documented (Bug-Fix Pipeline 16)
+
+**What now works:** the diagnosis and fix are recorded for future readers. `opencode.json`'s `knowledgebase` MCP entry no longer declares `environment: { DATABASE_URL: "{env:DATABASE_URL}" }` — it carries only `type`, `command`, `enabled` (lines 65–69), so the child inherits the parent environment and `import 'dotenv/config'` remains the `.env` fallback. The investigation established the full chain: a parent `opencode serve` started outside an interactive shell lacked the variable → OpenCode injected an empty string into the child → dotenv refuses to overwrite an existing key → the index layer short-circuited with "DATABASE_URL is not configured". Proof: `zsh -ic 'npm run kb:stats'` connects (4 projects / 56 chunks, last sync 2026-10-31) while `zsh -c` reports the variable unset.
+
+**Verification:** `opencode.json` parses as valid JSON, all 11 MCP servers intact, no `environment` key on the `knowledgebase` entry; tracker entry appended to `docs/tracker-log.md`; `docs/TRACKER-INDEX.md` updated (pipeline row, entry location, learned-knowledge session row). Per-file `kb:stats` A/B result from the fix step. `memory_search` executed; `knowledgebase_search` NOT executed (PG vector unavailable — the live MCP child still holds the injected empty string).
+
+**Known issue / follow-ups:** (1) restart OpenCode from an interactive shell so the MCP children (50430, 55767, 58594 under `opencode serve` 26325) drop the injected `""` — until then `knowledgebase_*` tools stay unusable; (2) `opencode.json:22-23` `github` server has the identical defect class and is likely failing now; (3) `docs/spike-kb-mcp-database-url-investigation.md` is stale — it asserts "no env block / no dotenv import" (both false) and recommends the very config being removed; (4) the credential in commit `d788f68`'s historical `.env` blob is still unrotated. No secret values, prefixes, or connection strings are recorded in this entry.
+
+### Bug-Fix Pipeline 17 — `github` MCP `{env:…}` Block Removed (latent defect) — 2026-11-01 — ✅ DONE (config-only)
+
+Removed the `environment` block from the `github` MCP server entry in `opencode.json` — the same `{env:X}` empty-string injection class fixed for `knowledgebase` in Pipeline 16. The entry previously spanned lines 19–26 and is now `opencode.json:19–23` with only `type`, `command`, `enabled`.
+
+**Correction to Pipeline 16:** live process probing showed `GITHUB_PERSONAL_ACCESS_TOKEN` **was present** in the parent `opencode serve` process (length matching the shell-exported value), so the `github` server was connecting successfully before this change. The defect was **latent, not active**, and Pipeline 16's prediction that the `github` server was "likely failing now" is superseded. `DATABASE_URL` was genuinely absent from the parent — that fix remains the real, active defect and still needs a restart to take effect.
+
+**Validation:** valid JSON; 11 MCP servers unchanged; zero `environment` keys remain in the `mcp` block; `opencode mcp list` → 9 connected, 2 disabled. The remaining `{env:…}` is `context7` → `headers.CONTEXT7_API_KEY` (`opencode.json:28`) — correct for a remote server (headers are its auth path) and deliberately left unchanged.
+
+**Reported but NOT changed:** `opencode.mcp.example.json` carries the same pattern for `github` (L23–25), `playwright` (L39–43), `playwright-firefox` (L50–55). That is the consumer scaffold, so this is a systemic follow-up rather than a local fix.
+
+**Restart topology (durable):** `opencode serve --service` (pid 26325) reads the config, spawns all MCP servers, and holds the frozen environment; it has its own process group, survives every client, has no launchd job, and inherits the environment of the first client that starts it. Therefore quitting the TUI is insufficient, `opencode reload` cannot change a process environment, and the restart must come from a shell carrying the exports (`opencode service restart` from a fresh interactive shell; better long-term, move the exports to `~/.zshenv`).
+
+**Security note:** a diagnostic echo expanded a token variable once into the session transcript (no file, no summary). Only the fact is recorded here — no value, prefix, fragment, or connection detail. Rotate that token if the transcript exposure is unacceptable; rotation is a user-owned step.
+
+**Tracking:** `docs/tracker-log.md` (Pipeline 17 entry), `docs/TRACKER-INDEX.md` (pipeline row, location row, session row), `.agents/instructions/learned-knowledge.instructions.md` (new 2026-11-01 session). `memory_search` executed; `knowledgebase_search` NOT executed (PG vector unavailable until the service restart).

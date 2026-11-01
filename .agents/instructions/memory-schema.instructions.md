@@ -57,7 +57,7 @@ Docs files do not require `category`, `entities`, or strict heading structure. H
 
 ## Auto-Suggest on Normalization
 
-When `scripts/normalize-memory.js` runs (postinstall or manual), it:
+When `scripts/normalize-memory.js` runs — via `npx ai-workflow-setup`, `npm run memory:normalize`, or directly — it:
 - Adds missing frontmatter using filename, H1 title, and git modification date
 - Auto-suggests `tags` by scanning content for vocabulary keywords
 - Auto-suggests `entities` using regex patterns from `.vocabulary.json`

@@ -2,8 +2,18 @@ name: Publish to npm
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish — must match package.json (e.g. 2.0.0, without the leading v)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   publish:
@@ -15,6 +25,31 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify version matches the release tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Manual releases may only run from refs/heads/main (got '$REF')"
+            exit 1
+          fi
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            EXPECTED="$INPUT_VERSION"
+            ACTUAL="$PKG_VERSION"
+          else
+            EXPECTED="v$PKG_VERSION"
+            ACTUAL="$REF_NAME"
+          fi
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Release version '$ACTUAL' does not match the expected version '$EXPECTED' (package.json is '$PKG_VERSION')"
+            exit 1
+          fi
+          echo "Version check passed: $PKG_VERSION"
 
       - name: Install dependencies
         run: npm ci
@@ -33,6 +68,6 @@ jobs:
           HEADLESS: 'true'
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

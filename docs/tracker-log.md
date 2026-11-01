@@ -1971,3 +1971,199 @@ The coverage detector is ~75 lines of bounded heuristic, not a full gitignore en
 - **Not yet done, outside this work unit:** no commit, no publish, no consumer rollout.
 - **apmc-cms** will need a manual `"instructions": ["AGENTS.project.md"]` entry (its `opencode.json` is scaffold-once and already exists) and a manual merge of the managed patterns into its own `.prettierignore`; it will also need the documented `AGENTS.md` restore procedure because its copy is frozen.
 - The tracker step also covers the "persist lessons learned" responsibility — see the learned-knowledge Session 2026-10-25 (project-owned sync layer) appended to `.agents/instructions/learned-knowledge.instructions.md`.
+
+## Standalone: Coder - Implementation — Playwright MCP Firefox parity (`playwright-firefox` server)
+
+**Date:** 2026-10-31
+**Status:** ⚠️ SKIPPED (code + docs complete and tested; Firefox UA smoke test blocked by the agent sandbox)
+
+### Summary
+Added a second Playwright MCP server, `playwright-firefox` (`--browser firefox --isolated`), beside the existing Chromium server in both `opencode.json` and the shipped `opencode.mcp.example.json`, including its own `playwright-firefox_*` permission namespace. Extended `buildArgs()` in the launcher with `--browser` / `--isolated` and fixed a latent bug (`--viewport` → `--viewport-size`, the only viewport flag the CLI defines). Docs and README now describe browser selection, the Firefox install step, and the permission namespace split.
+
+### Files Produced / Modified
+| File | Description |
+|---|---|
+| `opencode.json` | New `playwright-firefox` MCP entry; `playwright-firefox_*: allow` permission |
+| `opencode.mcp.example.json` | Same server routed through the launcher (`BROWSER`/`ISOLATED`/`HEADLESS`/`VIEWPORT`) + permission |
+| `scripts/mcp/playwright-mcp-launcher.js` | `buildArgs`: `--browser`, `--isolated`, `--viewport-size`; JSDoc lists supported vars, explains why `SLOW_MO` is unused |
+| `scripts/mcp/playwright-mcp-launcher.test.js` | 19 tests (up from 13): `BROWSER`, `ISOLATED` true/false, full flag order, `SLOW_MO` ignored, viewport flag corrected |
+| `docs/playwright-mcp-configuration.md` | "Browser selection" + "Installing the Firefox browser"; `opencode.mcp` → `opencode.json`; corrected config schema, `SLOW_MO`/`VIEWPORT` scope; removed non-existent `npm start` |
+| `README.md` | MCP Tooling: `opencode.json` reference + two-server note |
+| `memory-bank/activeContext.md`, `memory-bank/progress.md` | Implementation record |
+
+### Key Decisions
+- **`--isolated` over `--user-data-dir`** for the second server: a persistent profile cannot be shared by two concurrently running browsers in one workspace, and an in-memory profile also prevents cross-session state leakage. `--user-data-dir` documented as the opt-in for persistent state.
+- **New permission key rather than widening `playwright_*`**: opencode permission globs are namespace-prefixed, so the existing entry does not match `playwright-firefox`.
+- **`SLOW_MO` not wired into `buildArgs`**: `@playwright/mcp --help` has no `--slow-mo` flag (confirmed). Documented as test-runner-only instead of passing an invalid argument.
+- **`--viewport` → `--viewport-size`**: verified against `--help`; the old flag would have made any `VIEWPORT` configuration fail at server start.
+- Example config routes the Firefox server through the existing launcher (not a raw `npx`) so `HEADLESS`/`VIEWPORT` keep applying to both browsers.
+
+### Notes / Follow-up
+- **Environment blocker:** Firefox cannot launch from this agent's sandboxed shell — 1511/1522 fail with `sandbox_extension_issue_file_to_process ... (Operation not permitted)`; 1553/1555 start then report `Could not find profile folder` with an empty profile dir. Reproduced with the raw binary and a pre-created `-profile` dir; Chromium works in the same shell. The UA smoke test is therefore unverified in-session.
+- Real-server verification that *was* possible: driving the MCP server over stdio with the launcher's argv — initialize OK, 25 tools listed, server selected Firefox (and correctly reported the missing browser build).
+- `@playwright/mcp` bundles its own Playwright, so its required Firefox revision can differ from the project's; `npx @playwright/mcp install-browser firefox` is the reliable installer (documented).
+- During flag testing, `pkill -f "playwright/mcp"` terminated the session's live `playwright` and `playwright-firefox` MCP servers; restart the opencode host to re-spawn them.
+- `e2e-tester` still uses chrome-devtools MCP and was not modified — decide separately whether it should adopt `playwright-firefox_*`.
+- `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured). Memory-bank semantic search executed.
+
+## Standalone: Coder - Implementation — npm scaffold cleanup to 2.0.0
+
+**Date:** 2026-10-31
+**Status:** ✅ SUCCESS
+
+### Summary
+Removed the dead library surface and the blocked postinstall mechanism from `@abarcenas/ai-workflow-template`, and made the package an honest CLI/scaffold. `npx ai-workflow-setup` was verified to already perform the old postinstall work (sync.js then normalize-memory.js), so nothing had to be rewired. Version is now 2.0.0 with license, publish config, engine floor, a size-reduced tarball, and a tag-gated provenance publish.
+
+### Files Produced / Modified
+| File | Description |
+|---|---|
+| `package.json` | Removed `main`, `postinstall`, `"//"`; added `engines`/`publishConfig`; trimmed `files` + `!scripts/**/*.test.js`; version 2.0.0 |
+| `package-lock.json` | Synced to 2.0.0 via `npm install --package-lock-only` |
+| `LICENSE` | New ISC license, 2026 abarcenas29 |
+| `CONTRIBUTING.md` | New; preserves the `"//"` packaging note verbatim under "Packaging rules" (not shipped) |
+| `.github/workflows/npm-publish.yml` | Tag/dispatch trigger, OIDC permissions, version guard, `--provenance` |
+| `README.md` | Install rewritten, setup command corrected, postinstall + `docs/` tree claims removed, dead link fixed, stale publish/normalize text updated |
+| `.vscode/tasks.json` | VS Code task no longer points at the deleted `postinstall` script; uses `sync` |
+| `scripts/sync-unit.test.js` | Packaging test asserts removed fields and new tarball shape |
+| `memory-bank/activeContext.md`, `memory-bank/progress.md` | Implementation record |
+
+### Key Decisions
+- **No `exports`/`types` added:** the package is a scaffold; the only entry point is the bin. Adding an exports map would imply an importable API that does not exist.
+- **`engines.node ">=22"`:** highest real dependency floor is `better-sqlite3` at Node 20 (and it excludes 21); 20 is EOL, so 22 is the lowest supportable active LTS. No dependency requires 22.22.2.
+- **`files` negation works:** npm honoured `!scripts/**/*.test.js` (0 test files in the pack), so no explicit non-test subpath listing was needed.
+- **`--provenance` requires `id-token: write`:** provenance is produced only from CI, never locally.
+
+### Notes / Follow-up
+- Nothing was published and no tag was created; a `v2.0.0` tag push is the release action.
+- The temp consumer run intentionally skipped hooks/prepare/knowledgebase; the sync phase is the postinstall replacement and was run directly to prove the file list and idempotency.
+- `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured); memory-bank semantic search executed.
+
+## Bug-Fix Pipeline 16: Knowledgebase MCP Could Not See `DATABASE_URL` — Empty-String Injection from `opencode.json`
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS (root cause fixed and proven end-to-end from an interactive shell; the three live MCP processes still need a restart)
+
+### Summary
+
+Answered a support question — "can the `knowledgebase` MCP server see the database URL?" — and the answer was no. The `knowledgebase` server entry in `opencode.json` declared `environment: { DATABASE_URL: "{env:DATABASE_URL}" }`; because the long-lived `opencode serve` parent was itself started outside an interactive shell, the parent had no such variable and OpenCode injected an **empty string** into each MCP child. An empty string defeats the child's `dotenv` fallback (dotenv will not overwrite an already-set key), so the server reported "DATABASE_URL is not configured" even though `.env` was valid. The fix was to delete the `environment` block entirely, which was verified by an interactive-shell vs non-interactive-shell A/B test.
+
+### Step 1: Coder — Read-Only Investigation
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+A read-only investigation established that the knowledgebase MCP server could not see the connection URL, traced the failure to an injected empty string in the server's config, and identified two related but separate problems (a stale spike document and an unremediated credential in git history).
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| — (none) | Investigation was read-only; no files were created or changed in this step |
+| `opencode.json` (examined) | The `knowledgebase` MCP entry carried the `environment` block with `"{env:DATABASE_URL}"` |
+| `scripts/mcp-knowledgebase-server.js` (examined) | Imports `dotenv/config` at startup to pick the URL up from `.env` |
+| `scripts/knowledgebase-index.js` (examined) | Exits the "not configured" path when `DATABASE_URL` is missing or empty |
+| `.env` (examined, not modified) | Present and valid; the value never reached the MCP process |
+
+#### Key Decisions
+
+- **Stayed strictly read-only** — the step was scoped to evidence gathering so the diagnosis could be reviewed before any config change.
+- **Trusted live tool behaviour plus process inspection over assumptions** — `knowledgebase_stats`, `knowledgebase_list`, and `knowledgebase_search` all reported "not configured", and the process environment of the running MCP children was inspected (values never recorded; only presence/emptiness).
+- **Confirmed the dotenv behaviour rather than assuming it** — dotenv's loader skips keys that already exist in the environment, which is the exact mechanism that turns an injected `""` into a silent, permanent failure.
+
+#### Notes / Follow-up
+
+- Diagnosis: injected empty string → dotenv cannot override it → the index layer short-circuits with "DATABASE_URL is not configured".
+- **Stale documentation found:** `docs/spike-kb-mcp-database-url-investigation.md` is now wrong. It states there is no env block and no dotenv import (both untrue), and its "recommended fix" is precisely the defect being removed. It must be corrected or superseded.
+- **Security debt still open:** commit `d788f68` retains a previously tracked `.env` blob in git history that contained a live-looking credential. Rotation is still outstanding (already tracked in `memory-bank/activeContext.md`). No value, prefix, or fragment of that credential is reproduced here.
+
+### Step 2: Coder — Fix
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+Removed the redundant and harmful `environment` block from the `knowledgebase` MCP server entry in `opencode.json`. The entry now contains only `type`, `command`, and `enabled`, so the child process inherits the parent's real environment instead of receiving a placeholder empty string. End-to-end proof from an interactive shell now succeeds, while a non-interactive shell still fails — confirming that `.zshrc` sourcing, not the config, was the remaining variable.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `opencode.json` | Deleted the `environment` block from the `knowledgebase` server entry (now lines 65–69: `type`, `command`, `enabled`) |
+| `memory-bank/activeContext.md` | Recorded the root cause, the fix, and the restart requirement |
+| `memory-bank/progress.md` | Recorded the completed fix and the remaining follow-ups |
+
+#### Key Decisions
+
+- **Deleted the `environment` block instead of "fixing" it** — MCP children already inherit the parent environment, so the block is redundant when the variable is set and actively harmful when it is not. Omitting it makes the config correct under both conditions.
+- **Did not patch around the symptom in the server script** — making the server treat an empty string as "absent" would have hidden a config defect that can silently affect any `{env:...}` entry. The config was the right layer to fix.
+- **Kept the `github` server out of scope** — it has the identical defect class (`GITHUB_PERSONAL_ACCESS_TOKEN: "{env:...}"` at `opencode.json:22-23`, exported only from `~/.zshrc`), but broadening the change mid-task would have muddled verification of the reported issue. It is recorded as a follow-up instead.
+
+#### Notes / Follow-up
+
+- **Why the variable was never set for the server:** `~/.zshrc` contains an unconditional top-level `export DATABASE_URL=...` (line 8); `~/.zshenv` and `~/.zprofile` do not. `.zshrc` is sourced only for interactive shells, and the `opencode serve` process was started outside one, so the export never reached the MCP child. `zsh -c` (non-interactive) leaves it unset; `zsh -ic` (interactive) sets it.
+- **Config validation:** `opencode.json` parses as valid JSON, all 11 MCP servers are intact, and the `knowledgebase` entry no longer has an `environment` key.
+- **End-to-end proof:** `zsh -ic 'npm run kb:stats'` connects successfully (4 projects, 56 chunks, last sync 2026-10-31); the same command under `zsh -c` reports the URL as unset. That delta is exactly the `.zshrc`-sourcing difference and confirms the diagnosis.
+- **Restart still required:** MCP servers are long-lived processes and do not reload configuration. The children running under the existing `opencode serve` parent still hold the injected empty string, so the `knowledgebase_*` tools remain unusable until OpenCode is restarted from an interactive shell.
+
+#### Follow-ups
+
+1. **Restart OpenCode from an interactive shell** so the MCP children are re-spawned with the inherited environment; then re-check `knowledgebase_stats`.
+2. **Fix the `github` server** — remove the `environment` block at `opencode.json:22-23` (same defect class; likely failing identically today).
+3. **Correct or supersede** `docs/spike-kb-mcp-database-url-investigation.md`, whose findings and recommended fix are now inverted.
+4. **Rotate the credential** exposed by commit `d788f68`, then decide on history purge (destructive, user-owned decision).
+
+## Bug-Fix Pipeline 17: `github` MCP Server — Same `{env:…}` Empty-String Pattern Removed (defect was LATENT, not active)
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS (config-only fix; the defect was latent, not producing a live failure)
+
+### Summary
+
+Removed the `environment` block from the `github` MCP server entry in `opencode.json` — the same `{env:X}` empty-string injection class fixed for the `knowledgebase` server in Pipeline 16. The entry previously occupied lines 19–26 and now occupies `opencode.json:19–23`, carrying only `type`, `command`, and `enabled`. The change was made for consistency with the `knowledgebase` fix and to eliminate the latent defect before it could produce a failure.
+
+**Important correction to the Pipeline 16 record:** live process probing showed that `GITHUB_PERSONAL_ACCESS_TOKEN` **was present** in the parent `opencode serve` process (93 characters, matching the shell-exported value), so the `github` server was in fact connecting successfully before this change. The Pipeline 16 prediction that "the `github` server is likely failing identically today" is **incorrect** and is superseded by this entry. The `{env:X}` pattern only degrades to an injected `""` when the parent lacks the variable; where the parent has it, the block is a redundant no-op. `DATABASE_URL`, by contrast, was genuinely absent from the parent — that remains the real, active defect, and its fix still requires a service restart to take effect.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `opencode.json` | Deleted the `environment` block from the `github` server entry; the entry is now `opencode.json:19–23` (`type`, `command`, `enabled`) |
+| `docs/tracker-log.md` | This record |
+| `docs/TRACKER-INDEX.md` | Pipeline row, entry-location row, learned-knowledge session row |
+| `.agents/instructions/learned-knowledge.instructions.md` | New session entry (verify-the-premise rule; service restart topology) |
+| `memory-bank/progress.md` | Summary entry with the same information |
+
+### Validation
+
+- `opencode.json` parses as valid JSON.
+- All 11 MCP servers unchanged: `ddg-search`, `chrome-devtools`, `angular-cli`, `github`, `context7`, `playwright`, `playwright-firefox`, `example-server`, `example-remote`, `memory-bank`, `knowledgebase`.
+- Zero `environment` keys remain anywhere in the `mcp` block.
+- `opencode mcp list` → **9 connected, 2 disabled** (the two `example-*` servers).
+- The only remaining `{env:…}` interpolation in the file is `context7` → `headers.CONTEXT7_API_KEY` (`opencode.json:28`). This is **correct and was left unchanged**: `context7` is a remote server, and request headers are its authentication path — there is no parent environment to inherit from and no `dotenv` fallback involved.
+
+### Key Decisions
+
+- **Removed the block rather than leaving a redundant no-op** — an explicit `"{env:X}"` passthrough converts "absent" (inheritable, fallback-eligible) into "set but empty" (a real value that defeats every fallback). Omitting it is correct under both conditions, so leaving it in place only preserves the trap.
+- **Recorded the corrected assumption explicitly instead of letting the Pipeline 16 prediction stand** — a tracker log that keeps asserting "the `github` server is likely failing" after evidence disproves it would mislead the next reader into debugging a non-existent failure. The correction is stated as a supersede, not silently edited into history.
+- **Left `context7` untouched** — the `headers` path is a genuinely different mechanism from child-process environment inheritance; treating every `{env:…}` as suspect would have been wrong here.
+- **Did not expand scope to the consumer scaffold** — `opencode.mcp.example.json` carries the same pattern for three servers, but it is a different artifact (what consumers receive) and changing it is a distribution decision, not a local config fix.
+
+### Notes / Follow-up
+
+**Reported but NOT changed — systemic follow-up.** `opencode.mcp.example.json` carries the same `{env:X}` pattern for `github` (L23–25), `playwright` (L39–43), and `playwright-firefox` (L50–55). This file is the consumer-facing scaffold, so the defect class is shipped to every project that adopts it. It was out of scope for this fix and should be addressed as its own task, because changing it affects what consumers receive and how existing consumer configs continue to work.
+
+**Restart topology (durable operational knowledge).** The process that matters is `opencode serve --service` (pid 26325). It is the process that reads `opencode.json`, spawns all MCP servers, and holds the frozen environment. It has its own process group, survives every client, and had 6 additional clients attached at the time of inspection. There is **no launchd job**: it is started on demand by the first client and inherits **that** client's environment. Consequences:
+
+- Quitting the TUI (or any client) is **insufficient** — the service keeps running with the environment it was born with.
+- `opencode reload` re-reads configuration but **cannot change a running process's environment**, so it does **not** fix a missing environment variable.
+- The service must be restarted **from a shell that carries the exports**. Recommended: `opencode service restart` from a fresh interactive shell.
+- Safer long-term: move the exports from `~/.zshrc` to `~/.zshenv`, which zsh sources for every invocation, so any future on-demand start inherits them regardless of how it was launched.
+
+**Security note (recorded as fact only).** During this pipeline a diagnostic echo accidentally expanded a token variable once into the session transcript. The value reached no file and no summary in this record. Only the fact is recorded here — no value, prefix, fragment, or connection detail is reproduced, and the same redaction convention applies as in earlier pipelines. Recommendation: **rotate that token** if the transcript's exposure is unacceptable; the token's presence in a chat transcript is a live exposure until rotated, and rotation is a user-owned step this agent cannot perform.
+
+**Outstanding from Pipeline 16 (unchanged by this work):** the `DATABASE_URL` fix is correct on disk but not yet in effect, because the live MCP children under pid 26325 still hold the injected empty string. It becomes effective only after a service restart from a shell with the exports.
+
+**Reporting asymmetry observed (worth knowing):** with the database unavailable, `knowledgebase_search` says so plainly ("Knowledgebase not available: DATABASE_URL is not configured"), but `knowledgebase_index` returns `Indexed 0 chunks, updated 0, skipped 0` — a message indistinguishable from a genuine no-op success. Anyone re-indexing learned knowledge before the restart will get a zero-count result that looks like "already up to date" when nothing was written.

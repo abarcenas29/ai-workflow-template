@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "npm: install-playwright",
+      "label": "npm: sync",
       "type": "npm",
-      "script": "postinstall",
+      "script": "sync",
       "group": "build",
       "presentation": {
         "echo": true,
