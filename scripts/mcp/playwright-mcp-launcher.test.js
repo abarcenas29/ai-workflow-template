@@ -11,15 +11,23 @@
 //   1.  default args (no env flags)
 //   2.  HEADLESS=true adds --headless
 //   3.  HEADLESS=false does not
-//   4.  VIEWPORT adds --viewport <size>
+//   4.  VIEWPORT adds --viewport-size <size>
 //   5.  HEADLESS + VIEWPORT together
-//   6.  spawn is called as `npx <args>` with inherited stdio + shell
-//   7.  exit code 0 is forwarded
-//   8.  non-zero exit code is forwarded
-//   9.  missing exit code falls back to 0
-//  10.  SIGINT / SIGTERM are forwarded to the child
-//  11.  launch returns the child
-//  12.  direct run auto-launches; imported elsewhere it does not
+//   6.  BROWSER adds --browser <name>
+//   7.  ISOLATED=true adds --isolated (and false does not)
+//   8.  all flags emit in the documented order
+//   9.  SLOW_MO is ignored (no such CLI flag)
+//  10.  USER_DATA_DIR adds --user-data-dir <path>
+//  11.  ISOLATED=true wins over USER_DATA_DIR (mutually exclusive)
+//  12.  an unknown BROWSER value throws
+//  13.  spawn is called as `npx <args>` with inherited stdio + platform shell
+//  14.  launch forwards env-derived flags into spawn's argv
+//  15.  exit code 0 is forwarded
+//  16.  non-zero exit code is forwarded
+//  17.  missing exit code falls back to 0
+//  18.  SIGINT / SIGTERM are forwarded to the child
+//  19.  launch returns the child
+//  20.  direct run auto-launches; imported elsewhere it does not
 // ═════════════════════════════════════════════════════════════════════════════
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -83,32 +91,108 @@ describe('playwright-mcp-launcher', () => {
     expect(buildArgs({ HEADLESS: 'false' })).toEqual(['@playwright/mcp@latest'])
   })
 
-  it('buildArgs: VIEWPORT adds a two-token viewport flag', () => {
+  it('buildArgs: VIEWPORT adds a two-token viewport-size flag', () => {
     expect(buildArgs({ VIEWPORT: '1280x720' })).toEqual([
       '@playwright/mcp@latest',
-      '--viewport',
+      '--viewport-size',
       '1280x720',
     ])
+  })
+
+  it('buildArgs: BROWSER adds --browser <name>', () => {
+    expect(buildArgs({ BROWSER: 'firefox' })).toEqual([
+      '@playwright/mcp@latest',
+      '--browser',
+      'firefox',
+    ])
+  })
+
+  it('buildArgs: ISOLATED=true adds --isolated', () => {
+    expect(buildArgs({ ISOLATED: 'true' })).toEqual([
+      '@playwright/mcp@latest',
+      '--isolated',
+    ])
+  })
+
+  it('buildArgs: ISOLATED=false does not add --isolated', () => {
+    expect(buildArgs({ ISOLATED: 'false' })).toEqual(['@playwright/mcp@latest'])
+  })
+
+  it('buildArgs: USER_DATA_DIR adds --user-data-dir <path>', () => {
+    expect(buildArgs({ USER_DATA_DIR: '/tmp/firefox-profile' })).toEqual([
+      '@playwright/mcp@latest',
+      '--user-data-dir',
+      '/tmp/firefox-profile',
+    ])
+  })
+
+  it('buildArgs: ISOLATED=true wins over USER_DATA_DIR', () => {
+    expect(
+      buildArgs({ ISOLATED: 'true', USER_DATA_DIR: '/tmp/firefox-profile' }),
+    ).toEqual(['@playwright/mcp@latest', '--isolated'])
+  })
+
+  it('buildArgs: throws on an unsupported BROWSER value', () => {
+    expect(() => buildArgs({ BROWSER: 'chromium' })).toThrow(
+      /Invalid BROWSER "chromium"\. Expected one of: chrome, firefox, webkit, msedge\./,
+    )
   })
 
   it('buildArgs: combines headless and viewport flags', () => {
     expect(buildArgs({ HEADLESS: 'true', VIEWPORT: '800x600' })).toEqual([
       '@playwright/mcp@latest',
       '--headless',
-      '--viewport',
+      '--viewport-size',
       '800x600',
     ])
   })
 
+  it('buildArgs: emits every flag in the documented order', () => {
+    expect(
+      buildArgs({
+        BROWSER: 'firefox',
+        ISOLATED: 'true',
+        HEADLESS: 'true',
+        VIEWPORT: '1920x1080',
+      }),
+    ).toEqual([
+      '@playwright/mcp@latest',
+      '--headless',
+      '--browser',
+      'firefox',
+      '--isolated',
+      '--viewport-size',
+      '1920x1080',
+    ])
+  })
+
+  it('buildArgs: ignores SLOW_MO (no --slow-mo flag exists)', () => {
+    expect(buildArgs({ SLOW_MO: '100' })).toEqual(['@playwright/mcp@latest'])
+  })
+
   // ── launch ───────────────────────────────────────────────────────────────
 
-  it('launch: spawns npx with inherited stdio and shell', () => {
+  it('launch: spawns npx with inherited stdio and a platform-appropriate shell', () => {
     launch({ env: {}, proc: new EventEmitter(), exit: vi.fn() })
 
     expect(spawn).toHaveBeenCalledWith('npx', ['@playwright/mcp@latest'], {
       stdio: 'inherit',
-      shell: true,
+      shell: process.platform === 'win32',
     })
+  })
+
+  it('launch: forwards env-derived flags into spawn argv', () => {
+    launch({
+      env: { BROWSER: 'firefox', ISOLATED: 'true' },
+      proc: new EventEmitter(),
+      exit: vi.fn(),
+    })
+
+    expect(spawn).toHaveBeenCalledWith(
+      'npx',
+      ['@playwright/mcp@latest', '--browser', 'firefox', '--isolated'],
+      expect.objectContaining({ stdio: 'inherit' }),
+    )
   })
 
   it('launch: returns the spawned child', () => {
@@ -184,7 +268,7 @@ describe('playwright-mcp-launcher', () => {
       expect(spawn).toHaveBeenCalledWith(
         'npx',
         expect.arrayContaining(['@playwright/mcp@latest']),
-        { stdio: 'inherit', shell: true },
+        { stdio: 'inherit', shell: process.platform === 'win32' },
       )
     } finally {
       process.argv[1] = originalArgv1

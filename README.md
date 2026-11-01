@@ -1,22 +1,29 @@
 # AI Workflow Template
 
-Publishable AI workflow starter pack for OpenCode — auto-syncing, version-managed, npm-distributed agent configuration suite with vector search memory.
+Publishable AI workflow starter pack for OpenCode — explicitly-synced, version-managed, npm-distributed agent configuration suite with vector search memory.
 
 ## Install
 
 ```bash
-npm install @abarcenas/ai-workflow-template
+npm install --save-dev @abarcenas/ai-workflow-template
+npx ai-workflow-setup
 ```
 
-The package runs `postinstall` to sync files; for full setup including git hooks, use the setup command below.
+This package is a **CLI/scaffold, not a runtime library** — it has no `require`/`import` entry point, so importing it is not supported by design. Installing it copies nothing into your project and ships no install/`postinstall` hook; `npx ai-workflow-setup` is the only setup path and does all file syncing, memory-bank scaffolding, and hook installation.
+
+### Upgrading to 2.0.0
+
+2.0.0 removed the install-time `postinstall` sync, so upgrading no longer copies anything into your project. After installing the new version, run the setup command once:
+
+```bash
+npx ai-workflow-setup
+```
+
+Node 20 support was also dropped (`engines.node` is now `>=22`), and the package no longer declares a `main` entry point — it is a scaffold CLI, not an importable library.
 
 ## Git Hook Setup
 
 ```bash
-# One-step setup (fetches from npm registry automatically):
-npx @abarcenas/ai-workflow-template
-
-# Or if the package is already installed:
 npx ai-workflow-setup
 ```
 
@@ -29,11 +36,13 @@ npx ai-workflow-setup
 | Prepare | Merges `"husky"` into your `package.json` prepare script |
 | Husky Init | Initializes husky and sets `core.hooksPath` |
 | Sync | Copies agent configurations, skills, and memory bank scaffolding |
+| Skills | Refreshes pinned skills from upstream (skipped with `--skip-sync`) |
+| Knowledgebase | Registers the project with the centralized knowledgebase (skipped with `--skip-knowledgebase`) |
 
 ### Options
 
 ```bash
-npx ai-workflow-setup --dry-run        # Preview without changes
+npx ai-workflow-setup --dry-run        # Preview hooks/prepare/skills, skip sync
 npx ai-workflow-setup --force          # Overwrite existing hooks
 npx ai-workflow-setup --skip-hooks     # Skip hook installation
 npx ai-workflow-setup --skip-sync      # Skip file sync
@@ -48,7 +57,7 @@ npx ai-workflow-setup --help           # Show all options
 - **Complex hooks** trigger a warning with manual merge instructions
 - **CI environments** auto-skip hook configuration
 
-> **npm v12 note:** Future npm versions block automatic `postinstall` scripts. The explicit `npx setup` command is the recommended, future-proof approach.
+> **No install-time scripts:** npm 12+, pnpm 10+, and Yarn 4 block dependency lifecycle scripts by default. This package ships no `postinstall`; everything runs when you explicitly invoke `npx ai-workflow-setup`.
 
 ## What This Package Does
 
@@ -59,10 +68,12 @@ npx ai-workflow-setup --help           # Show all options
 - **Memory bank** — persistent project context with sqlite-vec semantic search
 - **Caveman mode** — ultra-compressed communication for token efficiency
 - **Playwright + Vitest testing** — E2E browser tests, unit tests with v8 coverage (≥90%)
-- **Version auto-bumping + auto-publishing** — Husky-managed, npm publish on merge to `main`
+- **Version auto-bumping + auto-publishing** — Husky-managed; npm publish on version tag push
 - **graphify knowledge graph** — queryable code-level relationship mapping
 
-## Sync Behavior
+## Maintainer sync (in this repo)
+
+`npm run sync` is a maintainer command defined in this repository's own `package.json`. It is not shipped to consumers — consumer projects sync by running `npx ai-workflow-setup`, which invokes the same sync engine.
 
 ```bash
 npm run sync -- --dry-run   # Preview changes without applying
@@ -78,7 +89,7 @@ npm run sync                # Normal sync
 - Project-owned files are never overwritten or pruned after creation, and `--force` cannot replace them
 - GitHub Actions workflows are excluded from consumer sync (`.github/workflows/`)
 
-> `--dry-run` previews copies and prunes, but missing scaffold files (memory-bank stubs, `opencode.json`, `AGENTS.project.md`, `.prettierignore`) are still created. This matches the pre-existing scaffold behaviour.
+> `npx ai-workflow-setup --dry-run` previews the hooks, prepare, and skills phases but skips sync, so no files are copied or pruned and no scaffold files are created. For a preview of sync itself, run `npm run sync -- --dry-run` in this repository; consumers sync with `npx ai-workflow-setup`.
 
 ### Project-owned files
 
@@ -107,11 +118,18 @@ Post-install, your project receives this structure:
 ├── instructions/   # Framework, workflow, and security guidance
 ├── skills/         # 34 specialized AI skills
 └── prompts/        # Reusable prompt templates
-.opencode/agents/   # Orchestrator + specialized sub-agents
-.github/workflows/  # CI/CD automation (excluded from sync)
-docs/               # Guides (e.g. playwright-mcp-configuration.md)
+.opencode/
+├── agents/         # Orchestrator + specialized sub-agents
+├── commands/       # Slash commands
+└── plugins/        # graphify knowledge-graph plugin
+memory-bank/        # Persistent project context (+ tasks/)
+scripts/            # Sync, memory, and knowledgebase CLI helpers
 AGENTS.md           # Master instruction file with agent guidance
 AGENTS.project.md   # Project-owned rules (recreated if deleted, never overwritten)
+opencode.json       # OpenCode config (project-owned after creation)
+.prettierignore     # Formatter coverage for managed files (project-owned)
+skills-lock.json    # Pinned skill versions
+.github/workflows/  # Repo-only — never synced to consumers
 ```
 
 ## Multi-Agent Orchestrator
@@ -149,7 +167,7 @@ Invoke the orchestrator with `@orchestrator` followed by your task:
 
 ### MCP Tooling
 
-Some agents require MCP servers configured in `opencode.mcp`:
+Some agents require MCP servers configured in `opencode.json` (template: `opencode.mcp.example.json`):
 
 | Agent | Required MCP | Purpose |
 | --- | --- | --- |
@@ -157,6 +175,9 @@ Some agents require MCP servers configured in `opencode.mcp`:
 | E2E Tester | Playwright | Browser automation |
 | Reviewer | GitHub | PR and issue management |
 | Deployer | GitHub | Releases, Actions |
+
+Playwright MCP is configured twice for browser parity: `playwright` (Google Chrome — the `chrome` channel, which `@playwright/mcp` uses by default, so Google Chrome must be installed) and `playwright-firefox` (Firefox, `--browser firefox --isolated`). Each server needs its own permission entry (`playwright_*`, `playwright-firefox_*`), and Firefox must be installed first with `npx playwright install firefox` — see [`docs/playwright-mcp-configuration.md`](https://github.com/abarcenas29/ai-workflow-template/blob/main/docs/playwright-mcp-configuration.md#browser-selection). Existing `opencode.json` files are never rewritten by sync, so upgrading projects must add the `playwright-firefox` block and its permission by hand.
+
 
 ## TDD Orchestrator
 
@@ -219,7 +240,7 @@ projectbrief.md → productContext.md / systemPatterns.md / techContext.md → a
 
 ### Document Schema
 
-All memory-bank files use YAML frontmatter (`id`, `title`, `updated`, `tags`, `entities`, `category`) for search indexing; see `memory-bank/.vocabulary.json` for the controlled vocabulary. `npm install` runs `normalize-memory.js` to add frontmatter; the Husky pre-commit hook rejects invalid frontmatter. Task commands: `add task`, `update task [ID]`, `show tasks [filter]`.
+All memory-bank files use YAML frontmatter (`id`, `title`, `updated`, `tags`, `entities`, `category`) for search indexing; see `memory-bank/.vocabulary.json` for the controlled vocabulary. `npx ai-workflow-setup` runs `normalize-memory.js` to add frontmatter; the Husky pre-commit hook rejects invalid frontmatter. Task commands: `add task`, `update task [ID]`, `show tasks [filter]`.
 
 ### Token Efficiency
 
@@ -258,7 +279,12 @@ Husky auto-bumps versions on every commit: minor by default (`1.2.0 → 1.3.0`),
 
 ## Publish Flow
 
-GitHub Actions automatically publishes to npm when merging to `main`.
+GitHub Actions publishes to npm when a `v*` tag is pushed (or when the workflow is dispatched manually with a matching version). The workflow fails if the tag does not match `package.json`:
+
+```bash
+git tag v2.0.0
+git push origin v2.0.0
+```
 
 Add `NPM_TOKEN` to GitHub repository secrets:
 
@@ -283,7 +309,7 @@ npm run test:unit:watch    # Watch mode for unit tests
 npm run memory:rebuild     # Build the vector index (one-time, ~8 min)
 npm run memory:update      # Incremental index update (seconds)
 npm run memory:search "tdd orchestrator status"
-npm run memory:normalize   # Normalize frontmatter (runs automatically on install)
+npm run memory:normalize   # Normalize frontmatter (also runs during npx ai-workflow-setup)
 ```
 
 ### Testing
@@ -301,8 +327,8 @@ npm run memory:normalize   # Normalize frontmatter (runs automatically on instal
 1. Edit files in `.agents/`, `docs/`, or `scripts/`
 2. Test changes locally
 3. Commit (triggers auto-version bump)
-4. Merge to `main` (triggers npm publish)
-5. Consumers run `npm install` to get updates
+4. Push a `v*` tag matching `package.json` (triggers npm publish)
+5. Consumers install the new version, then re-run `npx ai-workflow-setup` to sync
 
 ## Important Notes
 
@@ -312,5 +338,5 @@ npm run memory:normalize   # Normalize frontmatter (runs automatically on instal
 - Do not add `AGENTS.project.md` or `opencode.json` to `package.json` `files`: both are scaffolded create-if-absent and must never ship from the package
 - `AGENTS.md` is the main instruction file agents should read
 - Package assumes the public npm registry
-- Playwright MCP integration is documented in `docs/`
+- Playwright MCP integration is documented in [`docs/playwright-mcp-configuration.md`](https://github.com/abarcenas29/ai-workflow-template/blob/main/docs/playwright-mcp-configuration.md)
 - Run `npx ai-workflow-setup` after install to configure git hooks (npm v12+ compatible)

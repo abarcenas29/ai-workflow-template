@@ -65,7 +65,7 @@ Before debugging from scratch, search for similar errors and their known resolut
 Example queries:
 - "spawnScript child process hanging silent output"
 - "process.exit kills parent import module"
-- "npm postinstall blocked in v12"
+- "npm dependency lifecycle scripts blocked in v12"
 
 ### 3. Making Architectural Decisions
 
@@ -117,7 +117,7 @@ knowledgebase_search({
 **Finding specific error resolutions:**
 ```
 knowledgebase_search({
-    query: "npm postinstall execution blocked in v12 dependency lifecycle",
+    query: "npm dependency lifecycle script execution blocked in v12",
     topK: 3
 })
 ```
