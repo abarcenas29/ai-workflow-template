@@ -1,15 +1,21 @@
+# Publishes @abarcenas/ai-workflow-template to npm when work lands on main.
+#
+# - Trigger: push to main (i.e. a merged PR), plus a manual workflow_dispatch for
+#   retrying a run that failed after the merge. Tags play no part in publishing.
+# - Version: read from package.json. Nothing in CI derives it from a git ref.
+# - Bumping: handled locally by the Husky pre-commit hook (scripts/bump-version.js),
+#   which bumps the minor version on every commit. Whatever version is on main when
+#   the PR merges is the version that gets published.
+# - Safety: a preflight step hard-fails if that exact version is already on the
+#   registry, so a duplicate merge fails loudly instead of silently no-op'ing.
+
 name: Publish to npm
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish — must match package.json (e.g. 2.0.0, without the leading v)'
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -26,31 +32,6 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Verify version matches the release tag
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
-          REF: ${{ github.ref }}
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$REF" != "refs/heads/main" ]; then
-            echo "::error::Manual releases may only run from refs/heads/main (got '$REF')"
-            exit 1
-          fi
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            EXPECTED="$INPUT_VERSION"
-            ACTUAL="$PKG_VERSION"
-          else
-            EXPECTED="v$PKG_VERSION"
-            ACTUAL="$REF_NAME"
-          fi
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::Release version '$ACTUAL' does not match the expected version '$EXPECTED' (package.json is '$PKG_VERSION')"
-            exit 1
-          fi
-          echo "Version check passed: $PKG_VERSION"
-
       - name: Install dependencies
         run: npm ci
 
@@ -66,6 +47,40 @@ jobs:
           CI: true
           # The config defaults to headed mode; CI runners have no display.
           HEADLESS: 'true'
+
+      # Refuse to publish a version that already exists. Without this, merging a PR
+      # that forgot to bump package.json fails deep inside `npm publish` with an
+      # opaque 403, or (worse) is retried by hand against the wrong version.
+      - name: Ensure version is unpublished
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "Checking ${NAME}@${VERSION} on the registry..."
+
+          # `npm view` exits non-zero both for "version not found" (E404) and for
+          # real failures (auth, network, registry 5xx). Only E404 means the
+          # version is genuinely unpublished, so the error text is inspected
+          # rather than the exit code alone.
+          if OUTPUT="$(npm view "${NAME}@${VERSION}" version 2>&1)"; then
+            echo "::error::Version ${VERSION} is already published to npm. Bump the version in package.json before merging to main."
+            exit 1
+          fi
+
+          if ! printf '%s' "$OUTPUT" | grep -q 'E404'; then
+            echo "::error::Could not determine whether ${NAME}@${VERSION} is published — npm view failed without an E404. Refusing to publish."
+            printf '%s\n' "$OUTPUT"
+            exit 1
+          fi
+
+          # A 404 on the version is expected. A 404 on the package itself means the
+          # name or registry is wrong, and publishing would create a brand-new
+          # package instead of releasing a version of this one.
+          if ! npm view "${NAME}" version >/dev/null 2>&1; then
+            echo "::error::Package ${NAME} does not resolve on the registry. Check the package name and registry-url before publishing."
+            exit 1
+          fi
+
+          echo "Version ${VERSION} is unpublished — proceeding."
 
       - name: Publish to npm
         run: npm publish --access public --provenance
