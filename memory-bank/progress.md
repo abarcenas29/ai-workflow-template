@@ -21,6 +21,21 @@ category: "progress"
 
 ## What Works
 
+### 2026-11-01: Tracker — Publish-on-Merge Restoration + `2.0.0` Release Documented (Release Pipeline 18)
+
+`@abarcenas/ai-workflow-template@2.0.0` is what `npm install @abarcenas/ai-workflow-template` resolves to now; npm's `latest` dist-tag moved off `1.49.0` for the first time since the scaffold rewrite.
+
+- **Trigger for the work:** the user asked whether the package was published at the latest version. Researcher found `dist-tags.latest = 1.49.0` against `package.json` `2.0.0`, and `2.0.0` absent from the registry (E404). Cause: `f394a43` had replaced `on: push: branches: [main]` with `on: push: tags: ['v*']` plus a required `workflow_dispatch` `version` input, and no `v2.0.0` tag was ever pushed — so no run existed at all, failed or otherwise.
+- **Archaeology correction:** the old workflow never bumped the version. It was a 38-line file whose only release action was `npm publish --access public`; the bump has always lived in `scripts/bump-version.js` via `.husky/pre-commit`, bumping the minor version on every local commit. `git merge` does not run hooks, so an N-commit branch burns N minor versions (historical proof: `1.44.0 → 1.49.0` in one evening, then a manual settle to `1.45.0` at `d5274c2`). The hook was intact — only the trigger needed restoring.
+- **User decisions:** revert the trigger only (not `git revert f394a43`); keep `--provenance`, the `permissions` block, and `workflow_dispatch`; hard-fail on an already-published version; hold the version at `2.0.0` so the merge ships it; keep the Husky hook as the bump mechanism.
+- **Commits:** `8cc8fdc` `ci(release): publish on push to main instead of tag` (trigger restored, tag/`inputs.version`/`ref_name` removed, preflight guard added) and `11fd9c5` `ci(release): guard manual dispatch and align release docs` (dispatch restricted to `refs/heads/main`; `CONTRIBUTING.md`/`CHANGELOG.md`/`README.md`/`progress.md` aligned; `E404`-text guard replaced with one `npm view … versions --json` read + quoted `grep -F` anchor; `concurrency: npm-publish-main`, `timeout-minutes: 20`, `if: github.repository == 'abarcenas29/ai-workflow-template'`).
+- **Review:** CHANGES REQUIRED, 0 blockers, 3 majors — all fixed in `11fd9c5`. Deferred: `--provenance` duplication with `publishConfig.provenance`, missing `cache: 'npm'`, test duplication with `pr-test.yml`.
+- **Release:** PR **#37** merged as **`6064517eba0cb196d6418caa9fdd63f75e7e04ab`** at `2026-11-01T05:59:32Z` via `--merge` (no admin override, branch retained) after `test` and `playwright` passed. Publish run **`41279001641`** succeeded in 38s; `dist-tags.latest` `1.49.0` → **`2.0.0`**; `2.0.0` published `2026-11-01T06:01:28.476Z`; SLSA provenance attestation (`search.sigstore.dev/?logIndex=3622028091`); 146 files / 348.5 kB; no stray `2.1.0`.
+- **Verified from the registry:** `2.0.0` has no `main` and no `postinstall`, both of which `1.49.0` shipped. Propagation lag of ~2 minutes was observed after the run went green — an immediate E404 is not a failed release.
+- **Documentation:** `docs/tracker-log.md` (Release Pipeline 18), `docs/TRACKER-INDEX.md`, `.agents/instructions/learned-knowledge.instructions.md` (new session), and this entry.
+- **Known follow-ups:** `1.49.0` is **not yet deprecated** — `CONTRIBUTING.md` records the `npm deprecate` command; and the memory-bank records for this release (`activeContext.md`, `tasks/_index.md`, this file) remain **uncommitted**.
+- `memory_search` executed (its top hit was the earlier `v1.40.0` release record, which confirmed the pre-`f394a43` shape); `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured).
+
 ### 2026-11-01: Coder — `github` MCP entry no longer shadows `GITHUB_PERSONAL_ACCESS_TOKEN`
 
 Both remaining `{env:…}`-in-`environment` blocks are gone; no MCP entry in `opencode.json` passes an interpolated variable through `environment` any more.

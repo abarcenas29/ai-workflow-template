@@ -2167,3 +2167,224 @@ Removed the `environment` block from the `github` MCP server entry in `opencode.
 **Outstanding from Pipeline 16 (unchanged by this work):** the `DATABASE_URL` fix is correct on disk but not yet in effect, because the live MCP children under pid 26325 still hold the injected empty string. It becomes effective only after a service restart from a shell with the exports.
 
 **Reporting asymmetry observed (worth knowing):** with the database unavailable, `knowledgebase_search` says so plainly ("Knowledgebase not available: DATABASE_URL is not configured"), but `knowledgebase_index` returns `Indexed 0 chunks, updated 0, skipped 0` — a message indistinguishable from a genuine no-op success. Anyone re-indexing learned knowledge before the restart will get a zero-count result that looks like "already up to date" when nothing was written.
+
+## Release Pipeline 18: Publish-on-Merge Restored — npm `latest` Moves `1.49.0` → `2.0.0`
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS — `@abarcenas/ai-workflow-template@2.0.0` published from `main` with SLSA provenance; `1.49.0` not yet deprecated
+**Pipeline:** researcher → implementer (archaeology) → deployer → reviewer → deployer (fixes) → deployer (release) → tracker
+
+### Summary
+
+A single question — "Is this published to the latest?" — exposed a four-day-old gap: npm's `latest` dist-tag was `1.49.0` while the repository had been on `2.0.0` since 2026-10-31. Commit `f394a43` had replaced the publish-on-merge trigger with `push: tags: ['v*']` plus a required `workflow_dispatch` `version` input, and no `v2.0.0` tag was ever pushed, so nothing published. The pipeline reverted the trigger only, hardened the resulting workflow after review, merged PR **#37**, and published `2.0.0` from `main` with a provenance attestation — moving `dist-tags.latest` from `1.49.0` to `2.0.0`.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.github/workflows/npm-publish.yml` | Trigger restored to `push: branches: [main]`; tag trigger, `inputs.version`, and `ref_name` logic removed; preflight duplicate-version guard added; manual dispatch restricted to `refs/heads/main`; `concurrency: npm-publish-main`, `timeout-minutes: 20`, and a `github.repository` guard added |
+| `CONTRIBUTING.md` | Release section rewritten for publish-on-merge: no tags, no dispatch inputs, `SKIP_BUMP=1` documented, hard-fail on an already-published version, and the planned `1.49.0` deprecation command |
+| `CHANGELOG.md`, `README.md` | Release statements aligned with the restored trigger (README: merging to `main` publishes that version; pushing a `v*` tag publishes nothing) |
+| `memory-bank/progress.md` | Release-flow description corrected during the fix pass; this pipeline's summary appended by the tracker |
+| `docs/tracker-log.md`, `docs/TRACKER-INDEX.md`, `.agents/instructions/learned-knowledge.instructions.md` | This record |
+| `package.json` | **Not modified.** Held at `2.0.0` for the release — no bump, no metadata change |
+
+### Step 1: Researcher — Registry vs. Repository State
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+Answered the question directly: the package was published, but not at the current version. The registry's `latest` dist-tag resolved to `1.49.0`, while `package.json` on `main` said `2.0.0`, and `2.0.0` returned E404 — it had never been uploaded. The step also identified the cause: commit `f394a43` had made publishing tag-triggered, and no `v2.0.0` tag existed.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| — (none) | Read-only investigation; nothing was created or changed |
+
+#### Key Decisions
+
+- **Judged by the dist-tag and version metadata, not by "does the version list contain 2.0.0"** — the version was absent entirely, so the useful evidence was `dist-tags.latest` plus the E404.
+- **Reported the trigger change as the cause rather than guessing at a failed publish run** — there was no failed run to find, because no run was ever triggered.
+
+#### Notes / Follow-up
+
+- The researcher could report registry state but not git authorship — the who/when/why of `f394a43` needed an agent with shell access. That hand-off became Step 2.
+
+### Step 2: Implementer — Archaeology (The Correction That Reshaped the Fix)
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+Reconstructed what the pre-`f394a43` release path actually did and corrected a false premise carried into the request. The old workflow **never bumped the version**: it was a 38-line file with `on: push: branches: [main]` and a single `npm publish --access public`. The bump lived in `scripts/bump-version.js`, run by `.husky/pre-commit`, raising the minor version on every *local* commit (merge commits skip hooks). That hook was still intact and unchanged — so the only thing lost at `f394a43` was the trigger.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| — (none) | Read-only archaeology; no files were created or changed |
+| `.husky/pre-commit` (examined) | Still calls `scripts/bump-version.js`; untouched by `f394a43` |
+| `scripts/bump-version.js` (examined) | Minor bump (`+0.1.0`) per commit, with the `SKIP_BUMP` opt-out already in place |
+
+#### Key Decisions
+
+- **Revert the trigger only, not `git revert f394a43`** — a full revert would also have discarded the provenance and permissions work that was worth keeping.
+- **Keep the Husky hook as the bump mechanism** — re-implementing version bumping inside CI would create two competing sources of the version.
+- **Hold the version at `2.0.0` for the release** — the breaking scaffold change was already represented by `2.0.0` and had never shipped, so bumping again would have published the wrong version number.
+- **Hard-fail when the version is already on the registry** — a silent skip would let a forgotten bump look like a successful release.
+
+#### Notes / Follow-up
+
+- Historical proof of the hook's cost, recorded so it is not rediscovered: `1.44.0 → 1.49.0` across one evening's commits, then a manual settle back to `1.45.0` (`d5274c2`).
+- Consequence for this pipeline: any commit landing before the release merge would inflate the shipped version unless made with `SKIP_BUMP=1`.
+
+### Step 3: Deployer — Workflow Revert (`8cc8fdc`)
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+Created branch `ci/publish-on-main-revert` from `origin/main` (`7a5c4c1`) and restored publish-on-merge in one commit, `8cc8fdc` — `ci(release): publish on push to main instead of tag`. The tag trigger, the `inputs.version` requirement, and the `ref_name`-based version derivation were removed; a preflight guard was added so an already-published version fails the run loudly.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.github/workflows/npm-publish.yml` | Restored `push: branches: [main]`; removed tag/dispatch-input version logic; added the unpublished-version preflight |
+| Git refs | Branch `ci/publish-on-main-revert`, commit `8cc8fdc` |
+
+#### Key Decisions
+
+- **Version comes from `package.json`, nothing else** — no git ref, no dispatch input, so the merge is the release event and the file is the single source of truth.
+- **Kept `--provenance`, the `permissions` block, and `workflow_dispatch`** — provenance and OIDC were improvements worth preserving; manual dispatch stays as the retry path for a run that fails after merge.
+- **No `package.json` edit** — `2.0.0` was already the intended release.
+
+#### Notes / Follow-up
+
+- The first guard implementation detected the duplicate by matching npm's human-readable `E404` error text. The reviewer flagged this in Step 4 and it was replaced in Step 5.
+
+### Step 4: Reviewer — CHANGES REQUIRED (0 Blockers, 3 Majors)
+
+**Date:** 2026-11-01
+**Status:** ⚠️ CHANGES REQUIRED — all three majors fixed before release
+
+#### Summary
+
+Reviewed the reverted workflow against the new release contract. No blockers. Three majors were raised: a manual dispatch could be started against any ref and would publish that ref's tree with the real token; the release documentation still described the tag flow; and the preflight guard depended on the text of an npm error message rather than on a deterministic registry read.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| — (none) | Review only; findings handed back to the deployer |
+
+#### Key Decisions
+
+- **Blocked on the dispatch-ref hole rather than noting it as a nit** — a manual run against a feature branch would publish unreviewed code with a valid attestation.
+- **Treated the error-text guard as a major, not a style issue** — the guard is the only thing standing between a stale version and a failed release, so its failure mode has to be deterministic.
+
+#### Notes / Follow-up
+
+Deferred as non-blocking, and still deferred at the end of the pipeline:
+
+1. `--provenance` on the command line duplicates `publishConfig.provenance: true`.
+2. `actions/setup-node` does not set `cache: 'npm'`, so CI reinstalls from scratch on every run.
+3. The publish workflow repeats the unit and Playwright jobs that `pr-test.yml` already ran on the PR.
+
+### Step 5: Deployer — Review Fixes (`11fd9c5`)
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+Closed all three majors in `11fd9c5` — `ci(release): guard manual dispatch and align release docs`. Manual dispatch is now restricted to `refs/heads/main`; `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md`, and `memory-bank/progress.md` describe the restored flow; and the preflight guard performs one `npm view <pkg> versions --json` read whose exit status decides whether the registry answered, then matches the version with a quoted `grep -F` anchor. `concurrency: npm-publish-main`, `timeout-minutes: 20`, and the `github.repository` guard were added in the same pass.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.github/workflows/npm-publish.yml` | Main-only dispatch guard, deterministic preflight, concurrency group, timeout, repository guard |
+| `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md`, `memory-bank/progress.md` | Release documentation aligned with publish-on-merge |
+| Git refs | Commit `11fd9c5` on `ci/publish-on-main-revert` |
+
+#### Key Decisions
+
+- **One registry read, exit-status-driven** — an auth, network, or registry failure now fails closed instead of being misread as "version not found, proceed".
+- **`grep -F` with the surrounding quotes** — keeps the dots literal and anchors the match to a whole JSON string, so `2.0.0` cannot match inside `2.0.0-rc.1` or `12.0.0`.
+- **`github.repository` guard added because the workflow ships inside the tarball** — a consumer who copies it must not be able to publish their own package with it, or to have it run against this repo's secrets by accident.
+- **`concurrency` with `cancel-in-progress: false`** — two quick merges must not both clear the preflight and race at the registry, but an in-flight publish must never be killed mid-upload.
+
+#### Notes / Follow-up
+
+All three reviewer majors verified fixed. The three deferred items above were carried forward unchanged.
+
+### Step 6: Deployer — Release (PR #37 → Merge → Publish Run `41279001641`)
+
+**Date:** 2026-11-01
+**Status:** ✅ SUCCESS
+
+#### Summary
+
+Pushed the branch, opened PR **#37** (`ci/publish-on-main-revert` → `main`), and merged it as **`6064517eba0cb196d6418caa9fdd63f75e7e04ab`** at `2026-11-01T05:59:32Z` via `--merge` — no admin override, branch retained. Both required checks (`test`, `playwright`) were green. The push to `main` triggered publish run **`41279001641`**, which completed successfully in 38 seconds and published `2.0.0`.
+
+#### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| Git refs | PR #37 merged to `main` as `6064517` |
+| npm registry | `@abarcenas/ai-workflow-template@2.0.0` published with the `latest` tag and a provenance attestation |
+
+#### Key Decisions
+
+- **Merged rather than squashed or rebased** — `--merge` preserves both commits (`8cc8fdc`, `11fd9c5`) with their own messages, so the revert and the review fixes stay separately auditable.
+- **Waited for checks instead of merging on a clean status** — the release contract now depends on the same gates the PR ran.
+- **Verified after propagation, not immediately** — see the notes below.
+
+#### Notes / Follow-up
+
+- Publish output: `total files: 146`, `package size: 348.5 kB`, `+ @abarcenas/ai-workflow-template@2.0.0`; provenance signed and published to the transparency log at `search.sigstore.dev/?logIndex=3622028091`.
+- **Registry propagation lag of about two minutes** was observed after the run went green. An immediate E404 or a `latest` still reading `1.49.0` is not a failed release; poll until it flips.
+- No stray `2.1.0` was published — the version was held deliberately and nothing bumped it during the release.
+
+### Verification — Registry Before / After
+
+| Check | Before | After |
+|---|---|---|
+| `dist-tags.latest` | `1.49.0` | **`2.0.0`** |
+| `2.0.0` on the registry | absent (E404) | published `2026-11-01T06:01:28.476Z` |
+| `dist.attestations.provenance.predicateType` | n/a for `2.0.0` | `https://slsa.dev/provenance/v1` |
+| `dist-tags` | `latest: 1.49.0` | `latest: 2.0.0`, no `2.1.0` |
+| Package shape | `1.49.0` shipped a `postinstall` and a `main: index.js` for a file that never existed | `2.0.0` ships neither — the scaffold declares only its bin |
+
+### Key Decisions
+
+- **Revert the deployment trigger, keep the deployment hardening** — `git revert f394a43` was rejected because it would have removed provenance, OIDC permissions, and the duplicate-version guard along with the broken trigger.
+- **Bumping stays local, in the Husky hook** — archaeology showed CI never bumped; adding a CI bump would create a second source of the version and make the merge-time value unpredictable.
+- **Hold `2.0.0` instead of bumping to `2.1.0`** — `2.0.0` was the intended release for the breaking scaffold change and had never been published, so the merge was its release event.
+- **Hard-fail on an already-published version** — a skip or a no-op would make a forgotten bump indistinguishable from a successful release.
+- **Keep `workflow_dispatch`, restricted to `main`** — a failed run after merge needs a retry path, but only `main` is releasable.
+
+### Notes / Follow-up
+
+**Deferred reviewer items (non-blocking, all still open):**
+
+1. `--provenance` is passed on the command line even though `publishConfig.provenance: true` already sets it.
+2. `actions/setup-node` has no `cache: 'npm'`.
+3. The publish workflow re-runs the unit and Playwright suites that `pr-test.yml` already gated on the PR.
+
+**Known follow-ups:**
+
+1. **`1.49.0` is not deprecated.** `CONTRIBUTING.md` documents the command to run once the release settles: `npm deprecate @abarcenas/ai-workflow-template@1.49.0 "2.0.0 removed postinstall; run npx ai-workflow-setup after upgrading"`. Until then, `npm install` can still resolve to a version that ships a `postinstall` and a dead `main` entry point.
+2. **The memory-bank records for this release are uncommitted.** `memory-bank/activeContext.md` and `memory-bank/tasks/_index.md` were updated by the deployer step and still sit in the working tree with this log entry; nothing was committed after the merge.
+
+**Operational facts worth keeping:**
+
+- **Classic npm tokens were revoked on 2025-12-09.** `NPM_TOKEN` must be a granular access token with Bypass 2FA enabled, or the publish step fails at authentication rather than at the guard.
+- **`.github/workflows/pr-test.yml` ships inside the tarball**, which is why the publish workflow now carries a `github.repository` guard — a consumer copy must be inert upstream of this repository.
+- **A merged `package.json` bump is not a release.** If the trigger is ever tag-based again, nothing publishes until a tag is pushed.
