@@ -68,7 +68,7 @@ npx ai-workflow-setup --help           # Show all options
 - **Memory bank** — persistent project context with sqlite-vec semantic search
 - **Caveman mode** — ultra-compressed communication for token efficiency
 - **Playwright + Vitest testing** — E2E browser tests, unit tests with v8 coverage (≥90%)
-- **Version auto-bumping + auto-publishing** — Husky-managed; npm publish on version tag push
+- **Version auto-bumping + auto-publishing** — Husky-managed; npm publish on merge to `main`
 - **graphify knowledge graph** — queryable code-level relationship mapping
 
 ## Maintainer sync (in this repo)
@@ -279,12 +279,20 @@ Husky auto-bumps versions on every commit: minor by default (`1.2.0 → 1.3.0`),
 
 ## Publish Flow
 
-GitHub Actions publishes to npm when a `v*` tag is pushed (or when the workflow is dispatched manually with a matching version). The workflow fails if the tag does not match `package.json`:
+GitHub Actions publishes to npm when work lands on `main` — that is, when a PR is merged. The version published is whatever `package.json` says at merge time (the Husky pre-commit hook already bumped the minor version):
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git push origin feat/my-change
+gh pr merge --merge    # merging to main publishes that version
 ```
+
+A version already on the registry fails the run instead of republishing, so bump `package.json` rather than re-running against the same version. To retry a failed publish, dispatch against `main` — there are no inputs:
+
+```bash
+gh workflow run npm-publish.yml --ref main
+```
+
+Pushing a `v*` tag does not publish anything.
 
 Add `NPM_TOKEN` to GitHub repository secrets:
 
@@ -327,7 +335,7 @@ npm run memory:normalize   # Normalize frontmatter (also runs during npx ai-work
 1. Edit files in `.agents/`, `docs/`, or `scripts/`
 2. Test changes locally
 3. Commit (triggers auto-version bump)
-4. Push a `v*` tag matching `package.json` (triggers npm publish)
+4. Merge the PR to `main` (triggers npm publish)
 5. Consumers install the new version, then re-run `npx ai-workflow-setup` to sync
 
 ## Important Notes

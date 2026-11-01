@@ -1,55 +1,56 @@
+# Publishes @abarcenas/ai-workflow-template to npm when work lands on main.
+#
+# - Trigger: push to main (i.e. a merged PR), plus a manual workflow_dispatch for
+#   retrying a run that failed after the merge. Tags play no part in publishing.
+# - Version: read from package.json. Nothing in CI derives it from a git ref.
+# - Bumping: handled locally by the Husky pre-commit hook (scripts/bump-version.js),
+#   which bumps the minor version on every commit. Whatever version is on main when
+#   the PR merges is the version that gets published.
+# - Safety: a preflight step hard-fails if that exact version is already on the
+#   registry, so a duplicate merge fails loudly instead of silently no-op'ing.
+
 name: Publish to npm
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish — must match package.json (e.g. 2.0.0, without the leading v)'
-        required: true
-        type: string
 
 permissions:
   contents: read
   id-token: write
 
+# Serialize publishes: two quick merges must not both clear the preflight guard
+# and race each other at the registry. Never cancel — an in-flight publish should
+# be allowed to finish rather than be killed mid-upload.
+concurrency:
+  group: npm-publish-main
+  cancel-in-progress: false
+
 jobs:
   publish:
+    # This file is distributed to consumers, who may adapt it for their own
+    # package. Keep it inert anywhere but the upstream repo.
+    if: github.repository == 'abarcenas29/ai-workflow-template'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # A manual run may be started against any ref, and it would publish that
+      # ref's tree with the real NPM_TOKEN and a provenance attestation. Only
+      # main is releasable.
+      - name: Require main for manual runs
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Manual publishes must run against refs/heads/main (got ${GITHUB_REF})."
+          exit 1
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Verify version matches the release tag
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
-          REF: ${{ github.ref }}
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$REF" != "refs/heads/main" ]; then
-            echo "::error::Manual releases may only run from refs/heads/main (got '$REF')"
-            exit 1
-          fi
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            EXPECTED="$INPUT_VERSION"
-            ACTUAL="$PKG_VERSION"
-          else
-            EXPECTED="v$PKG_VERSION"
-            ACTUAL="$REF_NAME"
-          fi
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::Release version '$ACTUAL' does not match the expected version '$EXPECTED' (package.json is '$PKG_VERSION')"
-            exit 1
-          fi
-          echo "Version check passed: $PKG_VERSION"
 
       - name: Install dependencies
         run: npm ci
@@ -66,6 +67,38 @@ jobs:
           CI: true
           # The config defaults to headed mode; CI runners have no display.
           HEADLESS: 'true'
+
+      # Refuse to publish a version that already exists. Without this, merging a PR
+      # that forgot to bump package.json fails deep inside `npm publish` with an
+      # opaque 403, or (worse) is retried by hand against the wrong version.
+      - name: Ensure version is unpublished
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+
+          # The version must be a plain X.Y.Z: no ranges, no pre-release tags.
+          case "$VERSION" in
+            *[!0-9.]*|*..*|.*|*.) echo "::error::package.json version '${VERSION}' is not a plain X.Y.Z"; exit 1 ;;
+          esac
+
+          echo "Checking ${NAME}@${VERSION} on the registry..."
+          # One deterministic read of the published version list. Its exit status
+          # — not the text of an error message — decides whether the registry
+          # answered, so an auth/network/registry failure fails closed.
+          VERSIONS="$(npm view "${NAME}" versions --json)" || {
+            echo "::error::Registry read failed for ${NAME}. Refusing to publish."
+            exit 1
+          }
+
+          # `-F` keeps the dots in the version literal instead of regex wildcards,
+          # and the surrounding quotes anchor the match to a whole JSON string, so
+          # "2.0.0" cannot match inside "2.0.0-rc.1" or "12.0.0".
+          if printf '%s' "$VERSIONS" | grep -qF "\"${VERSION}\""; then
+            echo "::error::Version ${VERSION} is already published to npm. Bump package.json before merging to main."
+            exit 1
+          fi
+
+          echo "Version ${VERSION} is unpublished — proceeding."
 
       - name: Publish to npm
         run: npm publish --access public --provenance
