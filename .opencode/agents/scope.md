@@ -49,7 +49,7 @@ There is no third ending. Do not implement, do not plan, do not research beyond 
 1. **Read the draft file.** It is your only memory. If it does not exist, this is round 1: create it from the template under [State Persistence](#state-persistence-one-draft-file).
 2. **Ground the questions in project vocabulary.** Read `.agents/config/domain.md`. If it names `GLOSSARY.md` or `docs/adr/`, read the parts relevant to the feature. When those files are absent, proceed silently — do not report the absence and do not scaffold them.
 3. **Load the `grilling` skill** with the skill tool and follow it. Never invoke `grill-me` or `grill-with-docs`: both are `disable-model-invocation: true` wrappers, so they cannot be driven by an orchestrator. If the round resolves terminology or an architectural decision, load `domain-modeling` as a second skill.
-4. **Find your own facts.** Use `read` and `search` to answer factual questions yourself: what exists, how something currently works, what an option costs. Never ask the requester for something you can look up. The grilling skill tells you to dispatch a sub-agent for facts; you cannot delegate, so do that lookup yourself. A genuinely empirical question becomes a prototype request (see [Prototype Hand-Off](#prototype-hand-off)).
+4. **Find your own facts.** Use `read` and `search` to answer factual questions yourself: what exists, how something currently works, what an option costs. Never ask the requester what you can look up. Grilling says to dispatch a sub-agent for facts; you cannot delegate, so look them up. A genuinely empirical question becomes a prototype request (see [Prototype Hand-Off](#prototype-hand-off)).
 5. **Compute the frontier.** Build the design tree, then select only decisions whose prerequisites are settled. A question that depends on another open question belongs to a later round, not this one.
 6. **Decide the ending.** If the frontier is empty, or every remaining unknown is explicitly deferred, go to [Termination and the Terminal Artifact](#termination-and-the-terminal-artifact). Otherwise emit the frontier as described below, persist it, and stop.
 7. **Persist before returning.** Write the current problem statement, evidence, answers, and open frontier into the draft. The orchestrator will carry only the path to the next round.
@@ -264,6 +264,7 @@ Do this first in every round, before step 1 of the Round Protocol. Scoping is a 
    - **Success** — note "knowledgebase_search accessed — N results returned." and use the results to sharpen the question set.
    - **Error / unavailable** — note "knowledgebase_search skipped (PG vector unavailable)." Do NOT block, fail, retry, or stall the round; proceed with memory bank and learned knowledge only.
 4. **Fall back to project files.** Read specific source files with `read`/`search` to settle factual questions, as step 4 of the Round Protocol already requires.
+5. **Communication**: Read `.agents/instructions/communication.instructions.md` and follow the `decision-framed` envelope for all user-facing output.
 
 The retrieval outcome belongs in the round's return summary: report it on the `Knowledge:` line so the orchestrator can see whether Layer 3 contributed without opening the draft.
 

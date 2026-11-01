@@ -168,6 +168,7 @@ After all pipeline steps complete, present the user with:
 - **Use specific subagent_types**: Always use the precise subagent_type from the Sub-Agent Registry (e.g., `"coder"`, `"implementer"`). Never use `"general"` — it obscures which agent is running.
 - **Never write code**: The orchestrator never creates or modifies source files. Sub-agents handle all file operations.
 - **Never read project files for analysis**: The orchestrator reads only the log file for coordination. All project analysis is delegated.
+- **Communication standard**: Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output; emit its Orchestrator Normalization Block at every confirmation gate.
 
 ## Output Format
 

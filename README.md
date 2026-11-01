@@ -328,7 +328,7 @@ npm run memory:normalize   # Normalize frontmatter (also runs during npx ai-work
 | Unit | Vitest | `npm run test:unit` | `npm run test:unit:coverage` (≥90%) |
 
 - E2E tests live in `tests/*.spec.ts` — browser automation via Playwright
-- Unit tests live in `scripts/*.test.{js,ts}` — component tests via Vitest with v8 coverage
+- Unit tests live in `scripts/*.test.{js,ts}` and `tests/*.test.js` — component tests and cross-file spec checks via Vitest with v8 coverage
 
 ## Updating the Template
 
