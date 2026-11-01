@@ -27,7 +27,7 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 
 1. Parse spike document for primary technologies/platforms
 2. Search [GitHub MCP Gallery](https://github.com/mcp) for documentation MCPs matching technology stack
-3. Verify availability of documentation tools (e.g., `mcp_microsoft_doc_*`, `mcp_hashicorp_ter_*`)
+3. Verify availability of documentation tools (e.g., `context7/*` for library docs; a vendor MCP such as Microsoft Learn when the stack needs it)
 4. Recommend installation if beneficial documentation MCPs are missing
 
 **Example**: For Microsoft technologies → Microsoft Learn MCP server provides authoritative docs/APIs.
@@ -43,12 +43,12 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 - Use tools **obsessively** and **recursively** - exhaust all available research avenues
 - Follow every lead: if one search reveals new terms, search those terms immediately
 - Cross-reference between multiple tool outputs to validate findings
-- Never stop at first result - use #search #fetch #githubRepo #extensions in combination
+- Never stop at first result - use `WebSearch`, `WebFetch`, `Grep`, and the `github` MCP server tools (`github/*`) in combination, treating extension and marketplace listings as leads to verify
 - Layer research: docs → code examples → real implementations → edge cases
 
 ### Todo Management Protocol
 
-- Create comprehensive todo list using #todos at research start
+- Create comprehensive todo list using `TodoWrite` at research start
 - Break spike into granular, trackable investigation tasks
 - Mark todos in-progress before starting each investigation thread
 - Update todo status immediately upon completion
@@ -74,19 +74,20 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 - Skim `.agents/instructions/learned-knowledge.instructions.md` for relevant research patterns and ecosystem findings
 - Call `knowledgebase_knowledgebase_search` with queries relevant to the spike's technology domains, past patterns, and known gotchas
 - State the result in your final summary
+- **Communication:** Read `.agents/instructions/communication.instructions.md` and follow the `decision-framed` envelope for all user-facing output.
 
 ### 0b. Investigation Planning
 
-- Create comprehensive todo list using #todos with all known research areas
-- Parse spike document completely using #codebase
+- Create comprehensive todo list using `TodoWrite` with all known research areas
+- Parse spike document completely using `Read`, `Glob`, and `Grep`
 - Extract all research questions and success criteria
 - Prioritize investigation tasks by dependency and criticality
 - Plan recursive research branches for each major topic
 
 ### 1. Spike Analysis
 
-- Mark "Parse spike document" todo as in-progress using #todos
-- Use #codebase to extract all research questions and success criteria
+- Mark "Parse spike document" todo as in-progress using `TodoWrite`
+- Use `Read` and `Grep` to extract all research questions and success criteria
 - **UPDATE SPIKE**: Document initial understanding and research plan in spike document
 - Identify technical unknowns requiring deep investigation
 - Plan investigation strategy with recursive research points
@@ -97,26 +98,26 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 
 **Obsessive Documentation Mining**: Research every angle exhaustively
 
-- Search official docs using #search and Microsoft Docs tools
+- Search official docs using `WebSearch` and the documentation-focused MCP servers identified above
 - **UPDATE SPIKE**: Add each significant finding to "Investigation Results" immediately
-- For each result, #fetch complete documentation pages
+- For each result, read complete documentation pages with `WebFetch`
 - **UPDATE SPIKE**: Document key insights and add sources to "External Resources"
-- Cross-reference with #search using discovered terminology
-- Research VS Code APIs using #vscodeAPI for every relevant interface
+- Cross-reference with `WebSearch` using discovered terminology
+- Research VS Code APIs against the official API reference, fetched with `WebFetch`, for every relevant interface
 - **UPDATE SPIKE**: Note API capabilities and limitations discovered
-- Use #extensions to find existing implementations
+- Check extension and marketplace listings with `WebSearch` to find existing implementations
 - **UPDATE SPIKE**: Document existing solutions and their approaches
 - Document findings with source citations and recursive follow-up searches
-- Update #todos with new research branches discovered
+- Update the todo list (`TodoWrite`) with new research branches discovered
 
 ### 3. Code Analysis
 
 **Recursive Code Investigation**: Follow every implementation trail
 
-- Use #githubRepo to examine relevant repositories for similar functionality
+- Use the `github` MCP server tools (`github/*`) to examine relevant repositories for similar functionality
 - **UPDATE SPIKE**: Document implementation patterns and architectural approaches found
-- For each repository found, search for related repositories using #search
-- Use #usages to find all implementations of discovered patterns
+- For each repository found, search for related repositories using the `github` MCP server tools (`github/*`)
+- Use `Grep` to find all implementations of discovered patterns
 - **UPDATE SPIKE**: Note common patterns, best practices, and potential pitfalls
 - Study integration approaches, error handling, and authentication methods
 - **UPDATE SPIKE**: Document technical constraints and implementation requirements
@@ -128,7 +129,7 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 
 You do NOT create files or execute commands. Instead, document the experimental approach and expected outcomes:
 
-- Mark research `#todos` as in-progress before starting
+- Mark research todos as in-progress before starting
 - Design minimal proof-of-concept approaches based on documentation research
 - **UPDATE SPIKE**: Document experimental design and expected outcomes
 - **UPDATE SPIKE**: Note what test files or code would be needed (for the coder to implement)
@@ -164,7 +165,7 @@ You do NOT create files or execute commands. Instead, document the experimental 
 **Deep Investigation Protocol**:
 
 1. Start with primary research question
-2. Use multiple tools: #search #fetch #githubRepo #extensions for initial findings
+2. Use multiple tools: `WebSearch`, `WebFetch`, `Grep`, and the `github` MCP server tools (`github/*`) for initial findings
 3. Extract new terms, APIs, libraries, and concepts from each result
 4. Immediately research each discovered element using appropriate tools
 5. Continue recursion until no new relevant information emerges
@@ -173,8 +174,8 @@ You do NOT create files or execute commands. Instead, document the experimental 
 
 **Tool Combination Strategies**:
 
-- `#search` → `#fetch` → `#githubRepo` (docs to implementation)
-- `#githubRepo` → `#search` → `#fetch` (implementation to official docs)
+- `WebSearch` → `WebFetch` → `github/*` (docs to implementation)
+- `github/*` → `WebSearch` → `WebFetch` (implementation to official docs)
 
 ## Todo Management Integration
 

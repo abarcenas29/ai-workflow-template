@@ -35,6 +35,7 @@ category: "progress"
 - **Documentation:** `docs/tracker-log.md` (Release Pipeline 18), `docs/TRACKER-INDEX.md`, `.agents/instructions/learned-knowledge.instructions.md` (new session), and this entry.
 - **Known follow-ups:** `1.49.0` is **not yet deprecated** — `CONTRIBUTING.md` records the `npm deprecate` command; and the memory-bank records for this release (`activeContext.md`, `tasks/_index.md`, this file) remain **uncommitted**.
 - `memory_search` executed (its top hit was the earlier `v1.40.0` release record, which confirmed the pre-`f394a43` shape); `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured).
+- **Production validation of the duplicate-version guard (2026-11-01):** PR **#38** (`docs/release-2-0-0-record`) merged as **`8cadfa8`** (commit `9caf4d4`, made with `SKIP_BUMP=1`, version left at `2.0.0` on purpose) and publish run **`41279687455`** failed **by design** at `Ensure version is unpublished` (`Version 2.0.0 is already published to npm.`); `Publish to npm` was skipped and the registry was untouched (`latest` still `2.0.0`, 30 versions, no `2.1.0`) — so **`main` intentionally carries one permanently red Actions run**, and the docs/memory-bank files listed as uncommitted above are now landed.
 
 ### 2026-11-01: Coder — `github` MCP entry no longer shadows `GITHUB_PERSONAL_ACCESS_TOKEN`
 
@@ -2856,3 +2857,66 @@ Removed the `environment` block from the `github` MCP server entry in `opencode.
 **Security note:** a diagnostic echo expanded a token variable once into the session transcript (no file, no summary). Only the fact is recorded here — no value, prefix, fragment, or connection detail. Rotate that token if the transcript exposure is unacceptable; rotation is a user-owned step.
 
 **Tracking:** `docs/tracker-log.md` (Pipeline 17 entry), `docs/TRACKER-INDEX.md` (pipeline row, location row, session row), `.agents/instructions/learned-knowledge.instructions.md` (new 2026-11-01 session). `memory_search` executed; `knowledgebase_search` NOT executed (PG vector unavailable until the service restart).
+
+### 2026-11-01 — Implementer: Communication standard implementation plan (planning only, nothing implemented)
+
+**What now works:** `plan/process-communication-standard-v1.md` is the executable plan for the settled D1–D15 design. It fixes the exact reference-line text for all seven shapes, a per-file insertion map (15 agent files + `AGENTS.md`, anchored by both line number and quoted text), the full eight-section content specification for the canonical instruction file, the five-item reviewer block, the `AGENTS.project.md` override paragraph, and 10 verification checks (TEST-01…TEST-10).
+
+**What is left:** every task — no file was implemented. Batch A (T1) creates `.agents/instructions/communication.instructions.md`; Batch B (T2–T8) inserts the 15 reference lines, the `AGENTS.md` row, the reviewer check, and the three orchestrator bullets; Batch C runs the reviewer pass, the smoke prompt, and the static checks.
+
+**Known issues / risks carried into implementation:** (1) the spike's literal "all user-facing output" wording could be read as covering artifacts — the plan resolves it via the instruction file's `## Where This Applies` section (AMB-3); (2) the 40-line cap has no automated enforcement after this change (O-3), so drift is only caught by a reviewer on `*.md` (RISK-01); (3) `planner.md:25-27` keeps its dead tool list (O-4, deferred); (4) `docs/spike-communication-style.draft.md` stays in the tree unmodified; (5) seven parallel Batch B coders must not write `memory-bank/*` or the plan file — T11 is the single writer.
+
+**Bootstrap:** `docs/.architecture-context.md` present and substantive (not bootstrapped this session; its "`.agent.md`" file naming and "20+ skills" count are stale — `docs/.architecture-context.md:57-60`), memory-bank core files all present. `memory_search` executed; `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).
+
+### 2026-11-01 — Coder: Communication standard implemented, verified, plan closed (T11)
+
+**What now works.** The template has one reader model and one mechanically checkable reply shape, expressed once and referenced everywhere. `.agents/instructions/communication.instructions.md` (342 lines, eight sections) holds the reader model, the three violation modes, both envelopes, the vocabulary rules, the artifact binding, the single Orchestrator Normalization Block, and the `AGENTS.project.md` override. All **15** agent specs carry exactly one variant-naming reference line (6 `decision-framed`: scope, researcher, architect, implementer, designer, planner; 9 `change-framed`: coder, unit-tester, e2e-tester, reviewer, deployer, tracker + the three orchestrators), with no file naming both variants and none naming neither. `AGENTS.md:45` makes it findable; `reviewer.md` gains the five-item check plus the verdict-neutral `**Communication:**` line as the last bullet of slot 4.
+
+**Verification.** TEST-01…TEST-06 and TEST-08 pass outright; TEST-07 passes with recorded baseline debt. `npm run test:unit` → **26 files / 800 tests**, exit 0. `tests/spec-orchestrator-parity.test.js` alone → **8/8**, exit 0, so the CON-02 occurrence counts (2 / 6 / 2) survived. `npx playwright test` → **7 passed / 1 skipped**, exit 0. All prohibitions hold: `opencode.json`, `opencode.mcp.example.json`, `package.json`, `package-lock.json` untouched; no `GLOSSARY.md`, no `AGENTS.project.md`, no new skill, no committed test.
+
+**What is left.** Nothing in this plan — all 12 rows are marked complete and `status: Completed`. Deferred by design, not by omission: automated enforcement of the caps (O-3 / ALT-08), retrofitting old artifacts (O-2), and a live sample for the reply spot-check (TEST-11, never run). ~~repairing `planner.md:25-27`'s dead tool list (O-4)~~ — **repaired 2026-11-01**, together with the identical vocabulary in `researcher.md`.
+
+**Known issues.** (1) ~~**13 pre-existing over-length lines** remain in the agent specs (`reviewer.md:24,39`; `scope.md:52`; `tracker.md:24,25`; `orchestrator.md:20,118,180,214`; `coder.md:28`; `e2e-tester.md:25`; `unit-tester.md:42`; `deployer.md:25`)~~ — each verified byte-identical to `HEAD`, none introduced here, all left alone because CON-01 forbids unrelated rewording. **→ RESOLVED 2026-11-01** by the Batch E close-out: all 13 were rewrapped and `awk 'length>400'` over `.opencode/agents/**/*.md` now returns **0** hits (see *Batch E close-out* below). (2) The caps are enforced by **nothing but a reviewer on `*.md` diffs** (RISK-01), so a chat reply can breach 40 lines unnoticed — **partially closed 2026-11-01:** the pipeline reply spot-check (T13) is now built into `reviewer.md`, though it has never been sampled. (3) The reviewer check cites the standard's `## The Envelope` heading rather than a second copy of the path (keeps one-path-occurrence true), so renaming that heading rots the reference silently. (4) The gate clause in the `feature-pipeline` and `tdd-orchestrator` bullets is inert there (AMB-2), carried for symmetry. (5) `memory-bank/*` is deliberately excluded from the standard.
+
+`memory_search` executed (6 results, all from the two communication spike documents); `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured).
+
+### 2026-11-01 — Coder: Batch E close-out — reply spot-check applied, dead tools repaired, over-length debt paid
+
+Three debts carried by the communication-standard plan are closed, and the one thing that could not be checked
+is recorded as unchecked rather than implied.
+
+- **T13 applied.** `reviewer.md` now carries the pipeline reply spot-check inside `### Communication standard
+  check`, after the `*.md`-gate paragraph and before the numbered five-item list, so it runs on every pipeline
+  rather than only on markdown diffs. Four mechanical checks: **S1** take the earliest upstream reply visible
+  and name it by stage and agent (falling back to the reviewer's own reply when standalone); **S2** count its
+  lines excluding fenced tables, verbatim quotes, and an exemption line, pass at ≤40; **S3** the producer's four
+  literal headings in order with no fifth `##`; **S4** exactly one `**Communication:**`, as the last bullet of
+  slot 4. The verdict extends that same line and one `## Evidence` bullet carries the count.
+- **Insertion is verbatim.** A `diff` of the plan's recorded block against the block now in the file returns
+  zero differences, so the applied text is the reviewed text and not a paraphrase.
+- **`researcher.md` dead-tool repair (20 replacements).** The file carried the same retired GitHub-Copilot
+  vocabulary already fixed in `planner.md`: `#search`, `#fetch`, `#githubRepo`, `#extensions`, `#vscodeAPI`,
+  `#usages`, `#codebase`, `#todos`, plus the invented `mcp_microsoft_doc_*` / `mcp_hashicorp_ter_*` tool IDs.
+  Each now names a real tool from `.agents/instructions/agent.instructions.md:86-98` (`WebSearch`, `WebFetch`,
+  `Grep`, `Read`, `Glob`, `TodoWrite`) or the `github` MCP server (`github/*`), or states the intent in plain
+  prose where no equivalent exists (extension/marketplace listings, the VS Code API reference). Structure,
+  bullet counts, and the `decision-framed` reference line are unchanged, and **no write or execute capability
+  was added** — the agent stays read-only by design.
+- **13-line over-length debt paid.** `awk 'length>400'` over every `*.md` under `.opencode/agents/` returns **0**
+  lines, down from 13 (`reviewer.md:24,39`, `scope.md:52`, `tracker.md:24,25`, `orchestrator.md:20,118,180,214`,
+  `coder.md:28`, `e2e-tester.md:25`, `unit-tester.md:42`, `deployer.md:25`). CON-04 is satisfied in the agent
+  specs rather than carrying a recorded exception.
+- **One stale sentence corrected (recorded deviation).** `.agents/instructions/communication.instructions.md`
+  said the mitigation was "the specification, not the behaviour" and that `reviewer.md` did not yet instruct
+  the check. That became false once T13 landed, so it now reads that the instruction landed on 2026-11-01 and
+  has never run. **Identical line count** (386 lines) and identical eight `##` headings, so the plan's line-map
+  translation paragraph remains accurate.
+- **Verification:** `npm run test:unit` → 26 files / **800 tests**; `tests/spec-orchestrator-parity.test.js` →
+  8/8; `tests/spec-knowledge-retrieval.test.js` → 6/6; `tests/spec-kb-consolidation.test.js` → 12/12;
+  `npx playwright test` → **7 passed / 1 skipped**; `grep -c 'communication.instructions.md'` → `1` in each of
+  the **15** agent specs; parity counts 2 / 6 / 2 unchanged.
+- **Still open.** **TEST-11 has never run** — no pipeline reply has reached `reviewer` since the edit, so the
+  spot-check is built but unsampled, and its first real run may fail on drift that has been shipping. Sampling
+  is 1/k per pipeline by design. **Nothing is committed**; the deployer owns git.
+
+`memory_search` executed (results covered the communication spike and the prior T11 record); `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured in the `opencode serve` parent).

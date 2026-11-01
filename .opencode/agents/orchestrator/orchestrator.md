@@ -17,7 +17,7 @@ You are a master orchestration agent that coordinates specialized sub-agents to 
 - **basePath**: Root directory for the work (defaults to current workspace)
 - **logFile**: Path to the orchestration log (defaults to `docs/.orchestrator-log.md`)
 - **autoConfirm**: If `true`, execute all pipeline steps without pausing. If `false`, ask the user before each delegation. (Default: `false`)
-- **confirmationGates**: Agents whose output requires mandatory user confirmation before the pipeline advances to the next step. Confirmation is requested *after* the agent produces its output, regardless of `autoConfirm`. Default: `["researcher", "implementer", "scope"]`. `scope` is included because its output is a set of open questions that only the user can answer — the gate is structural, not merely a post-output checkpoint (see Step 2a).
+- **confirmationGates**: Agents whose output requires user confirmation before the pipeline advances. Confirmation is requested *after* the agent produces output, regardless of `autoConfirm`. Default: `["researcher", "implementer", "scope"]`. `scope` is included because its output is open questions only the user can answer — the gate is structural, not a post-output checkpoint (see Step 2a).
 
 ## Sub-Agent Registry
 
@@ -115,7 +115,7 @@ When in doubt, prefer inserting `scope` — a short interview is cheaper than bu
 
 #### Always-interactive rule (REQ-10, D-06)
 
-`scope` is a mandatory pause point **regardless of `autoConfirm`**. `autoConfirm: true` must never skip it, and the orchestrator must never let the agency answer the scope agent's questions on the user's behalf — no "assume reasonable defaults", no inferred answers, no silence-as-consent. A grilling agent that answers its own questions is broken by definition. This is why `scope` is in the `confirmationGates` default list: its gate is structural (the pipeline cannot advance without human answers), not just a post-output checkpoint.
+`scope` is a mandatory pause **even when `autoConfirm: true`**: never skipped, and the orchestrator never answers them for the user — no "assume reasonable defaults", no inferred answers, no silence-as-consent. An agent answering its own questions is broken by definition. So `scope` sits in `confirmationGates`: structural (no advance without human answers), not a post-output checkpoint.
 
 For every scope round, the orchestrator must:
 
@@ -177,7 +177,7 @@ IMPORTANT:
 - Perform the necessary reads/writes under this base path.
 - Previous step context: {previous_step_summary}
 - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
-- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a task-relevant query (graceful failure — report whether executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
+- Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a relevant query (graceful failure — report executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Return a clear summary (actions taken + files produced/modified + issues).
 ```
@@ -186,7 +186,7 @@ IMPORTANT:
 7. Update the log file with: step name, status (SUCCESS/SKIPPED/FAILED), duration, artifacts produced, key findings.
 8. If a required step fails, stop the pipeline and report to the user.
 9. **Confirmation Gate**: If the current agent is in the `confirmationGates` list (default: `["researcher", "implementer", "scope"]`):
-   - Present the agent's output summary (key findings, files produced, artifacts) to the user.
+   - Present the agent's output summary (key findings, files produced, artifacts) to the user as the Orchestrator Normalization Block's four labelled lines, then the output verbatim.
    - Ask: **"{agent_name} output is ready. Review the summary above. Confirm to proceed to the next step?"**
    - **Do not advance** to the next pipeline step until the user explicitly confirms.
    - If the user confirms, log "Confirmation gate passed" in the log file.
@@ -211,7 +211,7 @@ When the pipeline reaches the "coder" step and the implementer's summary include
       - Perform the necessary reads/writes under this base path.
       - Previous step context: {previous_step_summary}
       - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
-      - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a task-relevant query (graceful failure — report whether executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
+      - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a relevant query (graceful failure — report executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
       - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
       - Return a clear summary (actions taken + files produced/modified + issues).
       ```
@@ -265,6 +265,7 @@ After all pipeline steps complete, present the user with:
 - **Use specific subagent_types**: Always use the precise subagent_type from the Sub-Agent Registry (e.g., `"coder"`, `"researcher"`, `"implementer"`). Never use `"general"` — it obscures which agent is running.
 - **Never write code**: The orchestrator never creates or modifies source files. Sub-agents handle all file operations.
 - **Never read project files for analysis**: The orchestrator reads only the log file for coordination. All project analysis is delegated.
+- **Communication standard**: Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output; emit its Orchestrator Normalization Block at every confirmation gate.
 
 ## Output Format
 

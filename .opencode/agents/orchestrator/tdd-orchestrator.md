@@ -394,3 +394,4 @@ Always end with a structured summary:
 - **Respect the TDD discipline**: The RED phase writes tests that SHOULD fail. The GREEN phase writes minimal code to pass. Never let the coder preempt the unit-tester.
 - **Test tracking is mandatory**: Every test suite must be tracked in `memory-bank/tasks/` with a task file, `_index.md` entry, and updates to `activeContext.md` and `progress.md`.
 - **Coverage gate is enforced**: Do not proceed past VERIFY until coverage meets `minCoverage` or `maxTDDIterations` is exhausted.
+- **Communication standard**: Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output; emit its Orchestrator Normalization Block at every confirmation gate.
