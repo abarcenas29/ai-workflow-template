@@ -46,7 +46,7 @@ Put project-specific agent rules in `AGENTS.project.md` at the repository root. 
 
 ## Available Skills
 
-All 34 skills installed in `.agents/skills/` are listed below. Load one when the task matches its purpose. The five scoping skills (`domain-modeling`, `grill-me`, `grill-with-docs`, `grilling`, `prototype`) are described in detail in [`## Agent skills`](#agent-skills).
+All 41 skills installed in `.agents/skills/` are listed below. Load one when the task matches its purpose. The scoping, wayfinding, and close-out skills (`domain-modeling`, `grill-me`, `grill-with-docs`, `grilling`, `prototype`, `wayfinder`, `to-tickets`, `to-spec`, `research`, `pr`, `to-pr`, `close-out`) are described in detail in [`## Agent skills`](#agent-skills).
 
 - `architecture-blueprint-generator` — Generate project architecture blueprints
 - `conventional-commit` — Create conventional commit messages
@@ -61,6 +61,7 @@ All 34 skills installed in `.agents/skills/` are listed below. Load one when the
 - `playwright-explore-website` — Explore websites with Playwright
 - `playwright-generate-test` — Generate Playwright tests
 - `polygot-test-agent` — Multi-agent polyglot test generation
+- `pr` — Write a PR body using the Summary / Evidence / Merge Danger structure
 - `prompt-builder` — Build high-quality prompts
 - `agent-governance` — Add governance and safety to agent systems
 - `boost-prompt` — Iteratively refine prompts
@@ -73,6 +74,7 @@ All 34 skills installed in `.agents/skills/` are listed below. Load one when the
 - `caveman-review` — Automated code review
 - `caveman-stats` — Tracking and statistics for caveman usage
 - `cavecrew` — Multi-agent coordination for caveman skills
+- `close-out` — Human-invoked phrase wrapper around `to-pr`; stops at an open PR
 - `compress` — General compression utilities
 - `domain-modeling` — Build and sharpen the project's domain model (`GLOSSARY.md`, ADRs)
 - `graphify-framework-aware` — Exclude framework boilerplate from graphify knowledge graphs
@@ -82,6 +84,11 @@ All 34 skills installed in `.agents/skills/` are listed below. Load one when the
 - `lighthouse-cli` — Run Lighthouse performance, accessibility, and SEO audits
 - `memory-search` — Semantic vector search over the memory bank
 - `prototype` — Build a throwaway prototype to answer a design question
+- `research` — Investigate a question against primary sources and capture findings in Markdown
+- `to-pr` — Commit, push, and open a pull request; base from `origin/HEAD`; never merges
+- `to-spec` — Turn the current conversation into a spec on the issue tracker
+- `to-tickets` — Break a plan or spec into tracer-bullet tickets with blocking edges
+- `wayfinder` — Chart a large effort as a shared map of decision tickets
 
 ## Available Prompts
 
@@ -94,7 +101,9 @@ Prompts in `.agents/prompts/` can be invoked directly:
 
 ## Agent skills
 
-Five skills installed from `mattpocock/skills` (pinned at `v1.3.1`) drive scoping and design work. They sit beside the other skills in `.agents/skills/`; this section explains when to reach for them and what they pair with.
+Ten skills installed from `mattpocock/skills` (pinned at `v1.3.2`) drive scoping, wayfinding, spec, ticket, and research work. They sit beside the other skills in `.agents/skills/`; this section explains when to reach for them and what they pair with.
+`wayfinder`, `to-tickets`, and `to-spec` set `disable-model-invocation: true` and are reached by a deliberate trigger (the orchestrator's Step 2b).
+`pr` and `research` carry no such key, so the skill tool loads them — `research` because `wayfinder` fires it for each `wayfinder:research` ticket.
 
 ### Skills
 
@@ -105,8 +114,22 @@ Five skills installed from `mattpocock/skills` (pinned at `v1.3.1`) drive scopin
 | `grill-with-docs` | `.agents/skills/grill-with-docs/SKILL.md` | You want the interview plus the written record — the glossary and ADRs are created as decisions settle. |
 | `domain-modeling` | `.agents/skills/domain-modeling/SKILL.md` | Project terminology or an architectural decision is being introduced or changed and `GLOSSARY.md` or an ADR needs to capture it. |
 | `prototype` | `.agents/skills/prototype/SKILL.md` | A design question can only be settled by running throwaway code — the logic branch for state models and data flow, the UI branch for look and feel. |
+| `wayfinder` | `.agents/skills/wayfinder/SKILL.md` | A chunk of work is too big for one session and needs a shared map of decision tickets on the issue tracker. |
+| `to-tickets` | `.agents/skills/to-tickets/SKILL.md` | A plan, spec, or conversation must become tracer-bullet tickets, each declaring its blocking edges. |
+| `to-spec` | `.agents/skills/to-spec/SKILL.md` | The conversation already holds the decisions and needs to be synthesized into a spec on the issue tracker — no interview. |
+| `pr` | `.agents/skills/pr/SKILL.md` | A pull request body needs the Summary / Evidence / Merge Danger structure. |
+| `research` | `.agents/skills/research/SKILL.md` | A question needs investigation against primary sources, with findings captured as Markdown. |
 
 `grill-me` and `grill-with-docs` are **human-invoked routers**: both set `disable-model-invocation: true`, so an agent cannot load them. Agents invoke `grilling` directly, plus `domain-modeling` when a term or decision actually settles.
+
+### Repo-local skills
+
+| Skill | Path | What it does |
+|-------|------|--------------|
+| `to-pr` | `.agents/skills/to-pr/SKILL.md` | Commit with a conventional message, push the branch, and open a PR. The base comes from `origin/HEAD`; it asks the user when ambiguous and never merges. |
+| `close-out` | `.agents/skills/close-out/SKILL.md` | Human-invoked phrase wrapper around `to-pr`. Trigger phrases: "I am done with this, close it up", "done with this", "close it up". |
+
+Both live in `.agents/skills/`, so they are shipped in the package and synced on setup.
 
 ### Scope agent
 
@@ -120,6 +143,12 @@ The agent has no command-execution permission: it never builds, runs, or tests c
 
 `.agents/config/domain.md` declares where domain documentation lives: `GLOSSARY.md` at the repository root and ADRs in `docs/adr/`, numbered `0001-slug.md` onwards — the single-context layout.
 The `domain-modeling` skill reads it before exploring the codebase; when the file or the docs it names are absent, the skill proceeds silently and creates them lazily, only once a term or decision has actually been settled.
+
+### Issue tracker
+
+`.agents/config/issue-tracker.md` declares GitHub Issues, holds the only label table, and defines the `## Wayfinding operations` conventions (map, ticket, claim, blocking, frontier query, closing).
+Its `## Repo-local mirror` block is what `docs/agents/issue-tracker.md` contains.
+`/setup-matt-pocock-skills` creates missing labels and that pointer; the file itself arrives through `npx ai-workflow-setup`.
 
 ## Available Agent Workflows
 

@@ -83,6 +83,10 @@ vi.mock('./skills-phase.js', () => ({
   runSkillsPhase: vi.fn(),
 }))
 
+vi.mock('./tracker-phase.js', () => ({
+  runTrackerPhase: vi.fn(),
+}))
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Imports — these resolve to the mocked modules above
 // ═════════════════════════════════════════════════════════════════════════════
@@ -106,6 +110,7 @@ import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
 import { registerKnowledgebase } from './knowledgebase.js'
 import { runSkillsPhase } from './skills-phase.js'
+import { runTrackerPhase } from './tracker-phase.js'
 import { EXIT_CODES } from './constants.js'
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -124,6 +129,7 @@ const defaultFlags = {
   skipPrepare: false,
   skipSync: false,
   skipKnowledgebase: false,
+  skipTracker: false,
   knowledgebase: false,
   help: false,
   version: false,
@@ -214,6 +220,10 @@ describe('main() — setup orchestrator', () => {
     runSkillsPhase.mockResolvedValue({
       action: 'completed',
       message: 'Pinned skills refreshed',
+    })
+    runTrackerPhase.mockResolvedValue({
+      action: 'completed',
+      message: 'Created 0 label(s), 6 already present',
     })
 
     // Spy on console.log for --version tests
@@ -1016,6 +1026,134 @@ describe('main() — setup orchestrator', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  // ── 29. Tracker phase (Phase 8) ─────────────────────────────────────────
+
+  it('full pipeline calls the tracker phase and exits 0', async () => {
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(runTrackerPhase).toHaveBeenCalledTimes(1)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'tracker', status: 'success' }),
+      ]),
+    )
+  })
+
+  it('--skip-tracker does not call the tracker phase', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, skipTracker: true })
+
+    const code = await main(['--skip-tracker'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(runTrackerPhase).not.toHaveBeenCalled()
+    // Other phases still run
+    expect(discover).toHaveBeenCalledTimes(1)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
+  })
+
+  it('a throwing tracker phase degrades to a warning, never FATAL', async () => {
+    runTrackerPhase.mockRejectedValue(new Error('gh exploded'))
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(stepWarn).toHaveBeenCalledWith(
+      expect.stringContaining('Tracker phase skipped: gh exploded'),
+    )
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'tracker',
+          status: 'warn',
+          message: 'Skipped — gh exploded',
+        }),
+      ]),
+    )
+  })
+
+  it('a not-applicable tracker phase (no GitHub remote, no gh, or unauthenticated) exits 0', async () => {
+    runTrackerPhase.mockResolvedValue({
+      action: 'not-applicable',
+      message: 'no GitHub `origin` remote',
+    })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'tracker',
+          status: 'neutral',
+          message: 'no GitHub `origin` remote',
+        }),
+      ]),
+    )
+  })
+
+  it('an unauthenticated gh is not-applicable, not a warning', async () => {
+    runTrackerPhase.mockResolvedValue({
+      action: 'not-applicable',
+      message: '`gh` is not authenticated — run `gh auth login` and re-run setup',
+    })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'tracker', status: 'neutral' }),
+      ]),
+    )
+  })
+
+  it('a partial tracker phase (label creation failed) warns without throwing', async () => {
+    runTrackerPhase.mockResolvedValue({
+      action: 'partial',
+      message: 'Created 5 label(s), 0 already present; failed: wayfinder:map (HTTP 500)',
+    })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: 'tracker',
+          status: 'warn',
+          message: expect.stringContaining('failed: wayfinder:map'),
+        }),
+      ]),
+    )
+  })
+
+  it('a skipped tracker phase inside an applicable run warns', async () => {
+    runTrackerPhase.mockResolvedValue({
+      action: 'skipped',
+      message: 'could not list labels with `gh` (HTTP 500)',
+    })
+
+    const code = await main([])
+
+    expect(code).toBe(EXIT_CODES.WARNINGS)
+    expect(summary).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'tracker', status: 'warn' }),
+      ]),
+    )
+  })
+
+  it('--knowledgebase runs only discovery and knowledgebase, not the tracker', async () => {
+    parseCliArgs.mockReturnValue({ ...defaultFlags, knowledgebase: true })
+
+    const code = await main(['--knowledgebase'])
+
+    expect(code).toBe(EXIT_CODES.SUCCESS)
+    expect(registerKnowledgebase).toHaveBeenCalledTimes(1)
+    expect(runTrackerPhase).not.toHaveBeenCalled()
   })
 
 })

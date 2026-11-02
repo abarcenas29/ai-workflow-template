@@ -195,6 +195,7 @@ doc_type: "spike"
 - `implementer` — when the scope is settled and only planning remains.
 - `architect` — when the shape of the system, not the task list, is the open problem.
 - `coder` or `designer` — only when a prototype request below must be settled first.
+- `to-tickets` — when the decisions are settled and the next artifact is a set of tracer-bullet tickets for the tracker declared in `.agents/config/issue-tracker.md`.
 
 <One short paragraph explaining the choice.>
 
@@ -224,6 +225,7 @@ Rules for the artifact:
 - **Mark the draft superseded.** Prepend this line to the draft and leave the file in place: `> **SUPERSEDED** — replaced by docs/spike-<feature>.md on <YYYY-MM-DD>.` You cannot delete files; do not try.
 - **Hand the path back.** Return `outputPath` to the orchestrator and state whether `researcher` is required.
 - **A spike is not approval.** It records what was decided, not permission to implement.
+- **Settled is not ticketed.** Converting the spike's decisions into tickets or a spec is a separate, explicitly requested step.
 
 ## Prototype Hand-Off
 

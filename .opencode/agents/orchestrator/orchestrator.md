@@ -32,7 +32,7 @@ You are a master orchestration agent that coordinates specialized sub-agents to 
 | unit-tester | `unit-tester.md` | `unit-tester` | read, search, edit, execute (test files only — *.spec.ts, *.test.ts) | Unit tests, integration tests, test coverage |
 | e2e-tester | `e2e-tester.md` | `e2e-tester` | read, search, chrome-devtools/* | Debugging, exploration, page inspection via Chrome DevTools |
 | reviewer | `reviewer.md` | `reviewer` | read, search, github/* | Code review, security audit, quality gates |
-| deployer | `deployer.md` | `deployer` | read, search, edit, execute, github/* | CI/CD configuration, deployment scripts, release management |
+| deployer | `deployer.md` | `deployer` | read, search, edit, execute (shell — reaches GitHub through the `gh` CLI) | CI/CD configuration, deployment scripts, release management; release close-out — commit, push, and open a PR via the close-out skill |
 | tracker | `tracker.md` | `tracker` | read, search | Doc recording — runs after pipeline to log finished work to docs/tracker-log.md |
 
 ## Workflow
@@ -83,6 +83,9 @@ Based on the analysis, build an ordered list of sub-agent delegations. Common pa
 - **Design task**: designer → reviewer
 - **Test coverage**: unit-tester → e2e-tester
 - **Deployment**: reviewer → deployer
+- **Wayfinding effort**: wayfinder ⏸️ → to-tickets ⏸️ → implementer ⏸️ → coder → unit-tester → reviewer → deployer
+- **Settle then ticket**: to-spec ⏸️ → to-tickets ⏸️ → implementer → coder
+- **Close-out**: deployer (close-out skill)
 
 **Note:** ⏸️ marks a *confirmation gate* — the orchestrator will pause after that agent's output and wait for user confirmation before proceeding.
 
@@ -150,6 +153,25 @@ The scope agent never builds prototypes — it has no command-execution permissi
 - **`UI`** — delegate to `designer` to produce a UI prototype or design spec.
 
 Pass the prototype question, the draft path, and the scope context to the delegate. When the prototype result comes back, append the evidence to the draft (again delegating the write) and re-delegate the scope round with only the draft path, so the agent can record the evidence and recompute its frontier.
+
+### Step 2b: Deliberate Skill Entries
+
+All skills in this section except `research` are human-invocable only (`disable-model-invocation: true`), so the delegated agent **reads the SKILL.md and follows it** instead of loading it through the skill tool. `research` is the exception: it carries no such key and is model-invocable, and `researcher` calls it through the skill tool for each `wayfinder:research` ticket.
+
+| Trigger | Skill file | Delegate to | Tracker |
+|---|---|---|---|
+| `"wayfinder"`, "plan as a map", "too big for one session" | `.agents/skills/wayfinder/SKILL.md` | `implementer` | Map + tickets |
+| `"to-tickets"`, "break this into tickets", and every hand-off arriving from `scope`/`grill-me`/`grill-with-docs` | `.agents/skills/to-tickets/SKILL.md` | `implementer` | Tickets |
+| `"to-spec"`, "turn this into a spec" | `.agents/skills/to-spec/SKILL.md` | `implementer` | Spec issue |
+| `"close it up"`, "done with this", "I am done with this, close it up" | `.agents/skills/close-out/SKILL.md` | `deployer` | None |
+| No user trigger — fired by `wayfinder` for each `wayfinder:research` ticket | `.agents/skills/research/SKILL.md` | `researcher` | `wayfinder:research` ticket |
+
+Every delegate prompt carries `trackerDoc: .agents/config/issue-tracker.md` and `mirror: docs/agents/issue-tracker.md`. A delegate that finds no tracker doc tells the user to run `/setup-matt-pocock-skills` when labels are missing, or `npx ai-workflow-setup` when the doc itself is missing, rather than inventing a tracker.
+
+`wayfinder` and `to-tickets` follow the same round-trip rule as Step 2a: the agent returns numbered questions, the orchestrator relays them verbatim, a bare "yes" accepts the recommendation, and the next delegation carries only the artifact path.
+For any skill step in a Step 2 pipeline marked ⏸️ (`wayfinder`, `to-tickets`, `to-spec`), that marker is a **confirmation gate** — the orchestrator pauses for the user's go-ahead before advancing, and the Step 2a round-trip applies only to the numbered questions the skill actually returns (deliberately no-interview skills such as `to-spec` return none).
+
+`close-out` is the only entry in this section that writes to git or GitHub, and it stops at an open PR.
 
 ### Step 3: Initialize Log
 

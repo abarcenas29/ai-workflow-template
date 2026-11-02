@@ -79,6 +79,7 @@ vi.mock('./prepare.js', () => ({ handlePrepare: vi.fn() }))
 vi.mock('./husky-init.js', () => ({ initHusky: vi.fn() }))
 vi.mock('./sync-phase.js', () => ({ runSyncPhase: vi.fn() }))
 vi.mock('./knowledgebase.js', () => ({ registerKnowledgebase: vi.fn() }))
+vi.mock('./tracker-phase.js', () => ({ runTrackerPhase: vi.fn() }))
 
 vi.mock('./skills-phase.js', async (importOriginal) => {
   const actual = await importOriginal()
@@ -97,6 +98,7 @@ import { handlePrepare } from './prepare.js'
 import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
 import { registerKnowledgebase } from './knowledgebase.js'
+import { runTrackerPhase } from './tracker-phase.js'
 import { EXIT_CODES } from './constants.js'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
@@ -1188,6 +1190,7 @@ describe('index.js skills phase wiring', () => {
     skipPrepare: false,
     skipSync: false,
     skipKnowledgebase: false,
+    skipTracker: false,
     knowledgebase: false,
     help: false,
     version: false,
@@ -1219,6 +1222,7 @@ describe('index.js skills phase wiring', () => {
     initHusky.mockResolvedValue({ action: 'initialized', message: 'husky' })
     runSyncPhase.mockResolvedValue({ action: 'completed', message: 'synced' })
     registerKnowledgebase.mockResolvedValue({ action: 'indexed', message: 'kb' })
+    runTrackerPhase.mockResolvedValue({ action: 'completed', message: 'tracker' })
   })
 
   afterEach(() => {
