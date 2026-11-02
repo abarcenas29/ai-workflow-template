@@ -21,6 +21,16 @@ category: "progress"
 
 ## What Works
 
+### 2026-11-02: Deployer — Branch closed out as PR #40, awaiting human merge
+
+The Matt skills expansion is published for review. `feat/matt-skills-expansion` was committed as `7214b25`, pushed, and opened as PR #40 against `main`; the `close-out` skill's terminal state is an open PR, so nothing was merged, approved, or deleted.
+
+- **One commit, 41 files:** `feat(skills): add scoping skills, tracker config, and close-out` (+2959/−26), staged by explicit path. `SKIP_BUMP=1` kept the intended `2.1.0`, because `.husky/pre-commit` would otherwise have bumped it to `2.2.0`; memory-schema validation still ran and passed on 3 files.
+- **Base resolved, not assumed:** `origin/HEAD` → `main`, and `feat/matt-skills-expansion` does not nest under another remote branch, so no clarification was needed.
+- **PR #40:** https://github.com/abarcenas29/ai-workflow-template/pull/40 — Summary tree of the new skill directories, Evidence from the 842-test / coverage / 7-Playwright / 10-of-10-lock runs, Merge Danger as a two-way door with blast radius `template consumers` (pin `v1.3.1` → `v1.3.2`, `to-pr` preconditions, setup `neutral` status).
+- **CI:** both PR checks pass — `test` (20s) and `playwright` (36s) in run `41367370381`.
+- **Drift:** `main` moved to `64297cf` (PR #39) after the push; the branch is 1 ahead / 2 behind and remains `MERGEABLE`. No rebase was performed.
+
 ### 2026-11-02: Tracker — Matt skills expansion recorded (Feature Pipeline 20)
 
 The scoped-work skill set no longer stops at "narrow the problem". Planning a large effort, turning decisions into tickets or a spec, researching open questions, and closing a branch out to a PR are now shipped skills, backed by a declared GitHub Issues tracker and the command the vendored files tell users to run.
@@ -30,7 +40,7 @@ The scoped-work skill set no longer stops at "narrow the problem". Planning a la
 - **One real blocker, caught by review not by tests.** `tracker-phase.js` passed `['auth status']` as a single argv element, so the auth pre-flight could never succeed and label creation could never run; the test fake dispatched on `args.join(' ')`, reproducing the code's own assumption, which is why 24 tests were green. Fixed to `['auth','status']`, and the fake now dispatches on the array with explicit shape assertions. Two majors alongside it: `to-pr` aborted on a clean tree even with commits ahead of base, and Phase 8's environment skip raised a warning exit code (now `not-applicable` → `neutral`, exit 0, while applicable failures still warn).
 - **Evidence:** `npm run test:unit` → **28 files / 842 tests**, 0 failures; coverage **96.52 / 93.9 / 97.09 / 96.76** (`tracker-phase.js` 94.65% statements); `npx playwright test` → 7 passed / 1 skipped; lock re-fetch **10/10 entries, 15/15 files, 0 mismatches**; `grep -c 'wayfinder:'` = 0 in both tracker consumers; mirror 598 B = 598 B.
 - **Review trail:** round 1 CHANGES REQUIRED (1 blocker, 2 major, 4 minor) → fix pass → round 2 **APPROVE WITH NITS** (all seven verified PASS) → four nits applied, 842 tests still passing.
-- **Deliberately not done:** **T30(f) live label creation** was withheld pending operator consent to create six real labels on this repository — recorded as not executed, with idempotency proven against a fake `gh` state instead. Nothing was committed, pushed, or published; the work sits on `feat/matt-skills-expansion` (from `61c7709`).
+- **Deliberately not done:** **T30(f) live label creation** was withheld pending operator consent to create six real labels on this repository — recorded as not executed, with idempotency proven against a fake `gh` state instead. At tracker time nothing had been committed, pushed, or published; the work sat on `feat/matt-skills-expansion` (from `61c7709`) — the Deployer close-out above then committed `7214b25` and opened PR #40.
 - **Environment:** `memory_bank_*` and `knowledgebase_*` MCP tools were unavailable for every agent this session (files read directly, gracefully); `node_modules` was absent until batch H ran `npm install`.
 - **Records:** `docs/tracker-log.md` (Feature Pipeline 20), `docs/.orchestrator-log.md` (Pipeline 20), `docs/TRACKER-INDEX.md`, and a `## Session: 2026-11-02` entry in `.agents/instructions/learned-knowledge.instructions.md`.
 
