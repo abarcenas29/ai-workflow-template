@@ -182,15 +182,24 @@ Use this to create deterministic, structured plans saved to `/plan/`. Follow thi
 - **Required sections** (in order):
   1. Introduction (with status badge)
   2. Requirements & Constraints (with REQ-, SEC-, CON- identifiers)
-  3. Implementation Steps (phases with task tables: Task ID, Description, Completed, Date)
+  3. Implementation Steps — one phase per batch, headed `## Phase N — Title (Batch X — Parallel)`; sequential phases drop the annotation. Every task table carries `Task ID | Description | File(s) | Batch | Dependencies | Completed`
   4. Alternatives (ALT- identifiers with rationale)
   5. Dependencies (DEP- identifiers)
   6. Files (FILE- identifiers)
   7. Testing (TEST- identifiers)
   8. Risks & Assumptions (RISK-, ASSUMPTION- identifiers)
   9. Related Specifications
+- **Batch semantics**: Batch A holds the tasks with no dependencies. A task moves to the next letter once every Task ID it depends on has been placed, so tasks sharing a batch have no interdependencies and can run in parallel. Every task declares its dependencies by Task ID, `—` when it has none. `Completed` takes the date the task lands; some plans also carry a trailing `Date` column, but the six above are the required set.
+- **Parallel Execution Summary**: a `| Batch | Tasks | Can run in parallel? | Depends on |` table stating which batches can run concurrently — `implementer.md` places it directly after the Introduction.
 
-Plans must be deterministic, self-contained, and immediately actionable. Use unambiguous language, specific file paths, and explicit completion criteria per task. DO NOT make code edits — only generate the plan.
+```markdown
+| Task ID | Description | File(s) | Batch | Dependencies | Completed |
+|---------|-------------|---------|-------|--------------|-----------|
+| T1 | Add the feed schema | `libs/contract/schemas/feed.schema.json` | A | — | |
+| T2 | Regenerate the wire types | `libs/contract/src/generated/feed.ts` | B | T1 | |
+```
+
+Plans must be deterministic, self-contained, and immediately actionable. Use unambiguous language, specific file paths, and explicit completion criteria per task. DO NOT make code edits — only generate the plan. `.opencode/agents/implementer.md` is the authority for the full format; this section is the summary.
 
 ### Research Spike — Systematic Technical Investigation
 
