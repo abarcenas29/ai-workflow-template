@@ -393,6 +393,7 @@ describe('help()', () => {
       ['--skip-prepare', 'Skip prepare script modification phase'],
       ['--skip-sync', 'Skip file sync phase'],
       ['--skip-knowledgebase', 'Skip knowledgebase registration phase'],
+      ['--skip-tracker', 'Skip GitHub issue-tracker label phase'],
       ['--knowledgebase', 'Run ONLY the knowledgebase registration phase'],
       ['--help', 'Show this help message and exit'],
       ['--version', 'Show the version number and exit'],
@@ -423,7 +424,7 @@ describe('help()', () => {
     ui.help()
 
     const optionLines = out().filter((l) => l.startsWith('    -'))
-    expect(optionLines).toHaveLength(12)
+    expect(optionLines).toHaveLength(13)
     // 4-space indent + widest flag group (20) + 2-space gap = column 26
     for (const line of optionLines) {
       expect(line[26]).not.toBe(' ')

@@ -61,7 +61,7 @@ npx ai-workflow-setup --help           # Show all options
 
 ## What This Package Does
 
-- **34 specialized AI skills**, framework instructions, and prompt templates (`.agents/`)
+- **41 specialized AI skills**, framework instructions, and prompt templates (`.agents/`)
 - **Smart agent frameworks** — Plan Mode, Implementation Plans, Research Spikes
 - **Multi-agent orchestrator** — dynamic pipelines with 10+ specialized sub-agents
 - **TDD orchestrator** — strict RED→GREEN→REFACTOR/VERIFY pipeline (90% coverage gate)
@@ -69,6 +69,7 @@ npx ai-workflow-setup --help           # Show all options
 - **Caveman mode** — ultra-compressed communication for token efficiency
 - **Playwright + Vitest testing** — E2E browser tests, unit tests with v8 coverage (≥90%)
 - **Version auto-bumping + auto-publishing** — Husky-managed; npm publish on merge to `main`
+- **Close-out / PR publishing** — conventional commit → push → `gh pr create`, base auto-detected from `origin/HEAD`, never merges
 - **graphify knowledge graph** — queryable code-level relationship mapping
 
 ## Maintainer sync (in this repo)
@@ -116,11 +117,11 @@ Post-install, your project receives this structure:
 ```text
 .agents/
 ├── instructions/   # Framework, workflow, and security guidance
-├── skills/         # 34 specialized AI skills
+├── skills/         # 41 specialized AI skills
 └── prompts/        # Reusable prompt templates
 .opencode/
 ├── agents/         # Orchestrator + specialized sub-agents
-├── commands/       # Slash commands
+├── commands/       # Slash commands (incl. /setup-matt-pocock-skills)
 └── plugins/        # graphify knowledge-graph plugin
 memory-bank/        # Persistent project context (+ tasks/)
 scripts/            # Sync, memory, and knowledgebase CLI helpers

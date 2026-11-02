@@ -2646,3 +2646,104 @@ spot-check is built and unsampled; its first run may fail on drift that has been
 sampling covers 1/k replies per pipeline by design. **Nothing is committed** — a deployer owns git.
 `memory_search` executed; `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not
 configured).
+
+---
+
+## Feature Pipeline 20: Matt Pocock Skills Expansion — `v1.3.2` Vendored Set, Repo-Local `to-pr`/`close-out`, GitHub Issues Tracker
+
+**Date:** 2026-11-02
+**Status:** ✅ SUCCESS — 30/30 tasks across batches A–I; `npm run test:unit` → **28 files / 842 tests, 0 failures**; coverage **96.52 / 93.9 / 97.09 / 96.76**; Playwright **7 passed / 1 skipped**; reviewer **APPROVE WITH NITS** in round 2 after one blocker and two majors were fixed. **Nothing was committed, pushed, labelled, or published.**
+**Pipeline:** implementer (bootstrap) → researcher → implementer (plan) → implementer (plan amendment) → coder (A–D) → coder (E–I) → reviewer (round 1: CHANGES REQUIRED) → coder (7 fixes) → reviewer (round 2: APPROVE WITH NITS) → coder (4 nits) → tracker (this entry)
+**Branch:** `feat/matt-skills-expansion`, cut from detached HEAD `61c7709`, in worktree `mattpocock-skills-additions`.
+**Environment (whole session):** the `memory_bank_*` and `knowledgebase_*` MCP tools were unavailable to every agent, so all agents read files directly instead of blocking; `node_modules` was absent until batch H ran `npm install`.
+
+### Summary
+
+The template's scoped-work skill set used to stop at "narrow the problem". It now carries the rest of the loop: plan an effort too large for one session (`wayfinder`), turn settled decisions into tracer-bullet tickets (`to-tickets`) or a spec (`to-spec`), research the open questions (`research`), and close a branch out to a pull request (`to-pr`, triggered by the phrase-based `close-out`). Those skills need a tracker and a command the upstream files name, so the change also declares GitHub Issues as this repository's issue tracker, creates its six labels idempotently during setup, and ships `/setup-matt-pocock-skills`. Seven new skills take the directory count from 34 to 41, and ten vendored files are now pinned at `v1.3.2`.
+
+### Execution Steps
+
+| # | Agent | Status | Result |
+|---|---|---|---|
+| 0 | implementer (bootstrap) | ✅ | `docs/.architecture-context.md` verified current and all six memory-bank core files present; nothing scaffolded. Canonical project id confirmed as `@abarcenas/ai-workflow-template`. |
+| 1 | researcher | ✅ | Read-only upstream map. Found that `to-pr` **does not exist upstream** (`pr` is a body-only template), that `to-ticket` is `to-tickets`, and that all four already existed upstream at the previous `v1.3.1` tag — an import, not something the pin bump introduced. Mapped the lock schema, the byte-verbatim convention, the wiring anchors, and `gh` 2.98.0's authenticated state. |
+| 2 | implementer (plan) | ✅ | `plan/feature-matt-skills-expansion-v1.md`: 26 tasks, 9 phases, batches A–I. |
+| 2b | implementer (plan amendment) | ✅ | Plan amended in place to **30 tasks**: D-07 reversed, `research` vendored (T27), `/setup-matt-pocock-skills` shipped (T28), docs (T29), verification (T30), CON-11/CON-12 added. R1's rejected option kept as ALT-11. |
+| 3 | coder (A–D) | ✅ | Seven vendored files at `v1.3.2`, two repo-local skills, tracker config + pointer, `.gitignore`, orchestrator/deployer/scope wiring, `skills-lock.json` at 10 entries / 15 files. |
+| 4 | coder (E–I) | ✅ | `tracker-phase.js` + 24 tests, the setup command, `--skip-tracker` as Phase 8, count updates to 41, version `2.1.0`, `npm install`, first green run. |
+| 5 | reviewer (round 1) | ⚠️ | CHANGES REQUIRED — 1 blocker (`['auth status']` as one argv element), 2 major (`to-pr` aborted on a clean tree; Phase 8 skip raised a warning exit code), 4 minor. |
+| 6 | coder (fix pass) | ✅ | All seven fixed; suite 835 → 842; coverage 96.52 / 93.9; Playwright 7 passed / 1 skipped. |
+| 7 | reviewer (round 2) | ✅ | **APPROVE WITH NITS** — all seven prior findings verified PASS, no regressions, four non-blocking nits. |
+| 8 | coder (nits) | ✅ | Four nits applied; 842 tests still passing. |
+| 9 | tracker | ✅ | This entry, the orchestrator log, the index, the memory-bank summary, and the learned-knowledge session. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/skills/wayfinder/SKILL.md` | **NEW** — vendored `v1.3.2`, byte-verbatim (12,408 B). Maps an effort too large for one session. |
+| `.agents/skills/to-tickets/SKILL.md` | **NEW** — vendored (5,812 B). Plan/spec → tracer-bullet tickets with blocking edges. |
+| `.agents/skills/to-spec/SKILL.md` | **NEW** — vendored (3,043 B). Current conversation → spec on the tracker. |
+| `.agents/skills/pr/SKILL.md`, `pr/CREDITS.md` | **NEW** — vendored (4,169 B + 604 B). The PR-body shape `to-pr` composes. `CREDITS.md` kept because dropping attribution would misrepresent provenance. |
+| `.agents/skills/research/SKILL.md` | **NEW** — vendored (832 B). Carries **no** `disable-model-invocation`, because `wayfinder` resolves research tickets through the skill tool. |
+| `.agents/skills/grilling/SKILL.md` | **REPLACED** — re-vendored at `v1.3.2` (1,987 → 2,077 B, hash `a146842e…`), the one existing skill whose bytes changed between tags. |
+| `.agents/skills/to-pr/SKILL.md` | **NEW, repo-local** — commit → push → `gh pr create`; base from `origin/HEAD`, asks when ambiguous, never merges or force-pushes. |
+| `.agents/skills/close-out/SKILL.md` | **NEW, repo-local** — human-invoked phrase wrapper (`disable-model-invocation: true`) that runs `to-pr` and stops at an open PR. |
+| `.agents/config/issue-tracker.md` | **NEW** — the only authored tracker definition: GitHub Issues, the six-row label table, `## Wayfinding operations`, triage, `.scratch/` fallback, and the `## Repo-local mirror` block. |
+| `docs/agents/issue-tracker.md` | **NEW** — 598-byte pointer, byte-identical to the mirror block, so the path the vendored skills name resolves without a second definition. |
+| `scripts/setup/tracker-phase.js` | **NEW** — parses the packaged label table (no JS constant), creates only missing labels, returns `not-applicable` where a tracker cannot exist. |
+| `scripts/setup/tracker-phase.test.js` | **NEW** — 24 tests; the fake dispatches on the argv **array**, so a collapsed subcommand cannot hide again. |
+| `scripts/setup/{constants,ui,index}.js` | **MODIFIED** — `--skip-tracker` flag, description/order entry, Phase 8 with `warn` (never `error`) on failure. |
+| `.opencode/commands/setup-matt-pocock-skills.md` | **NEW** — auth check → canonical doc present? → read labels → list → create only missing → refresh pointer → report. Three-key frontmatter, no `model`. |
+| `.opencode/agents/orchestrator/orchestrator.md` | **MODIFIED** — three Step 2 patterns, new Step 2b (deliberate skill entries, five paths), corrected deployer registry row. |
+| `.opencode/agents/deployer.md` | **MODIFIED** — `## Close-Out` section above `## Guidelines`; permissions untouched. |
+| `.opencode/agents/scope.md` | **MODIFIED** — two `to-tickets` hand-off bullets; round protocol and permissions untouched. |
+| `skills-lock.json` | **MODIFIED** — 10 `mattpocock/skills` entries at `v1.3.2`, 15 files, hashes re-derived from disk; the eight caveman entries byte-identical. |
+| `AGENTS.md`, `README.md`, `.agents/config/README.md`, `docs/.architecture-context.md` | **MODIFIED** — skill count 34 → 41, the ten-skill pin note, the new tables and sections, and the command named where users look; the `AGENTS.md` sorting claim was removed rather than re-sorting 41 bullets. |
+| `.gitignore` | **MODIFIED** — `.scratch/` ignored so the local-markdown tracker fallback can never be committed. |
+| `package.json`, `package-lock.json` | **MODIFIED** — version settled at `2.1.0`. |
+| `plan/feature-matt-skills-expansion-v1.md` | **MODIFIED** — R2 (gap close) and R3 (review fixes); all tasks marked complete. |
+| `tests/spec-skills-lock.test.js` | **NEW** — verifies every pinned `files[].sha256` and `computedHash` against the vendored bytes, and that the two repo-local skills have no lock entry. |
+
+### Key Decisions
+
+- **Pin to `v1.3.2` and accept the `grilling` re-vendor.** *Cost:* one extra changed file and hash. *Risk:* a consumer with local edits to `grilling` gets the existing overwrite warning. Leaving `grilling` at `v1.3.1` while the pin said `v1.3.2` would make the lock lie.
+- **Vendored bytes are never edited.** *Cost:* the upstream texts name paths and a command this repo must supply. *Risk:* a future agent "tidies" a vendored file and breaks hash verification — which is what `tests/spec-skills-lock.test.js` now catches.
+- **`to-pr` is repo-local; upstream `pr` is only the body shape.** *Cost:* one skill file this repo maintains. *Risk:* upstream `pr` changes its body structure and `to-pr` still describes the old one — visible as a one-line skill change, not silent drift.
+- **`close-out` is a phrase wrapper, not a second implementation.** *Cost:* two skills where one might do. *Risk:* the two drift — mitigated by `close-out` telling the agent to read `to-pr` end to end rather than restating it.
+- **One tracker authority, parsed not copied (CON-11).** *Cost:* the phase must parse Markdown, with a loud `skipped` on a malformed table. *Risk:* a consumer edits their project copy and setup still uses the packaged one — deliberate, and now stated in the doc's own prose.
+- **The command writes a pointer and labels, nothing else (CON-12).** *Cost:* a consumer with a missing tracker doc must run `npx ai-workflow-setup` first. *Risk:* none to the distribution path; the alternative was a second file-distribution mechanism.
+- **Environments without a tracker are `not-applicable`, not `skipped`.** *Cost:* a new status value. *Risk:* nobody notices a genuinely broken tracker run — bounded by the rule that applicable failures still warn and exit 1.
+- **The deployer uses `shell` `gh`, not a `github/*` MCP grant.** *Cost:* the registry row had to be corrected. *Risk:* none; `gh` 2.98.0 is installed and authenticated.
+- **Counts re-derived from disk, never carried from the brief.** *Cost:* one extra verification step. *Risk:* the brief's "34 → 38" would have been wrong in three files; 41 is what the skills directory actually holds.
+
+### Review History
+
+| Round | Verdict | Findings |
+|---|---|---|
+| 1 | ⚠️ CHANGES REQUIRED | **BLOCKER** — `tracker-phase.js:102` passed `['auth status']` as a single argv element, so the auth pre-flight could never pass and label creation could never run. **MAJOR** — `to-pr` aborted on a clean tree even with commits ahead of base; Phase 8's environment skip raised a warning exit code. **MINOR ×4.** |
+| Fix pass | ✅ | All seven closed. The test fake now dispatches on the argv array, which is why 24 tests had passed against broken code. |
+| 2 | ✅ APPROVE WITH NITS | All seven verified PASS, no regressions. Four nits: command pagination, ⏸️ reframing, an overstated `AGENTS.md` sorting claim, and T15/T16 marked superseded. |
+| Nit pass | ✅ | Four applied; 842 tests still passing. |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npm run test:unit` | ✅ 28 files / **842 tests**, 0 failed, 0 skipped |
+| `npm run test:unit:coverage` | ✅ **96.52% statements / 93.9% branches / 97.09% functions / 96.76% lines**; `tracker-phase.js` 94.65% statements |
+| `npx playwright test` | ✅ 7 passed, 1 skipped |
+| T26 upstream re-fetch | ✅ **10/10 entries, 15/15 files, 0 mismatches** |
+| Single label authority | ✅ `grep -c 'wayfinder:'` = 0 in both the command and `tracker-phase.js` |
+| Mirror drift | ✅ 598 B = 598 B, diff empty |
+| `research` bytes | ✅ local = upstream = `1f629e18…031d33`, zero `disable-model-invocation` |
+| Skills count | ✅ 41 directories, 10 vendored at `v1.3.2` |
+| T30(f) live label idempotency | ⚠️ **NOT EXECUTED** — operator consent for creating six real labels was withheld. Idempotency proven by T16 against a fake `gh` state; recorded as not executed, never as a pass. |
+
+### Notes / Follow-up
+
+- **Nothing is committed.** The work sits on `feat/matt-skills-expansion` (from `61c7709`); no commit, push, PR, label creation, or publish was performed. The next step is review and commit by whoever owns the branch.
+- **T30(f) is the one unrun check,** and it is unrun by choice: it creates six real labels on this repository. Re-run `/setup-matt-pocock-skills` twice when that side effect is acceptable; the second run must report `0 created, 6 already present`.
+- **`gh label list` pagination is capped at 200 rows** in both consumers. A tracker with more than 200 labels would silently see a truncated set and retry creations that already exist; the `already exists` fallback keeps that harmless.
+- **The learned-knowledge session** for this pipeline is appended as `## Session: 2026-11-02` in `.agents/instructions/learned-knowledge.instructions.md`; it records the argv-element blocker, the `not-applicable` contract, and the vendoring arithmetic.
+- `memory_search` / `knowledgebase_search`: **not executed** — no memory-bank or knowledgebase tool was exposed in this session's MCP catalog, and every agent read files directly. Recorded as an environment limitation, not a task failure.

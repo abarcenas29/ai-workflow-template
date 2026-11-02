@@ -30,6 +30,22 @@ You are a deployment and release engineering specialist focused on reliable, rep
 4. **Implement/Configure**: Create or modify deployment configurations.
 5. **Validate**: Verify configuration syntax and simulate deployment where possible.
 
+## Close-Out
+
+The trigger phrases are "I am done with this, close it up", "done with this", and "close it up".
+
+`close-out` is `disable-model-invocation: true`, so read `.agents/skills/close-out/SKILL.md` and follow it; from there it runs `.agents/skills/to-pr/SKILL.md`.
+
+Reach GitHub through the already-granted `shell` permission using the `gh` CLI — no `github/*` MCP tools are needed.
+
+The base branch comes from `origin/HEAD` when that resolves unambiguously; ask the user when it does not.
+
+Never merge, force-push, or delete a branch.
+
+The terminal artifact is an open PR URL, handed to a human for review and merge.
+
+If the PR must reference issues, read `docs/agents/issue-tracker.md` for the tracker conventions.
+
 ## Guidelines
 
 - Follow existing deployment patterns in the project

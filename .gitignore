@@ -24,3 +24,6 @@ models/
 
 # Environment files (may contain credentials)
 .env
+
+# Wayfinding scratch space (local-markdown tracker fallback)
+.scratch/

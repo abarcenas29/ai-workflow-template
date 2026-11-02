@@ -13,8 +13,9 @@
 //   8. Phase 5 — Sync (spawn sync.js + normalize-memory.js, unless --skip-sync)
 //   9. Phase 6 — Skills (refresh pinned skills from upstream, gated with --skip-sync)
 //  10. Phase 7 — Knowledgebase (register with centralized knowledgebase, unless --skip-knowledgebase)
-//  11. Render summary table via ui.summary()
-//  12. Determine exit code and return it
+//  11. Phase 8 — Tracker (create missing GitHub labels, unless --skip-tracker)
+//  12. Render summary table via ui.summary()
+//  13. Determine exit code and return it
 //
 // Each phase is wrapped in try/catch. Only discovery failure is fatal.
 // All other phase errors are logged and the pipeline continues (REQ-04).
@@ -42,6 +43,7 @@ import { initHusky } from './husky-init.js'
 import { runSyncPhase } from './sync-phase.js'
 import { runSkillsPhase } from './skills-phase.js'
 import { registerKnowledgebase } from './knowledgebase.js'
+import { runTrackerPhase } from './tracker-phase.js'
 
 // ── Package version (lazy, cached) ───────────────────────────────────────────
 
@@ -77,7 +79,7 @@ function getPackageVersion() {
  *
  * @param {string} action - Action value returned by a phase module
  *   (e.g. `'added'`, `'skipped'`, `'failed'`, `'dry-run'`).
- * @returns {'success' | 'warn' | 'error'}
+ * @returns {'success' | 'warn' | 'error' | 'neutral'}
  */
 function actionStatus(action) {
   switch (action) {
@@ -91,6 +93,11 @@ function actionStatus(action) {
     case 'merged':
     case 'indexed':
       return 'success'
+    // The phase had nothing to do in this environment (e.g. no GitHub remote,
+    // no `gh`, an unauthenticated `gh`). Neither success nor a warning, so it
+    // must not change the exit code.
+    case 'not-applicable':
+      return 'neutral'
     // These actions indicate the phase was intentionally skipped or
     // only partially completed — not an error but worth noting
     case 'skipped':
@@ -148,6 +155,7 @@ export async function main(argv) {
     flags.skipHooks = true
     flags.skipPrepare = true
     flags.skipSync = true
+    flags.skipTracker = true
     flags.skipKnowledgebase = false
   }
 
@@ -390,6 +398,36 @@ export async function main(argv) {
       stepWarn(`Knowledgebase registration skipped: ${err.message}`)
       phases.push({
         phase: 'knowledgebase',
+        status: 'warn',
+        message: `Skipped \u2014 ${err.message}`,
+      })
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Phase 8 — Tracker (unless --skip-tracker)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (!flags.skipTracker) {
+    section('Phase 8: Tracker')
+
+    try {
+      const trackerResult = await runTrackerPhase(
+        { ...context, flags },
+        { dryRun: flags.dryRun },
+      )
+      context.trackerResult = trackerResult
+      phases.push({
+        phase: 'tracker',
+        status: actionStatus(trackerResult.action),
+        message: trackerResult.message,
+      })
+    } catch (err) {
+      // Never fatal — an unexpected tracker error degrades to a warning.
+      // Environment gaps (no GitHub remote, no `gh`, unauthenticated `gh`)
+      // are returned as `not-applicable` above and map to a neutral status.
+      stepWarn(`Tracker phase skipped: ${err.message}`)
+      phases.push({
+        phase: 'tracker',
         status: 'warn',
         message: `Skipped \u2014 ${err.message}`,
       })

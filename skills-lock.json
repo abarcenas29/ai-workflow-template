@@ -53,7 +53,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/domain-modeling/SKILL.md",
-      "ref": "v1.3.1",
+      "ref": "v1.3.2",
       "computedHash": "7b925d7b1e341a2eeae33ad68a8a8c0ab889a38ddd22a7598e4c240e5a7556a3",
       "files": [
         {
@@ -77,7 +77,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/productivity/grill-me/SKILL.md",
-      "ref": "v1.3.1",
+      "ref": "v1.3.2",
       "computedHash": "caaf8b8de1684f96e26b28f3c29189db5c89cce4b73e1c93d86164f66ef88637",
       "files": [
         {
@@ -91,7 +91,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
-      "ref": "v1.3.1",
+      "ref": "v1.3.2",
       "computedHash": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
       "files": [
         {
@@ -105,13 +105,32 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/productivity/grilling/SKILL.md",
-      "ref": "v1.3.1",
-      "computedHash": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+      "ref": "v1.3.2",
+      "computedHash": "a146842ed93ca43d833550fa9adf02e58cb63c83fea9d4b4522995b82242d4e2",
       "files": [
         {
           "path": "SKILL.md",
-          "sha256": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+          "sha256": "a146842ed93ca43d833550fa9adf02e58cb63c83fea9d4b4522995b82242d4e2",
           "upstreamPath": "skills/productivity/grilling/SKILL.md"
+        }
+      ]
+    },
+    "pr": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/pr/SKILL.md",
+      "ref": "v1.3.2",
+      "computedHash": "ab63f1cf78647389edcd386c9427c5dfca27ed2836930c24773ffee834c19bcd",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "ab63f1cf78647389edcd386c9427c5dfca27ed2836930c24773ffee834c19bcd",
+          "upstreamPath": "skills/engineering/pr/SKILL.md"
+        },
+        {
+          "path": "CREDITS.md",
+          "sha256": "a7a087127665d7298a72280ef6e19c41ad8404523712a788c8dc3ab414bc2497",
+          "upstreamPath": "skills/engineering/pr/CREDITS.md"
         }
       ]
     },
@@ -119,7 +138,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/prototype/SKILL.md",
-      "ref": "v1.3.1",
+      "ref": "v1.3.2",
       "computedHash": "714de632d116bb73f65cdb5a882db15b9369a6713b9a47c0fad827848f0bfbe3",
       "files": [
         {
@@ -136,6 +155,62 @@
           "path": "UI.md",
           "sha256": "723211e878acbc7b6ff09755263f3295cde724ba902ff0064da41eed51d45ad3",
           "upstreamPath": "skills/engineering/prototype/UI.md"
+        }
+      ]
+    },
+    "research": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/research/SKILL.md",
+      "ref": "v1.3.2",
+      "computedHash": "1f629e18ab899412683bc6a1c4efb4339999e27c2fdac328f26ee10a8c031d33",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1f629e18ab899412683bc6a1c4efb4339999e27c2fdac328f26ee10a8c031d33",
+          "upstreamPath": "skills/engineering/research/SKILL.md"
+        }
+      ]
+    },
+    "to-spec": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-spec/SKILL.md",
+      "ref": "v1.3.2",
+      "computedHash": "43ad9cf318e5e7d3d1fa360253a37021796dc87a0c2e595ad262661a10f85088",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "43ad9cf318e5e7d3d1fa360253a37021796dc87a0c2e595ad262661a10f85088",
+          "upstreamPath": "skills/engineering/to-spec/SKILL.md"
+        }
+      ]
+    },
+    "to-tickets": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "ref": "v1.3.2",
+      "computedHash": "56ec23c5b2782785d4e65bff9e315b6d3aeb4ef977c174a219e99489fada1995",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "56ec23c5b2782785d4e65bff9e315b6d3aeb4ef977c174a219e99489fada1995",
+          "upstreamPath": "skills/engineering/to-tickets/SKILL.md"
+        }
+      ]
+    },
+    "wayfinder": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/wayfinder/SKILL.md",
+      "ref": "v1.3.2",
+      "computedHash": "0c9fa96791aebf3b7d654cf35c6aadde97d81f57c17b07d13b27c14d9c46561f",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "0c9fa96791aebf3b7d654cf35c6aadde97d81f57c17b07d13b27c14d9c46561f",
+          "upstreamPath": "skills/engineering/wayfinder/SKILL.md"
         }
       ]
     }
