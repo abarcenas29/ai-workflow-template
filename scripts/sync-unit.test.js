@@ -41,6 +41,7 @@ import {
   parsePrettierIgnoreRules,
   projectOwnedPaths,
   projectOwnedStubs,
+  projectOwnedAgentStubs,
   readManifest,
   requiredPrettierIgnorePatterns,
   resolvePruneEntry,
@@ -609,6 +610,7 @@ describe('resolvePruneEntry', () => {
       '__root__/.prettierignore',
       '__root__/.agents-sync-ignore',
       'instructions/learned-knowledge.instructions.md',
+      'config/quality-gates.md',
       '__project__/AGENTS.project.md',
       '__project__/.prettierignore',
     ]) {
@@ -945,7 +947,7 @@ describe('runSync copy passes', () => {
     expect(outputOf(errorSpy)).toContain('… syncing: AGENTS.md')
   })
 
-  it('writes nothing in --dry-run except pre-existing scaffolding behaviour', () => {
+  it('writes nothing in --dry-run, including scaffold files', () => {
     const { packageRoot, consumerRoot } = createCopyFixture()
 
     const result = runSync({
@@ -964,9 +966,11 @@ describe('runSync copy passes', () => {
     expect(existsSync(join(consumerRoot, 'AGENTS.md'))).toBe(false)
     // No manifest is persisted.
     expect(existsSync(join(consumerRoot, '.agents-sync-manifest.json'))).toBe(false)
-    // Scaffolding is not gated by --dry-run (pre-existing behaviour).
-    expect(existsSync(join(consumerRoot, 'memory-bank', 'projectbrief.md'))).toBe(true)
-    expect(existsSync(join(consumerRoot, 'opencode.json'))).toBe(true)
+    // Scaffolding is suppressed too: a dry run creates no files and no parent
+    // directories, so "preview without applying" is literally true.
+    expect(existsSync(join(consumerRoot, 'memory-bank', 'projectbrief.md'))).toBe(false)
+    expect(existsSync(join(consumerRoot, '.agents', 'instructions', 'learned-knowledge.instructions.md'))).toBe(false)
+    expect(existsSync(join(consumerRoot, 'opencode.json'))).toBe(false)
     expect(outputOf(logSpy)).toContain('Mode: dry-run.')
   })
 
@@ -1222,6 +1226,94 @@ describe('project-owned files', () => {
     )
   })
 
+  it('scaffolds .agents/config/quality-gates.md and keeps a local edit across --force', () => {
+    const qualityGates = '---\ntitle: "Quality Gates"\n---\n\n# Package declaration\n'
+    const packageRoot = createPackage({
+      agents: {
+        ...AGENTS_FILES,
+        'config/quality-gates.md': qualityGates,
+        'config/domain.md': 'package domain\n',
+      },
+      mcpExample: MCP_EXAMPLE,
+    })
+    const consumerRoot = createTempDir()
+
+    runSync({ packageRoot, consumerRoot })
+
+    // A fresh consumer receives the declaration, created from the package copy.
+    expect(
+      readFileSync(
+        join(consumerRoot, '.agents', 'config', 'quality-gates.md'),
+        'utf8',
+      ),
+    ).toBe(qualityGates)
+    // The rest of .agents/config/ still syncs normally — only the gate
+    // declaration is project-owned.
+    expect(
+      readFileSync(join(consumerRoot, '.agents', 'config', 'domain.md'), 'utf8'),
+    ).toBe('package domain\n')
+
+    const localEdit = '---\ntitle: "Quality Gates"\n---\n\n| G1 | own gate |\n'
+    writeFixtureFile(consumerRoot, '.agents/config/quality-gates.md', localEdit)
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--force'],
+      env: {},
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.skipped).toBe(0)
+    expect(
+      readFileSync(
+        join(consumerRoot, '.agents', 'config', 'quality-gates.md'),
+        'utf8',
+      ),
+    ).toBe(localEdit)
+  })
+
+  it('never prunes a consumer gate declaration, even when the package stops shipping it', () => {
+    const qualityGates = '---\ntitle: "Quality Gates"\n---\n\n# package declaration\n'
+    const packageRoot = createPackage({
+      agents: { ...AGENTS_FILES, 'config/quality-gates.md': qualityGates },
+      mcpExample: MCP_EXAMPLE,
+    })
+    const consumerRoot = createTempDir()
+
+    runSync({ packageRoot, consumerRoot })
+
+    const localEdit = '---\ntitle: "Quality Gates"\n---\n\n| G1 | own gate |\n'
+    writeFixtureFile(consumerRoot, '.agents/config/quality-gates.md', localEdit)
+
+    // Record the local content as the tracked baseline, so the only thing that
+    // keeps the file alive is the project-owned guard — not the
+    // locally-modified skip that would protect it anyway.
+    const manifestPath = join(consumerRoot, '.agents-sync-manifest.json')
+    const manifest = readConsumerManifest(consumerRoot)
+    manifest.files['config/quality-gates.md'] = sha256(localEdit)
+    writeManifest(manifestPath, manifest)
+
+    // The package no longer ships the declaration. Without the project-owned
+    // guard, --prune would treat this as a stale managed file and delete it.
+    rmSync(join(packageRoot, '.agents', 'config', 'quality-gates.md'))
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--prune', '--force'],
+      env: {},
+    })
+
+    expect(result.pruned).toBe(0)
+    expect(
+      readFileSync(
+        join(consumerRoot, '.agents', 'config', 'quality-gates.md'),
+        'utf8',
+      ),
+    ).toBe(localEdit)
+  })
+
   it('never clobbers an existing consumer .prettierignore', () => {
     const { packageRoot, consumerRoot } = createCopyFixture()
     const localIgnore = 'coverage/\nplaywright-report/\n'
@@ -1302,9 +1394,8 @@ describe('project-owned files', () => {
     )
   })
 
-  // Pins current behaviour: scaffolding is not gated by --dry-run. Update this
-  // test when scaffolding becomes dry-run aware.
-  it('documents that --dry-run still scaffolds missing project-owned files', () => {
+  // A dry run reports the files it would scaffold but writes none of them.
+  it('does not scaffold missing project-owned files in --dry-run', () => {
     const { packageRoot, consumerRoot } = createCopyFixture()
 
     const result = runSync({
@@ -1314,13 +1405,10 @@ describe('project-owned files', () => {
       env: {},
     })
 
+    // The would-be count is still reported, so the preview is informative.
     expect(result.scaffolded).toBe(10)
-    expect(readFileSync(join(consumerRoot, 'AGENTS.project.md'), 'utf8')).toBe(
-      projectOwnedStubs['AGENTS.project.md'],
-    )
-    expect(readFileSync(join(consumerRoot, '.prettierignore'), 'utf8')).toBe(
-      projectOwnedStubs['.prettierignore'],
-    )
+    expect(existsSync(join(consumerRoot, 'AGENTS.project.md'))).toBe(false)
+    expect(existsSync(join(consumerRoot, '.prettierignore'))).toBe(false)
     expect(existsSync(join(consumerRoot, '.agents-sync-manifest.json'))).toBe(
       false,
     )
@@ -1548,9 +1636,14 @@ describe('project-owned files', () => {
       '.prettierignore',
       '.agents-sync-ignore',
       'instructions/learned-knowledge.instructions.md',
+      'config/quality-gates.md',
     ]) {
       expect(projectOwnedPaths.has(relativePath), relativePath).toBe(true)
     }
+  })
+
+  it('scaffolds every project-owned .agents/ stub path', () => {
+    expect(projectOwnedAgentStubs).toEqual(['config/quality-gates.md'])
   })
 })
 

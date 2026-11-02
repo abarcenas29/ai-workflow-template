@@ -252,3 +252,26 @@ describe('tdd-orchestrator.md phase delegation parity (plan T17 / TEST-10)', () 
     ).toBe(6)
   })
 })
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Documentation handoff receivers — a separate assertion, so deleting a receiver
+// fails a test without touching the pinned 2 / 2 / 6 knowledge-retrieval counts.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('documentation handoff receivers exist in every orchestrator', () => {
+  it.each([
+    ['orchestrator.md', ORCHESTRATOR_PATH],
+    ['feature-pipeline.md', FEATURE_PIPELINE_PATH],
+    ['tdd-orchestrator.md', TDD_ORCHESTRATOR_PATH],
+  ])(
+    '%s defines exactly one "#### Applying documentation handoffs" receiver',
+    (_label, path) => {
+      const content = readRepoFile(path)
+
+      expect(
+        countOccurrences(content, '#### Applying documentation handoffs'),
+        `${path} must define exactly one documentation-handoff receiver`
+      ).toBe(1)
+    }
+  )
+})

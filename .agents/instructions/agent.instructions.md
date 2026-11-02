@@ -36,8 +36,7 @@ permissions:
 #### **description** (REQUIRED)
 
 - Double-quoted string, clearly stating the agent's purpose and domain expertise
-- One sentence and actionable; the files in this repository run 137–286 characters
-- The model choosing which agent to delegate to reads this string, so name the domain rather than the workflow
+- One sentence and actionable; keep it to one sentence — the model choosing which agent to delegate to reads this string, so name the domain rather than the workflow
 - Example: `"Production code implementation specialist. Writes clean, maintainable code following project conventions."`
 
 #### **mode** (RECOMMENDED — defaults to `primary`)
@@ -46,7 +45,7 @@ permissions:
 - `primary` — runs as the main agent for a session
 - `subagent` — runs only in a child session launched by another agent
 - `all` — either; this is what makes an agent delegable
-- This repository uses `all` on 11 agents and `primary` on `planner.md` plus the three `orchestrator/*.md` templates
+- Files intended to be delegated to use `all`; a file that is only a session entry point uses `primary`. Re-derive the split with the audit procedure.
 
 #### **permissions** (REQUIRED for enforcement)
 
@@ -63,36 +62,82 @@ permissions:
 - `name` is a V1 frontmatter field, ignored in any file that is read as v2 — that is, any file using `permissions`, `system`, `request`, or `disabled`
 - Do not add it; rename the file instead
 
-## Verified Inventory — This Repository's Agent Files
+## Audit Procedure — Re-derive the Inventory
 
-The tables below are derived from the 15 agent files under `.opencode/agents/` (12 root files plus 3 under `orchestrator/`). They are the evidence that this document describes reality; when you add a rule shape here, add it there first.
+This document describes shapes, not counts. A count written here is wrong the moment a
+project adds an agent, so the counts live in the change that used them — a plan, a PR
+body, a review — and are re-derived with the commands below. Never quote a number from
+this file as evidence.
 
-### Top-level keys
+### What to check
 
-| Key | Files using it | Example value |
-| --- | --- | --- |
-| `description` | 15 of 15 | `"Code review specialist. Reviews diffs with read-only shell access…"` |
-| `mode` | 15 of 15 | `all` (11 files), `primary` (4 files) |
-| `permissions` | 15 of 15 | ordered list of `{ action, resource, effect }` |
-| `name` | 0 | — |
-| `tools` | 0 | — |
+1. Every `permissions` list opens with a catch-all rule (`resource: "*"`).
+2. A catch-all with `effect: allow` appears only in a deliberate full-access agent, and
+   that file says so.
+3. No `name:`, `tools:`, or `permission:` (singular) key survives; each is a V1 field
+   that is ignored in a file read as v2.
+4. Every `mode` is `primary`, `subagent`, or `all`.
+5. Only the documented actions appear. The actions in use are the ones the audit prints;
+   any other action is left at the base policy rather than written out, and an
+   unexpected name is a deliberate addition to document, not a typo to ignore.
+6. No unspaced deny pattern shadows a longer allowed verb, and the spaced `git merge *`
+   guard exists wherever a reviewer allowlist exists.
 
-### Permission actions
+### Commands
 
-| `action` | Files using it | Rules | Example `resource` | `effect` values seen |
-| --- | --- | --- | --- | --- |
-| `edit` | 15 | 40 | `*.md`, `*.spec.ts`, `*` | `allow`, `deny` |
-| `shell` | 15 | 63 | `*`, `git diff*`, `git merge *` | `allow`, `deny` |
+Run from the repository root. Each command answers one question and prints the evidence;
+do not paraphrase its output.
 
-No other action appears in this repository: `read`, `glob`, `grep`, `webfetch`, and `subagent` are left at the runtime's base policy rather than written out. `ask` is not used either — an agent here either grants a capability or removes it.
+```bash
+# 1. File census — every agent spec, then the root/orchestrator split.
+find .opencode/agents -name '*.md' | sort
+find .opencode/agents -maxdepth 1 -name '*.md' | wc -l
+find .opencode/agents -path './.opencode/agents/orchestrator/*' -name '*.md' | wc -l
 
-### Effects
+# 2. Top-level keys in use — the shape of the frontmatter, not a stored count.
+grep -rhoE '^(description|mode|permissions|name|tools|permission):' .opencode/agents --include='*.md' | sort | uniq -c
 
-| `effect` | Rules | Where it appears |
-| --- | --- | --- |
-| `allow` | 65 | Specific grants, and the whole of `coder.md`, `deployer.md`, `planner.md` |
-| `deny` | 38 | Catch-all `*` gates, and the guard rails at the bottom of `reviewer.md` |
-| `ask` | 0 | Not used in this repository |
+# 3. V1 keys absent — expect no output.
+grep -rnE '^(name|tools|permission):' .opencode/agents --include='*.md'
+
+# 4. Modes in use — every value must be primary, subagent, or all.
+grep -rhE '^mode: ' .opencode/agents --include='*.md' | sort | uniq -c
+
+# 5. Rules by effect and by action.
+grep -rhoE '\{ action: [a-z_]+, +resource: "[^"]+", +effect: [a-z]+ \}' .opencode/agents --include='*.md' | awk -F'effect: ' '{print $2}' | sort | uniq -c
+grep -rhoE '\{ action: [a-z_]+, +resource: "[^"]+", +effect: [a-z]+ \}' .opencode/agents --include='*.md' | awk -F'action: ' '{print $2}' | cut -d',' -f1 | sort | uniq -c
+
+# 6. First rule per file must be the catch-all — expect no output from the first loop.
+#    -F is load-bearing: a bare "*" regex matches every `resource: ` prefix, which
+#    would filter out every rule line and make the check unable to fail.
+for f in $(find .opencode/agents -name '*.md'); do printf '%s: ' "$f"; awk '/^permissions:/{p=1;next} p&&/^  - \{/{print;exit}' "$f"; done | grep -Fv 'resource: "*"'
+for f in $(find .opencode/agents -name '*.md'); do printf '%s: ' "$f"; awk '/^permissions:/{p=1;next} p&&/^  - \{/{print;exit}' "$f"; done | grep 'effect: allow'
+
+# 7. Merge guard-rail spacing — the first command expects no output, the second expects one hit.
+#    Scoped to merge/merge-base because that is the only pair where an unspaced
+#    deny can shadow a longer allowlisted verb. Other unspaced bare-verb denies
+#    (`git add*`, `git commit*`, …) are deliberate guards with no such neighbour.
+grep -rnE 'resource: "git merge\*"' .opencode/agents --include='*.md'
+grep -rn 'resource: "git merge \*"' .opencode/agents --include='*.md'
+```
+
+A hit from check 6's second loop is a full-access agent and requires justification in its
+own file. Check 7's first command must return no output: an unspaced `git merge*` deny
+would swallow the longer read-only `git merge-base*` allow beside it. Its second command
+must return exactly one hit per reviewer allowlist: the spaced `git merge *` guard, which
+cannot match `git merge-base*`. The other unspaced bare-verb denies are intentional and
+are not reported as defects.
+
+### Reporting a mismatch
+
+A mismatch means either the file or this document is wrong. Fix the file first, re-run the
+command, and record the corrected count in the change description — never in this file.
+
+### What stays out of this file
+
+The four counts the old inventory carried (agent files, edit rules, shell rules, the
+allow/deny split) and any percentage or coverage figure. Those are measurements of one
+moment, not rules.
 
 ## Permission Configuration
 
@@ -136,7 +181,7 @@ If no rule matches at all, the runtime asks. The base policy's `{ action: "*", r
 | `task` | `subagent` | Same failure: the parent can launch every agent it wants |
 | `write`, `patch` | `edit` | One `edit` rule covers the `edit`, `write`, and `patch` tools |
 
-The full vocabulary — `read`, `edit`, `glob`, `grep`, `shell`, `subagent`, `skill`, `question`, `webfetch`, `websearch`, `external_directory`, `execute`, and `<server>_<tool>` — is defined by the runtime, not by this template. None of them is exercised by a file in this repository except `edit` and `shell`.
+The full vocabulary — `read`, `edit`, `glob`, `grep`, `shell`, `subagent`, `skill`, `question`, `webfetch`, `websearch`, `external_directory`, `execute`, and `<server>_<tool>` — is defined by the runtime, not by this template. This template exercises `edit` and `shell`. If the audit prints another action, treat it as deliberate and document it.
 
 ### Pattern Matching
 
@@ -203,7 +248,7 @@ permissions:
   - { action: github_add_issue_comment, resource: "*", effect: deny }
 ```
 
-Server names come from `opencode.json` (or `opencode.mcp.example.json` in this repository). No agent file here gates an MCP tool yet; the naming scheme is the runtime's, not this template's.
+Server names come from `opencode.json` (or `opencode.mcp.example.json` in this repository). No agent in this template gates an MCP tool. A project that needs to add `<server>_<tool>` rules does so in the frontmatter of its own copy of the agent file — the only per-agent permission surface — and then maintains that copy, because `scripts/sync.js` overwrites agent frontmatter under `--force`; the naming scheme is the runtime's, not this template's.
 
 ## Sub-Agent Invocation (Agent Orchestration)
 
@@ -565,7 +610,7 @@ Use consistent variable naming conventions:
 
 ### Frontmatter
 
-- [ ] `description` field present and descriptive (one sentence; 137–286 chars in this repository)
+- [ ] `description` field present and descriptive (one sentence)
 - [ ] `description` wrapped in double quotes
 - [ ] `mode` set to `primary`, `subagent`, or `all`
 - [ ] `permissions` present, opening with a catch-all `*` deny and followed by specific allows

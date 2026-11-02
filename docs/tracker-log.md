@@ -2747,3 +2747,101 @@ The template's scoped-work skill set used to stop at "narrow the problem". It no
 - **`gh label list` pagination is capped at 200 rows** in both consumers. A tracker with more than 200 labels would silently see a truncated set and retry creations that already exist; the `already exists` fallback keeps that harmless.
 - **The learned-knowledge session** for this pipeline is appended as `## Session: 2026-11-02` in `.agents/instructions/learned-knowledge.instructions.md`; it records the argv-element blocker, the `not-applicable` contract, and the vendoring arithmetic.
 - `memory_search` / `knowledgebase_search`: **not executed** — no memory-bank or knowledgebase tool was exposed in this session's MCP catalog, and every agent read files directly. Recorded as an environment limitation, not a task failure.
+
+---
+
+## Pipeline 21: Agent Definition Portability — Project-Owned Gate Declaration, De-Frozen Census, Role-Aware Documentation Handoff
+
+**Date:** 2026-11-02
+**Status:** ✅ SUCCESS — 8/8 pipeline steps; final review **0 BLOCKING / 0 MAJOR**; `npm run test:unit` → **29 files / 852 tests**; Playwright **7 passed / 1 skipped**; **18 tracked files modified (+617/−242)** plus **4 untracked deliverables**. **Nothing was committed, pushed, or published.**
+**Pipeline:** implementer (plan) → coder (14 files) → reviewer (⚠️ 3 MAJOR) → coder (repair, 8 findings closed) → reviewer (⚠️ 1 MAJOR) → coder (repair, 4 findings closed) → reviewer (✅ approved) → coder (polish, 4 follow-ups closed) → tracker (this entry)
+**Subject:** the agent definitions described capabilities the runtime does not enforce. The branch had diagnosed that correctly, but the repair hardcoded one consumer project's CI into a template that ships to many projects — so the fix had to remove the specificity without removing the doctrine.
+**Branch:** `feat/agent-definition-remediation`
+**Log caveat:** ⚠️ `docs/.orchestrator-log.md` carries no live entry for this pipeline — its last entry is Pipeline 20. This record is reconstructed from the orchestrator handoff and `plan/refactor-agent-portability-v1.md` §Execution Record, which is the authoritative task-level record. Per-step timing was not recorded and is not invented here.
+
+### Summary
+
+The shipped agent definitions told every consuming project to run a gate set that belonged to one project: eight gates that could not run in the template itself, and workflow files that did not exist. The fix moves the gate set into a project-owned declaration, `.agents/config/quality-gates.md`, which ships empty and reports `GATES: NOT DECLARED` instead of printing eight dead rows. The doctrine that came with those gates — skip-with-consequence, three-run failure classification, arithmetic count proof, discrimination proof — stayed in `unit-tester.md`.
+
+Three related defects went with it. The frozen agent census in `agent.instructions.md` became a re-derivation audit procedure, so no count can go stale. Eight orchestrator delegation sites stopped ordering every sub-agent to write the memory bank, and each orchestrator gained the receiver that applies a returned `## Documentation handoff`. `scripts/sync.js` now treats the gate declaration as project-owned and scaffolds it create-if-absent, so a consumer's declaration survives `--force` and `--prune`.
+
+The pipeline took three review passes. Review found a defect **inside each previous fix** — the empty declaration re-introduced green-by-absence, two audit commands could not fail, and a read-only agent was still told to write — which is why the loop ran to a clean pass rather than stopping at the first approval-shaped verdict.
+
+### Execution Steps
+
+| # | Agent | Status | Result |
+|---|---|---|---|
+| 1 | implementer | ✅ | `plan/refactor-agent-portability-v1.md` — 16 tasks, batches A–E; three shared text blocks (role-aware pair, handoff receiver, `NOT DECLARED` rule) quoted verbatim; every verification scoped to a command that can fail. |
+| 2 | coder | ✅ | 14 files, +368/−156. Gate declaration created, census replaced, eight orchestrator sites made role-aware, reviewer allowlist reduced, sync ownership added. **844** unit tests. |
+| 3 | reviewer | ⚠️ CHANGES REQUESTED | **3 MAJOR / 4 MINOR / 1 COSMETIC, 0 BLOCKING.** An empty declaration read as "nothing to run"; two audit commands could not fail; the stated override extension point did not exist. |
+| 4 | coder (repair) | ✅ | All 8 findings closed. Empty-but-present declaration now reports `GATES: NOT DECLARED`; `grep -Fv` fixes the audit; the false override claim removed rather than a mechanism invented; canonical handoff file created. **851** unit tests. |
+| 5 | reviewer | ⚠️ CHANGES REQUESTED | **1 MAJOR / 3 MINOR, 7 of 8 prior findings verified closed.** New major: read-only `e2e-tester` was still instructed to write — the same unsatisfiable-write defect in a different agent. |
+| 6 | coder (repair) | ✅ | All 4 findings closed. `e2e-tester` returns a handoff; reviewer's gate rule covers a present-but-empty declaration; memory-bank prose matches the shipped truth; handoff nested inside slot 4. **852** unit tests. |
+| 7 | reviewer | ✅ APPROVED | **0 BLOCKING / 0 MAJOR**, 2 MINOR + 2 COSMETIC follow-ups. Static evidence independently re-checked; permissions unchanged. |
+| 8 | coder (polish) | ✅ | 4 follow-ups closed: `__tests__/*` promise removed from the RED brief, stale memory-bank line corrected, two over-400-character bullets wrapped, typo fixed. **852** unit tests, **7 Playwright passed / 1 skipped**. |
+| 9 | tracker | ✅ | This entry, the index rows, the memory-bank summary, and the learned-knowledge session. |
+
+### Files Produced / Modified
+
+The table lists the substantive files; the diff is **18 tracked files (+617/−242)**, and the four untracked deliverables are called out as such.
+
+| File | Description |
+|---|---|
+| `.agents/config/quality-gates.md` | **NEW (untracked)** — the single project-owned gate declaration. `## Gate table` ships header-only; a fenced `EXAMPLE ONLY` block shows six placeholder rows; optional count-contract, coverage-threshold and ordering blocks; `## Reader rules` makes `NOT DECLARED` first-class. Ships no runnable command, package manager, workflow file, or percentage. |
+| `.agents/instructions/documentation-handoff.instructions.md` | **NEW (untracked)** — one canonical `### Documentation handoff` block, referenced by both producers and all three receivers instead of being restated in each spec. |
+| `plan/refactor-agent-portability-v1.md` | **NEW (untracked)** — 16 tasks, batches A–E, status **Completed**. Its §Execution Record holds the three repair tables and the four moved conditions (RISK-01 fix, literal-count deviations, carve-out in all three orchestrators, generic `AGENTS.md` sample paths). |
+| `tests/spec-quality-gates-declaration.test.js` | **NEW (untracked)** — pins both reader paths: an absent declaration **and** a present declaration with zero gates both report one `GATES: NOT DECLARED` row, never an empty table. |
+| `.opencode/agents/unit-tester.md` | G1–G8 and the dead workflow citations removed; reads `.agents/config/quality-gates.md`; frontmatter byte-identical (no grant widened). SKIPPED-with-consequence, three-run classification, arithmetic identity, discrimination proof and the handoff boundary all kept. |
+| `.opencode/agents/reviewer.md` | Allowlist reduced **30 allow / 21 deny → 23 allow / 15 deny**; project gate commands and project-shaped denies removed. The catch-all shell deny stays first, so nothing was widened. The false "consumer's own agent override" claim was removed. |
+| `.opencode/agents/e2e-tester.md` | Read-only agent no longer told to write: step 5 collects findings into a handoff, and Standalone Tracking returns the tracker entry instead of appending it. `edit: *` deny untouched (**0 allow / 2 deny**). |
+| `.agents/instructions/agent.instructions.md` | Frozen census ("15 agent files", "40 edit rules", "63 shell rules", "65 allow / 38 deny") replaced by `## Audit Procedure — Re-derive the Inventory`: six invariants and seven commands. V1→V2 mapping and pattern-matching semantics untouched. |
+| `.opencode/agents/orchestrator/orchestrator.md`, `feature-pipeline.md`, `tdd-orchestrator.md` | Role-aware read/write pair at **2 / 2 / 4** sites, plus one `#### Applying documentation handoffs` receiver per file. The write is conditional on the agent's own edit grant; the read stays for every agent. Parity counts **2 / 2 / 6** unchanged. |
+| `.agents/config/README.md` | Discovery entry naming `quality-gates.md` as the only gate declaration. |
+| `.agents/instructions/communication.instructions.md` | `### Documentation handoff` named as the one permitted `###` sub-block, last inside slot 4. S2 excludes its lines from the 40-line cap; S3 counts only `##` headings outside fenced payloads. |
+| `scripts/sync.js`, `scripts/sync-unit.test.js` | `config/quality-gates.md` added to `projectOwnedPaths` **and** scaffolded create-if-absent from the package copy; `--dry-run` scaffold loops now write nothing; new cases prove survival of `--force` and `--prune --force`, while `config/domain.md` still syncs. |
+| `tests/spec-orchestrator-parity.test.js` | Separate 3-case receiver assertion; targeted sync + parity + gate suites **142 passed**. |
+| `AGENTS.md`, `docs/.architecture-context.md` | Sample plan paths genericised so the token scan is 0; instruction count **23 → 24** for the new file. |
+| `memory-bank/{activeContext,progress,tasks/_index}.md` | Per-step record, including the two review repairs. |
+
+### Key Decisions
+
+- **Relocate project specifics; do not delete the doctrine that came with them.** The gate commands were one project's CI wearing a generic label. They moved into a project-owned declaration; the rules about *how to report a gate* stayed in the shipped agent. *Cost:* two files to read instead of one. *Risk:* a consumer never fills the declaration and sees `NOT DECLARED` forever — honest, and visible.
+- **An empty-but-present declaration needs its own report state.** The first fix produced a valid-but-empty table, which a reader could take as "nothing to run". The rule now maps absent **and** present-with-zero-gates to the same one-row `GATES: NOT DECLARED` output. *Cost:* one more branch in two readers. *Risk:* none; the alternative is green-by-absence re-introduced by the fix for green-by-absence.
+- **A stated extension point is a claim and was tested.** "Add rules in the consumer's own agent override" was false: `--force` overwrites frontmatter and `projectOwnedAgentStubs` holds only the gate declaration. The claim was removed, not replaced with an invented mechanism; the surviving guidance says a project widens its own copy and maintains it against `--force`. *Cost:* a consumer needing a gate allow maintains a fork. *Risk:* that maintenance is real work, which is why the catch-all deny now carries the explanation.
+- **Protect the file, not the directory.** `.agents/config/` also carries `domain.md`, `issue-tracker.md` and `README.md`, which must keep syncing. Ownership is the narrowest unit that satisfies durability. *Cost:* a one-file special case in `sync.js`. *Risk:* a future sibling needs the same treatment and the list grows.
+- **Nest the handoff; do not exempt it.** A canonical block spanning sections collides with a fixed four-heading envelope. The resolution is `###` inside slot 4, not a fifth `##` heading exempted by name, because a named exemption is a hole any reply could claim by relabelling a section. *Cost:* the envelope gains one permitted sub-level. *Risk:* two contracts must keep saying the same thing — now stated in the canonical file, both producers and all three receivers.
+- **The write is conditional on the grant; the read is not.** Eight sites that ordered every sub-agent to write the memory bank were unsatisfiable for a test-files-only agent. *Cost:* the orchestrator now transcribes returned handoffs. *Risk:* a missing handoff goes unrecorded — mitigated by a required `documentation not recorded` log line.
+- **De-freeze the census rather than update it.** Any count in a shipped instruction file is wrong the moment a consumer adds an agent. Counts now live in the change that used them and are re-derived by command. *Cost:* one extra command run per audit. *Risk:* an audit that is skipped — mitigated by making the commands able to fail.
+- **Removing enumerated deny rows is not a permission relaxation.** The catch-all shell deny already refuses every build, test and install runner; enumerating them per project was noise that also made the template wrong for consumers.
+
+### Review History
+
+| Round | Verdict | Findings and resolution |
+|---|---|---|
+| 1 | ⚠️ CHANGES REQUESTED | **0 BLOCKING / 3 MAJOR / 4 MINOR / 1 COSMETIC.** Empty declaration read as "nothing to run"; two audit commands could not fail (`grep -v 'resource: "*"'` filtered all 38 rule lines); the override extension point did not exist. All fixed. |
+| 2 | ⚠️ CHANGES REQUESTED | **1 MAJOR / 3 MINOR; 7 of 8 closed.** New major: read-only `e2e-tester` still told to write. Resolved, plus the reviewer's own empty-table rule, the memory-bank wording, and the handoff/envelope collision. |
+| 3 | ✅ APPROVED | **0 BLOCKING / 0 MAJOR**, 2 MINOR + 2 COSMETIC. All four follow-ups applied in the polish pass; no permission or doctrine change. |
+| Polish | ✅ | 852 tests still passing, 7 Playwright passed / 1 skipped; over-400-character debt back to zero. |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| Forbidden-token scan over edited shipped files | ✅ **0**, with a seeded `cms-apmc` control returning **1–2**, so the scan is non-vacuous |
+| `npm run test:unit` | ✅ **29 files / 852 tests**, 0 failures |
+| `npx playwright test` | ✅ **7 passed / 1 skipped** |
+| Sync + parity + gate suites | ✅ **142 passed** (160 with the two added spec suites) |
+| Orchestrator parity counts | ✅ `knowledge-retrieval.instructions.md` **2 / 2 / 6**; `knowledgebase_knowledgebase_search` in feature-pipeline **2** |
+| Reviewer permissions | ✅ **23 allow / 15 deny**; catch-all deny first; spaced `git merge *` guard intact; no runner command |
+| `e2e-tester` permissions | ✅ **0 allow / 2 deny** — still read-only |
+| Communication reference line | ✅ exactly **1** per spec across all 15 agent files |
+| Handoff receivers | ✅ **1 / 1 / 1** |
+| Untracked-deliverable awareness | ⚠️ **4 paths are untracked** — see follow-up |
+
+### Notes / Follow-up
+
+- **Four paths are untracked deliverables:** `.agents/config/quality-gates.md`, `.agents/instructions/documentation-handoff.instructions.md`, `plan/refactor-agent-portability-v1.md`, and `tests/spec-quality-gates-declaration.test.js`. A commit staged from `git diff --name-only` alone would silently drop all four; stage by explicit path or include untracked files.
+- **Nothing is committed.** The work sits on `feat/agent-definition-remediation`; no commit, push, or publish was performed.
+- **No outstanding defects.** The two MINOR and two COSMETIC items from the approving pass were closed in the polish pass, with no permission or doctrine change.
+- **The orchestrator log was the one process gap:** this pipeline never appended a live entry, so the timeline came from the handoff and the plan. **Repaired:** the missing record was appended retroactively as `docs/.orchestrator-log.md` Pipeline 21, and the fix — delegate the log write to the tracker at pipeline end — is recorded there. Record the next run live.
+- **`memory_search` / `knowledgebase_search`:** **NOT executed** — no memory-bank or knowledgebase tool was exposed in this session's MCP catalog. Context came from the plan, the repository files, and the existing learned-knowledge journal read directly. Not retried and not treated as a task failure.

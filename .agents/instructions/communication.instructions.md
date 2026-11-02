@@ -70,10 +70,13 @@ deliberately not gated on `*.md`, because that gate is the hole. The sample is
 chosen by rule, not by judgement, and four checks run on it: **S1** take the
 earliest upstream reply in the reviewer's context and name it by stage and
 agent, falling back to the reviewer's own reply when no upstream reply is
-visible; **S2** count its lines, excluding fenced tables, verbatim quotes, and
-an exemption declaration, and pass at ≤40; **S3** confirm the producer's four
+visible; **S2** count its lines, excluding fenced tables, verbatim quotes, a
+returned `### Documentation handoff` block, and an exemption declaration, and pass at
+≤40; **S3** confirm the producer's four
 literal headings for its variant (`### Variant assignment` has the mapping)
-appear in order 1→2→3→4, each a whole line, with no fifth `##` heading; **S4**
+appear in order 1→2→3→4, each a whole line, with no fifth `##` heading outside a
+fenced payload (a returned `### Documentation handoff` block is a `###` sub-block of
+slot 4, and its fenced payload headings are text to append, not reply headings); **S4**
 confirm `**Communication:**` appears exactly once, as the last bullet of slot 4.
 The result is recorded by extending that same line —
 `**Communication:** ✅ spot-check pass (implementer, stage 3)` — plus one
@@ -134,8 +137,9 @@ decides what must appear.
 | Measurements, citations, proofs, `path:line` references | `## Evidence` |
 | Options, trade-offs, risks, follow-ups, the verdict, the next action | slot 4 (`## Risks and next step` / `## Decision and options with cost/risk`) |
 
-The four headings are the only headings in a reply; the bullets above are
-content requirements, placed into the slot that matches their kind.
+The four `##` headings are the only top-level headings in a reply, and a returned
+`### Documentation handoff` block is the one permitted `###` sub-block, inside slot 4;
+the bullets above are content requirements, placed into the slot that matches their kind.
 
 ### Variant assignment
 
@@ -183,6 +187,16 @@ If a slot has nothing to report, keep the heading and write a single bullet
 `None.` — never drop the heading. A dropped heading is indistinguishable from
 a forgotten one, so the reviewer's check could not tell "nothing to say" from
 "broke the format".
+
+**The one permitted sub-block.** An agent whose edit grant cannot write the
+documentation target returns a `### Documentation handoff` block
+(`.agents/instructions/documentation-handoff.instructions.md`). It is the last block
+inside slot 4 — `## Risks and next step` or `## Decision and options with cost/risk` —
+and it is a `###` heading, never a fifth `##` heading. It is not a slot: it carries no
+cap of its own, its lines are transcribed text and do not count toward the 40-line cap,
+and the headings inside its fenced payload are text to append, not reply headings.
+Exempting a fifth `##` heading by name was the alternative and was rejected: it would
+open a hole any reply could claim by relabelling a section.
 
 ### change-framed
 

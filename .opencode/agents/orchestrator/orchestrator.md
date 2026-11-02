@@ -198,7 +198,8 @@ IMPORTANT:
 - Work on "{work_unit}" with base path: "{basePath}".
 - Perform the necessary reads/writes under this base path.
 - Previous step context: {previous_step_summary}
-- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions, and use `memory_bank_memory_search` / `memory_bank_memory_get` for context.
+- Documentation write: if your edit grant covers `memory-bank/**` or `docs/**`, update those files and run `memory_bank_memory_update`; otherwise return the `### Documentation handoff` block defined in `.agents/instructions/documentation-handoff.instructions.md` as the last block inside slot 4 of that reply and do not attempt the write — the orchestrator applies it.
 - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a relevant query (graceful failure — report executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Return a clear summary (actions taken + files produced/modified + issues).
@@ -214,6 +215,19 @@ IMPORTANT:
    - If the user confirms, log "Confirmation gate passed" in the log file.
    - If the user rejects, ask: "What would you like to do? Options: (1) Re-run with feedback, (2) Skip this phase, (3) Abort pipeline." Act on their choice.
    - This gate applies **regardless** of the `autoConfirm` setting — it is a mandatory pause point.
+
+#### Applying documentation handoffs
+
+A sub-agent whose edit grant does not cover `memory-bank/**` or `docs/**` returns a
+`### Documentation handoff` block instead of writing. The block format is defined once
+in `.agents/instructions/documentation-handoff.instructions.md`; apply it verbatim.
+This is the one write the orchestrator performs itself, and it is transcription, not
+authoring. After capturing any sub-agent summary:
+
+1. **Detect** — look for a `### Documentation handoff` heading in the returned summary.
+2. **Apply** — for each `**Target:**` entry, append the payload to that file; create it only if absent. Never overwrite, never rewrite `activeContext.md` or `progress.md` wholesale.
+3. **Reindex** — run `memory_bank_memory_update` once, after every entry from that step is applied.
+4. **Record** — log `handoff applied: {targets}`. If a summary carries no handoff and the agent's grant could not write documentation, log `documentation not recorded`; never assume it happened.
 
 #### Parallel Coder Execution
 
@@ -232,7 +246,8 @@ When the pipeline reaches the "coder" step and the implementer's summary include
       - Work on "Implement task {TASK_ID}: {Description} from plan /plan/{filename}" with base path: "{basePath}".
       - Perform the necessary reads/writes under this base path.
       - Previous step context: {previous_step_summary}
-      - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. After completing work, update `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/tasks/_index.md` if relevant, then run `memory_bank_memory_update`.
+      - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions, and use `memory_bank_memory_search` / `memory_bank_memory_get` for context.
+      - Documentation write: if your edit grant covers `memory-bank/**` or `docs/**`, update those files and run `memory_bank_memory_update`; otherwise return the `### Documentation handoff` block defined in `.agents/instructions/documentation-handoff.instructions.md` as the last block inside slot 4 of that reply and do not attempt the write — the orchestrator applies it.
       - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the 3-layer knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a relevant query (graceful failure — report executed or skipped). Skim `.agents/instructions/learned-knowledge.instructions.md` for role-relevant patterns. State the retrieval outcome in your final summary.
       - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
       - Return a clear summary (actions taken + files produced/modified + issues).
@@ -278,7 +293,7 @@ After all pipeline steps complete, present the user with:
 
 ## Guidelines
 
-- **Only delegate, never process**: If a task requires reading files, analyzing code, or writing output, delegate it. You do NOT do any of that yourself.
+- **Only delegate, never process**: If a task requires reading files, analyzing code, or writing output, delegate it. You do NOT do any of that yourself. The single exception is applying a returned `### Documentation handoff`, which is transcription of another agent's text.
 - **Pass paths, not content**: Sub-agents should read files themselves from the base path.
 - **Keep context minimal per step**: Don't dump the entire conversation; pass only the previous step's summary.
 - **Log everything**: The log file is the single source of truth for what happened.

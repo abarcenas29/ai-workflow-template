@@ -195,8 +195,8 @@ Use this to create deterministic, structured plans saved to `/plan/`. Follow thi
 ```markdown
 | Task ID | Description | File(s) | Batch | Dependencies | Completed |
 |---------|-------------|---------|-------|--------------|-----------|
-| T1 | Add the feed schema | `libs/contract/schemas/feed.schema.json` | A | — | |
-| T2 | Regenerate the wire types | `libs/contract/src/generated/feed.ts` | B | T1 | |
+| T1 | Add the feed schema | `src/<module>/schemas/feed.schema.json` | A | — | |
+| T2 | Regenerate the wire types | `src/<module>/generated/feed.ts` | B | T1 | |
 ```
 
 Plans must be deterministic, self-contained, and immediately actionable. Use unambiguous language, specific file paths, and explicit completion criteria per task. DO NOT make code edits — only generate the plan. `.opencode/agents/implementer.md` is the authority for the full format; this section is the summary.
