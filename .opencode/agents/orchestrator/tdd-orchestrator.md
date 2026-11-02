@@ -108,6 +108,19 @@ Create or append to the log file at `{logFile}` with:
 
 ### Step 4: Execute Pipeline
 
+#### Applying documentation handoffs
+
+A sub-agent whose edit grant does not cover `memory-bank/**` or `docs/**` returns a
+`### Documentation handoff` block instead of writing. The block format is defined once
+in `.agents/instructions/documentation-handoff.instructions.md`; apply it verbatim.
+This is the one write the orchestrator performs itself, and it is transcription, not
+authoring. After capturing any sub-agent summary:
+
+1. **Detect** — look for a `### Documentation handoff` heading in the returned summary.
+2. **Apply** — for each `**Target:**` entry, append the payload to that file; create it only if absent. Never overwrite, never rewrite `activeContext.md` or `progress.md` wholesale.
+3. **Reindex** — run `memory_bank_memory_update` once, after every entry from that step is applied.
+4. **Record** — log `handoff applied: {targets}`. If a summary carries no handoff and the agent's grant could not write documentation, log `documentation not recorded`; never assume it happened.
+
 #### Phase 1: Implementer (PLAN) ⏸️
 
 The implementer creates the plan document with **two separate batch tables** for test-writing and implementation.
@@ -129,8 +142,8 @@ IMPORTANT:
 - Architecture context: read docs/.architecture-context.md for tech stack, layer structure, and dependency rules.
 - Learned knowledge: read .agents/instructions/learned-knowledge.instructions.md for patterns and conventions.
 - Knowledge retrieval: read `.agents/instructions/knowledge-retrieval.instructions.md` for the mandatory 3-layer protocol (memory-bank + learned-knowledge + knowledgebase_search with graceful failure). Report whether knowledgebase_search was executed or skipped in your final summary.
-- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions. Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads.
-- After completing the plan, update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then run `memory_bank_memory_update`.
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions, and use `memory_bank_memory_search` / `memory_bank_memory_get` for context.
+- Documentation write: if your edit grant covers `memory-bank/**` or `docs/**`, update those files and run `memory_bank_memory_update`; otherwise return the `### Documentation handoff` block defined in `.agents/instructions/documentation-handoff.instructions.md` as the last block inside slot 4 of that reply and do not attempt the write — the orchestrator applies it.
 - Return a clear summary including: plan file path, number of test tasks, number of implementation tasks, batch breakdown per table.
 ```
 
@@ -161,14 +174,10 @@ IMPORTANT:
    - Write comprehensive tests covering: happy path, error cases, edge cases, boundary values.
    - Follow existing test patterns in the codebase (test framework, assertions, mocks).
    - Use descriptive test names that explain the scenario and expected behavior.
-   - Do NOT write any production/implementation code. ONLY write test files (*.spec.ts, *.test.ts, __tests__/*) with test cases.
-   - After creating test files, create memory-bank tracking entries:
-     1. Create `memory-bank/tasks/TEST-{TASK_ID}-{component-name}.md` with the full task structure (status, request, thought process, progress log).
-     2. Update `memory-bank/tasks/_index.md` — add the new test task entry.
-     3. Update `memory-bank/activeContext.md` — append test coverage baseline for this component.
-     4. Update `memory-bank/progress.md` — document which test suites were created and their status.
-     5. Run `memory_bank_memory_update` to sync the index.
-   - Return a clear summary: test files created, number of test cases per file, coverage areas covered, memory-bank files updated.
+   - Do NOT write any production/implementation code. ONLY write test files whose names match the **What you may write** list in `.opencode/agents/unit-tester.md` — that frontmatter allowlist is the canonical grant, so read it there rather than trusting a path set restated in this brief.
+   - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions, and use `memory_bank_memory_search` / `memory_bank_memory_get` for context.
+   - Documentation write: if your edit grant covers `memory-bank/**` or `docs/**`, update those files and run `memory_bank_memory_update`; otherwise return the `### Documentation handoff` block defined in `.agents/instructions/documentation-handoff.instructions.md` as the last block inside slot 4 of that reply and do not attempt the write — the orchestrator applies it.
+   - Return a clear summary: test files created, number of test cases per file, coverage areas covered, documentation handoff returned, or memory-bank files updated when the grant allows.
    ```
    d. **Wait for all test tasks in this batch to complete** (fan-in). Capture each response summary.
    e. Log per-task results (SUCCESS/FAILED, files produced).
@@ -207,12 +216,10 @@ IMPORTANT:
    - Write defensive code with proper error handling.
    - Do NOT write tests — tests already exist as part of TDD.
    - After implementing, verify that the code compiles/builds without errors.
-   - Update memory-bank files:
-     1. Update `memory-bank/activeContext.md` — append what was implemented and which tests it satisfies.
-     2. Update `memory-bank/progress.md` — document implementation status and test alignment.
-     3. Run `memory_bank_memory_update` to sync the index.
-     4. Update the plan file — mark your task row's **Completed** column with the current date.
-   - Return a clear summary: files created/modified, which test files were satisfied, build verification results, memory-bank files updated.
+   - Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions, and use `memory_bank_memory_search` / `memory_bank_memory_get` for context.
+   - Documentation write: if your edit grant covers `memory-bank/**` or `docs/**`, update those files and run `memory_bank_memory_update`; otherwise return the `### Documentation handoff` block defined in `.agents/instructions/documentation-handoff.instructions.md` as the last block inside slot 4 of that reply and do not attempt the write — the orchestrator applies it.
+   - Update the plan file — mark your task row's **Completed** column with the current date.
+   - Return a clear summary: files created/modified, which test files were satisfied, build verification results, documentation handoff returned, or memory-bank files updated when the grant allows.
    ```
    d. **Wait for all implementation tasks in this batch to complete** (fan-in). Capture each response summary.
    e. Log per-task results (SUCCESS/FAILED, files produced).
@@ -247,11 +254,8 @@ IMPORTANT:
 - If any tests FAIL: provide the failure details (file, line, error message, expected vs actual).
 - If coverage is BELOW {minCoverage}%: identify which files/modules have the lowest coverage and suggest additional test cases.
 - Do NOT modify any files — this is a read + execute + report phase only.
-- Update memory-bank files:
-  1. Update `memory-bank/activeContext.md` — append test run results and coverage report.
-  2. Update `memory-bank/progress.md` — document verification status.
-  3. Update `memory-bank/tasks/_index.md` — update test task statuses based on pass/fail results.
-  4. Run `memory_bank_memory_update` to sync the index.
+- Memory bank: read `.agents/instructions/memory-bank.instructions.md` for task/file conventions, and use `memory_bank_memory_search` / `memory_bank_memory_get` for context.
+- Documentation write: if your edit grant covers `memory-bank/**` or `docs/**`, update those files and run `memory_bank_memory_update`; otherwise return the `### Documentation handoff` block defined in `.agents/instructions/documentation-handoff.instructions.md` as the last block inside slot 4 of that reply and do not attempt the write — the orchestrator applies it.
 - Return a clear summary including: pass/fail counts, coverage percentage, threshold met (yes/no), failing test details if any, coverage gaps if any.
 ```
 
@@ -381,7 +385,7 @@ Always end with a structured summary:
 
 ## Guidelines
 
-- **Only delegate, never process**: If a task requires reading files, analyzing code, or writing output, delegate it. You do NOT do any of that yourself.
+- **Only delegate, never process**: If a task requires reading files, analyzing code, or writing output, delegate it. You do NOT do any of that yourself. The single exception is applying a returned `### Documentation handoff`, which is transcription of another agent's text.
 - **Tests FIRST, always**: Never delegate to the coder before the unit-tester has finished writing tests.
 - **Pass paths, not content**: Sub-agents should read files themselves from the base path.
 - **Keep context minimal per step**: Don't dump the entire conversation; pass only the previous step's summary.
@@ -392,6 +396,6 @@ Always end with a structured summary:
 - **Never write code**: The orchestrator never creates or modifies source files. Sub-agents handle all file operations.
 - **Never read project files for analysis**: The orchestrator reads only the log file for coordination. All project analysis is delegated.
 - **Respect the TDD discipline**: The RED phase writes tests that SHOULD fail. The GREEN phase writes minimal code to pass. Never let the coder preempt the unit-tester.
-- **Test tracking is mandatory**: Every test suite must be tracked in `memory-bank/tasks/` with a task file, `_index.md` entry, and updates to `activeContext.md` and `progress.md`.
+- **Test tracking is mandatory, and the orchestrator records it**: Every test suite must be tracked in `memory-bank/tasks/` with a task file, an `_index.md` entry, and updates to `activeContext.md` and `progress.md`. The unit-tester returns those entries in its `### Documentation handoff` block because its edit grant cannot write those paths; the orchestrator applies the block and reindexes.
 - **Coverage gate is enforced**: Do not proceed past VERIFY until coverage meets `minCoverage` or `maxTDDIterations` is exhausted.
 - **Communication standard**: Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output; emit its Orchestrator Normalization Block at every confirmation gate.

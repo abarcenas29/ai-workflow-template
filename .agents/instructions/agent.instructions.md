@@ -13,18 +13,21 @@ Instructions for creating effective and maintainable custom agent files that pro
 - File format: Markdown with YAML frontmatter
 - File naming convention: lowercase with hyphens (e.g., `test-specialist.md`)
 - Location: `.opencode/agents/` directory (repository-level)
-- Purpose: Define specialized agents with tailored expertise, tools, and instructions for specific tasks
+- Purpose: Define specialized agents with tailored expertise, permissions, and instructions for specific tasks
 - Official documentation: [opencode.ai](https://opencode.ai)
 
 ## Required Frontmatter
 
-Every agent file must include YAML frontmatter with the following fields:
+Every agent file must include YAML frontmatter. The runtime this repository targets (opencode v2) reads three keys, and every agent file here uses exactly these three:
 
 ```yaml
 ---
 description: "Brief description of the agent purpose and capabilities"
-name: "Agent Display Name"
-tools: ["Read", "Edit", "Grep"]
+mode: all
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ---
 ```
 
@@ -32,105 +35,239 @@ tools: ["Read", "Edit", "Grep"]
 
 #### **description** (REQUIRED)
 
-- Single-quoted string, clearly stating the agent's purpose and domain expertise
-- Should be concise (50-150 characters) and actionable
-- Example: `'Focuses on test coverage, quality, and testing best practices'`
+- Double-quoted string, clearly stating the agent's purpose and domain expertise
+- One sentence and actionable; keep it to one sentence — the model choosing which agent to delegate to reads this string, so name the domain rather than the workflow
+- Example: `"Production code implementation specialist. Writes clean, maintainable code following project conventions."`
 
-#### **name** (OPTIONAL)
+#### **mode** (RECOMMENDED — defaults to `primary`)
 
-- Display name for the agent
-- If omitted, defaults to filename (without `.md`)
-- Use title case and be descriptive
-- Example: `'Testing Specialist'`
+- One of `primary`, `subagent`, or `all`
+- `primary` — runs as the main agent for a session
+- `subagent` — runs only in a child session launched by another agent
+- `all` — either; this is what makes an agent delegable
+- Files intended to be delegated to use `all`; a file that is only a session entry point uses `primary`. Re-derive the split with the audit procedure.
 
-#### **tools** (OPTIONAL)
+#### **permissions** (REQUIRED for enforcement)
 
-- List of tool names the agent can use
-- Supports YAML array format
-- If omitted, agent has access to all available tools
-- See "Tool Configuration" section below for details
+- Ordered list of rules; each rule is `{ action, resource, effect }`
+- `action` — the operation being gated (see "Permission Configuration" below)
+- `resource` — the value matched: a path, a command line, an agent ID, a URL
+- `effect` — `allow`, `deny`, or `ask`
+- An agent with no `permissions` list inherits the runtime's base policy, which allows everything except `.env` reads — omitting this key is not "no access", it is "no restriction"
+- See "Permission Configuration" section below for details
 
-## Tool Configuration
+#### **name** (NOT a v2 key)
 
-### Tool Specification Strategies
+- The agent ID comes from the file path: `.opencode/agents/team/reviewer.md` is `team/reviewer`
+- `name` is a V1 frontmatter field, ignored in any file that is read as v2 — that is, any file using `permissions`, `system`, `request`, or `disabled`
+- Do not add it; rename the file instead
 
-**Enable all tools** (default):
+## Audit Procedure — Re-derive the Inventory
 
-```yaml
-# Omit tools property entirely, or use:
-tools: ["*"]
+This document describes shapes, not counts. A count written here is wrong the moment a
+project adds an agent, so the counts live in the change that used them — a plan, a PR
+body, a review — and are re-derived with the commands below. Never quote a number from
+this file as evidence.
+
+### What to check
+
+1. Every `permissions` list opens with a catch-all rule (`resource: "*"`).
+2. A catch-all with `effect: allow` appears only in a deliberate full-access agent, and
+   that file says so.
+3. No `name:`, `tools:`, or `permission:` (singular) key survives; each is a V1 field
+   that is ignored in a file read as v2.
+4. Every `mode` is `primary`, `subagent`, or `all`.
+5. Only the documented actions appear. The actions in use are the ones the audit prints;
+   any other action is left at the base policy rather than written out, and an
+   unexpected name is a deliberate addition to document, not a typo to ignore.
+6. No unspaced deny pattern shadows a longer allowed verb, and the spaced `git merge *`
+   guard exists wherever a reviewer allowlist exists.
+
+### Commands
+
+Run from the repository root. Each command answers one question and prints the evidence;
+do not paraphrase its output.
+
+```bash
+# 1. File census — every agent spec, then the root/orchestrator split.
+find .opencode/agents -name '*.md' | sort
+find .opencode/agents -maxdepth 1 -name '*.md' | wc -l
+find .opencode/agents -path './.opencode/agents/orchestrator/*' -name '*.md' | wc -l
+
+# 2. Top-level keys in use — the shape of the frontmatter, not a stored count.
+grep -rhoE '^(description|mode|permissions|name|tools|permission):' .opencode/agents --include='*.md' | sort | uniq -c
+
+# 3. V1 keys absent — expect no output.
+grep -rnE '^(name|tools|permission):' .opencode/agents --include='*.md'
+
+# 4. Modes in use — every value must be primary, subagent, or all.
+grep -rhE '^mode: ' .opencode/agents --include='*.md' | sort | uniq -c
+
+# 5. Rules by effect and by action.
+grep -rhoE '\{ action: [a-z_]+, +resource: "[^"]+", +effect: [a-z]+ \}' .opencode/agents --include='*.md' | awk -F'effect: ' '{print $2}' | sort | uniq -c
+grep -rhoE '\{ action: [a-z_]+, +resource: "[^"]+", +effect: [a-z]+ \}' .opencode/agents --include='*.md' | awk -F'action: ' '{print $2}' | cut -d',' -f1 | sort | uniq -c
+
+# 6. First rule per file must be the catch-all — expect no output from the first loop.
+#    -F is load-bearing: a bare "*" regex matches every `resource: ` prefix, which
+#    would filter out every rule line and make the check unable to fail.
+for f in $(find .opencode/agents -name '*.md'); do printf '%s: ' "$f"; awk '/^permissions:/{p=1;next} p&&/^  - \{/{print;exit}' "$f"; done | grep -Fv 'resource: "*"'
+for f in $(find .opencode/agents -name '*.md'); do printf '%s: ' "$f"; awk '/^permissions:/{p=1;next} p&&/^  - \{/{print;exit}' "$f"; done | grep 'effect: allow'
+
+# 7. Merge guard-rail spacing — the first command expects no output, the second expects one hit.
+#    Scoped to merge/merge-base because that is the only pair where an unspaced
+#    deny can shadow a longer allowlisted verb. Other unspaced bare-verb denies
+#    (`git add*`, `git commit*`, …) are deliberate guards with no such neighbour.
+grep -rnE 'resource: "git merge\*"' .opencode/agents --include='*.md'
+grep -rn 'resource: "git merge \*"' .opencode/agents --include='*.md'
 ```
 
-**Enable specific tools**:
+A hit from check 6's second loop is a full-access agent and requires justification in its
+own file. Check 7's first command must return no output: an unspaced `git merge*` deny
+would swallow the longer read-only `git merge-base*` allow beside it. Its second command
+must return exactly one hit per reviewer allowlist: the spaced `git merge *` guard, which
+cannot match `git merge-base*`. The other unspaced bare-verb denies are intentional and
+are not reported as defects.
+
+### Reporting a mismatch
+
+A mismatch means either the file or this document is wrong. Fix the file first, re-run the
+command, and record the corrected count in the change description — never in this file.
+
+### What stays out of this file
+
+The four counts the old inventory carried (agent files, edit rules, shell rules, the
+allow/deny split) and any percentage or coverage figure. Those are measurements of one
+moment, not rules.
+
+## Permission Configuration
+
+`permissions` is the only enforcement mechanism. A `tools:` array is a V1 field: it is ignored in any file that is read as v2, which is every file that also uses `permissions`, `system`, `request`, or `disabled`.
+
+### Rule Syntax
+
+**Grant everything** — the runtime's own base policy, useful only as a starting point:
 
 ```yaml
-tools: ["Read", "Edit", "Grep", "Bash"]
+permissions:
+  - { action: "*", resource: "*", effect: allow }
 ```
 
-**Enable MCP server tools**:
+**Deny by default, then grant specifically** — the shape used by most agents here:
 
 ```yaml
-tools: ["Read", "Edit", "github/*", "playwright/navigate"]
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
 ```
 
-**Disable all tools**:
+**Gate one action and leave the rest alone** — `read`, `glob`, and `grep` keep the base policy's `allow`, so a read-only agent needs two rules, not twenty:
 
 ```yaml
-tools: []
+permissions:
+  - { action: edit,  resource: "*", effect: deny }
+  - { action: shell, resource: "*", effect: deny }
 ```
 
-### Standard opencode Tools
+If no rule matches at all, the runtime asks. The base policy's `{ action: "*", resource: "*", effect: "allow" }` usually matches first, which is why a restriction has to be written down explicitly.
 
-All tool names are case-sensitive:
+### Action Names
 
-| Tool          | Category         | Description                                   |
-| ------------- | ---------------- | --------------------------------------------- |
-| `Bash`        | Shell execution  | Execute shell commands in the terminal        |
-| `Read`        | File reading     | Read file contents                            |
-| `Write`       | File editing     | Write or create new files                     |
-| `Edit`        | File editing     | Modify existing files via string replacement  |
-| `Grep`        | Code search      | Search file contents using regular expressions |
-| `Glob`        | File search      | Find files by glob patterns                   |
-| `Task`        | Sub-agent        | Invoke other agents with subtasks             |
-| `TodoWrite`   | Task management  | Create and manage task items for tracking     |
-| `Skill`       | Skill loader     | Load specialized skill instructions           |
-| `WebFetch`    | Web access       | Fetch and read web content                    |
-| `WebSearch`   | Web access       | Search the web (requires configured MCP)      |
+`action` is a string, not a closed enum, so plugins may add their own. The names that changed from V1 are the ones that bite:
+
+| V1 name | V2 name | Why it matters |
+| --- | --- | --- |
+| `bash` | `shell` | A `bash` rule never matches, so the shell stays on the base `allow` |
+| `task` | `subagent` | Same failure: the parent can launch every agent it wants |
+| `write`, `patch` | `edit` | One `edit` rule covers the `edit`, `write`, and `patch` tools |
+
+The full vocabulary — `read`, `edit`, `glob`, `grep`, `shell`, `subagent`, `skill`, `question`, `webfetch`, `websearch`, `external_directory`, `execute`, and `<server>_<tool>` — is defined by the runtime, not by this template. This template exercises `edit` and `shell`. If the audit prints another action, treat it as deliberate and document it.
+
+### Pattern Matching
+
+- `*` matches zero or more characters, including `/` — `*.md` matches `docs/adr/0001-x.md`
+- `?` matches exactly one character; every other character matches literally
+- The pattern is matched against the whole value, not a substring: `git status` does not match `git status --short`
+- A shell pattern ending in ` *` also matches the bare command, so `git status *` covers `git status` too
+
+### Shell Rules
+
+- `resource` for `shell` is the command line as typed — `git status --short`, not `git status`
+- The trailing `*` is what allows arguments: `git diff*` covers `git diff`, `git diff HEAD~1`, and `git diff --stat`
+- A compound command is split on `|`, `&&`, and `;`, and every segment is checked; one segment without an allow rule refuses the whole command
+- Redirection such as `2>/dev/null` does not break the match
+- `shell` runs with the host user's filesystem, process, and network authority — prefer a narrow allowlist over patterns that try to recognise every dangerous command
+
+### Permission Selection Best Practices
+
+- **Principle of Least Privilege**: open with `{ action: <x>, resource: "*", effect: deny }` and add only the allows the agent cannot work without
+- **Order is meaning**: the last matching rule wins, so the catch-all `*` deny goes **first** and the specific allows follow
+- **Guard rails go last**: a narrow deny such as `git commit*` belongs at the bottom, so a future widening of an allow above it still loses
+- **Space your patterns**: `git merge *` cannot swallow `git merge-base*`; `git merge*` would, and would silently remove the reviewer's most important read-only verb
+- **Focus**: every rule you add is a capability; an agent with four rules is easier to audit than one with forty
+- **Documentation**: comment why a specific allow exists, as `reviewer.md` and `unit-tester.md` do
+
+### How These Semantics Were Verified
+
+The rule shape, the effect values, the `mode` values, and the V1 → V2 action renames are read from the v2 documentation — [permissions](https://opencode.ai/v2/docs/permissions/), [agents](https://opencode.ai/v2/docs/agents/), [migrate-v1](https://opencode.ai/v2/docs/migrate-v1) — and corroborated against the installed runtime (`opencode v2.2.5`, `/opt/homebrew/Cellar/opencode-v2/2.2.5/bin/opencode`), whose embedded schema declares `Permission.Rule = { action: string, resource: string, effect: "allow" | "deny" | "ask" }`, `Permission.Effect = allow | deny | ask`, and `Agent.Info.mode = subagent | primary | all`.
+
+The ordering, wildcard, and shell facts were measured with live permission probes against a consumer of this package. They are recorded here as measurements, not as quotations from a specification:
+
+| Measured fact | Failure it prevents |
+| --- | --- |
+| The last matching rule wins | A catch-all `deny` written last locks the agent out of everything; written first, it is what makes the allows meaningful |
+| `*` spans `/` | `*.spec.ts` assumed to match one path segment only, so a nested test file is refused (or, with `*.md`, a nested doc is silently writable) |
+| The `shell` resource is the bare command line | A rule of `git status` that never matches `git status --short`, leaving the agent unable to inspect |
+| Compound commands are decomposed and every segment must match | `git status --short \| xargs rm` allowed because the left-hand segment was allowlisted |
+| Redirection does not break the match | `2>/dev/null` silently un-matching an otherwise allowlisted command |
+
+### Migrating a V1 `tools:` Array
+
+If you are copying an agent definition from an older version of this template, a `tools:` array is a V1 field: in a file that is read as v2 it contributes nothing — the runtime ignores it and logs a warning, and the agent falls back to the base policy, which allows everything. Convert it to a `permissions` list.
+
+Before:
+
+```yaml
+tools: ["Read", "Edit", "Grep"]
+```
+
+After:
+
+```yaml
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+```
 
 ### MCP Server Tools
 
-MCP servers configured in `opencode.json` are available as tools:
+MCP tools are not entries in a tool list. Each is a permission action named `<server>_<tool>`, with characters outside the identifier set replaced by `_` — the `github` server's `add_issue_comment` tool is `github_add_issue_comment`, and the `memory-bank` server's `memory_search` tool is `memory_bank_memory_search`:
 
 ```yaml
-tools: ['github/*']           # All GitHub MCP tools
-tools: ['playwright/navigate'] # Specific Playwright MCP tool
+permissions:
+  - { action: github_add_issue_comment, resource: "*", effect: deny }
 ```
 
-The `tools` entry format for MCP tools is `server-name/tool-name`, matching the MCP server name in your `opencode.json` configuration.
-
-### Tool Selection Best Practices
-
-- **Principle of Least Privilege**: Only enable tools necessary for the agent's purpose
-- **Security**: Limit `Bash` access unless explicitly required
-- **Focus**: Fewer tools = clearer agent purpose and better performance
-- **Documentation**: Comment why specific tools are required for complex configurations
+Server names come from `opencode.json` (or `opencode.mcp.example.json` in this repository). No agent in this template gates an MCP tool. A project that needs to add `<server>_<tool>` rules does so in the frontmatter of its own copy of the agent file — the only per-agent permission surface — and then maintains that copy, because `scripts/sync.js` overwrites agent frontmatter under `--force`; the naming scheme is the runtime's, not this template's.
 
 ## Sub-Agent Invocation (Agent Orchestration)
 
-Agents can invoke other agents using the **`Task` tool** to orchestrate multi-step workflows.
+Agents can invoke other agents through the **`subagent` permission action** to orchestrate multi-step workflows.
 
 The recommended approach is **prompt-based orchestration**:
 
 - The orchestrator defines a step-by-step workflow in natural language.
 - Each step is delegated to a specialized agent.
-- The orchestrator passes only the essential context (e.g., base path, identifiers) and requires each sub-agent to read its own `.md` spec for tools/constraints.
+- The orchestrator passes only the essential context (e.g., base path, identifiers) and requires each sub-agent to read its own `.md` spec for permissions/constraints.
 
 ### How It Works
 
-1. Enable agent invocation by including `Task` in the orchestrator's tools list:
+1. Enable agent invocation by granting the `subagent` action in the orchestrator's `permissions`:
 
 ```yaml
-tools: ["Read", "Edit", "Grep", "Task"]
+permissions:
+  - { action: subagent, resource: "*",     effect: deny }
+  - { action: subagent, resource: "coder", effect: allow }
 ```
 
 2. For each step, invoke a sub-agent by providing:
@@ -147,7 +284,7 @@ Use a consistent "wrapper prompt" for every step so sub-agents behave predictabl
 This phase must be performed as the agent "<AGENT_NAME>" defined in "<AGENT_SPEC_PATH>".
 
 IMPORTANT:
-- Read and apply the entire agent spec file (tools, constraints, quality standards).
+- Read and apply the entire agent spec file (permissions, constraints, quality standards).
 - Work on "<WORK_UNIT_NAME>" with base path: "<BASE_PATH>".
 - Perform the necessary reads/writes under this base path.
 - Return a clear summary (actions taken + files produced/modified + issues).
@@ -214,18 +351,20 @@ Expected: write basePath/analysis/report.md
 - **Sequential execution**: Run steps in order when dependencies exist between outputs/inputs
 - **Error handling**: Check results before proceeding to dependent steps
 
-### ⚠️ Tool Availability Requirement
+### ⚠️ Sub-Agent Availability Requirement
 
-**Critical**: If a sub-agent requires specific tools (e.g., `Edit`, `Bash`, `Grep`), the orchestrator must include those tools in its own `tools` list. Sub-agents cannot access tools that aren't available to their parent orchestrator.
+**Critical**: a sub-agent's capabilities come from its own `permissions`, not from its parent's. The parent's `subagent` rules decide *which* agents it may launch; the child then runs with the rules in its own file.
 
-**Example**:
+**Example** — an orchestrator that may launch only the coder:
 
 ```yaml
-# If your sub-agents need to edit files, execute commands, or search code
-tools: ["Read", "Edit", "Grep", "Bash", "Task"]
+# The parent gates delegation; it does not lend the child its own capabilities
+permissions:
+  - { action: subagent, resource: "*",     effect: deny }
+  - { action: subagent, resource: "coder", effect: allow }
 ```
 
-The orchestrator's tool permissions act as a ceiling for all invoked sub-agents. Plan your tool list carefully to ensure all sub-agents have the tools they need.
+The child's file is what stops the child from editing source or running arbitrary commands. If the child needs to write files, the `edit` rules in *its* frontmatter have to say so — widening the parent changes nothing.
 
 ### ⚠️ Important Limitation
 
@@ -471,10 +610,11 @@ Use consistent variable naming conventions:
 
 ### Frontmatter
 
-- [ ] `description` field present and descriptive (50-150 chars)
-- [ ] `description` wrapped in single quotes
-- [ ] `name` specified (optional but recommended)
-- [ ] `tools` configured appropriately (or intentionally omitted)
+- [ ] `description` field present and descriptive (one sentence)
+- [ ] `description` wrapped in double quotes
+- [ ] `mode` set to `primary`, `subagent`, or `all`
+- [ ] `permissions` present, opening with a catch-all `*` deny and followed by specific allows
+- [ ] No V1 keys (`name`, `tools`, `permission`) — they are ignored in a file read as v2
 
 ### Prompt Content
 
@@ -498,7 +638,7 @@ Use consistent variable naming conventions:
 ### Quality Assurance
 
 - [ ] Agent purpose is unique and not duplicative
-- [ ] Tools are minimal and necessary
+- [ ] Permission rules are minimal and necessary
 - [ ] Instructions are clear and unambiguous
 - [ ] Agent has been tested with representative tasks
 - [ ] Documentation references are current
@@ -506,35 +646,74 @@ Use consistent variable naming conventions:
 
 ## Common Agent Patterns
 
+Each pattern below is taken from a file in this repository, so the YAML is known to parse and known to be in use.
+
 ### Testing Specialist
 
 **Purpose**: Focus on test coverage and quality
-**Tools**: All tools (for comprehensive test creation)
+**Permissions**: Tests only — `edit *` denied, one allow per test-file convention, shell allowed so the suite can actually run (`unit-tester.md`)
 **Approach**: Analyze, identify gaps, write tests, avoid production code changes
+
+```yaml
+permissions:
+  - { action: edit,  resource: "*",         effect: deny }
+  - { action: edit,  resource: "*.spec.ts", effect: allow }
+  - { action: edit,  resource: "*_test.go", effect: allow }
+  - { action: shell, resource: "*",         effect: allow }
+```
 
 ### Implementation Planner
 
 **Purpose**: Create detailed technical plans and specifications
-**Tools**: Limited to `['Read', 'Grep', 'Write']`
+**Permissions**: Documentation only — `edit *` denied, `*.md` allowed, shell allowed for reading the codebase (`implementer.md`)
 **Approach**: Analyze requirements, create documentation, avoid implementation
+
+```yaml
+permissions:
+  - { action: edit,  resource: "*",    effect: deny }
+  - { action: edit,  resource: "*.md", effect: allow }
+  - { action: shell, resource: "*",    effect: allow }
+```
 
 ### Code Reviewer
 
 **Purpose**: Review code quality and provide feedback
-**Tools**: `['Read', 'Grep']` only
+**Permissions**: Edits denied except Markdown; shell denied first, then the inspection verbs, then the guard rails (`reviewer.md`)
 **Approach**: Analyze, suggest improvements, no direct modifications
+
+```yaml
+permissions:
+  - { action: edit,  resource: "*",           effect: deny }
+  - { action: edit,  resource: "*.md",        effect: allow }
+  - { action: shell, resource: "*",           effect: deny }
+  - { action: shell, resource: "git diff*",   effect: allow }
+  - { action: shell, resource: "git log*",    effect: allow }
+  - { action: shell, resource: "git commit*", effect: deny }
+```
 
 ### Refactoring Specialist
 
 **Purpose**: Improve code structure and maintainability
-**Tools**: `['Read', 'Grep', 'Edit']`
+**Permissions**: Full edit and shell (`coder.md`, `deployer.md`)
 **Approach**: Analyze patterns, propose refactorings, implement safely
+
+```yaml
+permissions:
+  - { action: edit,  resource: "*", effect: allow }
+  - { action: shell, resource: "*", effect: allow }
+```
 
 ### Security Auditor
 
 **Purpose**: Identify security issues and vulnerabilities
-**Tools**: `['Read', 'Grep', 'WebFetch']`
+**Permissions**: Read-only — no edits and no shell, which still leaves `read`, `glob`, and `grep` at the base policy's `allow` (`e2e-tester.md`, `scope.md`)
 **Approach**: Scan code, check against OWASP, report findings
+
+```yaml
+permissions:
+  - { action: edit,  resource: "*", effect: deny }
+  - { action: shell, resource: "*", effect: deny }
+```
 
 ## Common Mistakes to Avoid
 
@@ -542,15 +721,17 @@ Use consistent variable naming conventions:
 
 - ❌ Missing `description` field
 - ❌ Description not wrapped in quotes
-- ❌ Invalid tool names without checking documentation
+- ❌ `permission:` (singular) instead of `permissions:` — the V1 spelling, ignored in a file read as v2
+- ❌ A `tools:` array or a `name:` key — V1 fields, ignored in a file read as v2
 - ❌ Incorrect YAML syntax (indentation, quotes)
 
-### Tool Configuration Issues
+### Permission Configuration Issues
 
-- ❌ Granting excessive tool access unnecessarily
-- ❌ Missing required tools for agent's purpose
-- ❌ Using tool aliases from other platforms instead of opencode tool names
-- ❌ Forgetting MCP server namespace (`server-name/tool`)
+- ❌ Granting `edit` or `shell` with `resource: "*"` and `effect: allow` to an agent whose purpose is analysis
+- ❌ The catch-all `*` deny placed last — it then wins over every allow above it and locks the agent out of everything
+- ❌ A V1 action name (`bash`, `task`, `write`, `patch`) that matches nothing, leaving the capability on `allow`
+- ❌ A `shell` pattern of `git status` when the agent will type `git status --short`
+- ❌ An unspaced guard pattern (`git merge*`) that swallows the read-only verb beside it (`git merge-base*`)
 
 ### Prompt Content Problems
 
@@ -576,7 +757,7 @@ Use consistent variable naming conventions:
 2. Open opencode in your terminal or editor
 3. Invoke the agent by referencing its name
 4. Test with representative user queries
-5. Verify tool access works as expected
+5. Verify the permission rules behave as expected — a denied action must be refused, not prompted
 6. Confirm output meets expectations
 
 ### Integration Testing

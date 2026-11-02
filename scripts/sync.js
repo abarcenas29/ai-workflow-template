@@ -33,6 +33,11 @@ export const projectOwnedPaths = new Set([
   // Reserved: sync protects this file from overwrite and prune, but it does
   // NOT read or honour its globs yet. Do not present it as functional.
   '.agents-sync-ignore',
+  // The consumer's gate declaration. Project-owned because its contents are a
+  // project decision: a template update must not replace or prune it. It is
+  // scaffolded create-if-absent from the package copy (projectOwnedAgentStubs)
+  // so a fresh consumer still receives the empty declaration.
+  'config/quality-gates.md',
   ...excludedRelativePaths,
 ])
 
@@ -276,6 +281,12 @@ Cross-session knowledge accumulated by agent pipelines. Each session records dis
 
 `,
 }
+
+// Project-owned files that live under .agents/ rather than the consumer root.
+// Paths are relative to .agents/. Scaffolded create-if-absent from the package
+// copy — there is no duplicated stub text to drift — and then skipped by every
+// copy pass via projectOwnedPaths, so --force cannot replace a consumer's edit.
+export const projectOwnedAgentStubs = ['config/quality-gates.md']
 
 // Project-owned files are scaffolded create-if-absent and then left alone for
 // the lifetime of the consumer project (deleting one recreates it on the next
@@ -752,10 +763,12 @@ export function syncProject(context) {
       continue
     }
 
-    ensureParentDirectory(targetFile)
     if (isVerbose) console.error(`  … scaffolding: memory-bank/${fileName}`)
-    writeFileSync(targetFile, fileContent, 'utf8')
-    manifest.files[trackedKey] = hashFile(targetFile)
+    if (!dryRun) {
+      ensureParentDirectory(targetFile)
+      writeFileSync(targetFile, fileContent, 'utf8')
+      manifest.files[trackedKey] = hashFile(targetFile)
+    }
     scaffolded += 1
   }
 
@@ -769,10 +782,38 @@ export function syncProject(context) {
       continue
     }
 
-    ensureParentDirectory(targetFile)
     if (isVerbose) console.error(`  … scaffolding: .agents/instructions/${fileName}`)
-    writeFileSync(targetFile, fileContent, 'utf8')
-    manifest.files[trackedKey] = hashFile(targetFile)
+    if (!dryRun) {
+      ensureParentDirectory(targetFile)
+      writeFileSync(targetFile, fileContent, 'utf8')
+      manifest.files[trackedKey] = hashFile(targetFile)
+    }
+    scaffolded += 1
+  }
+
+  /* ──  Scaffold project-owned .agents/ files ─────────────────── */
+
+  // Create-if-absent from the package copy. The .agents copy pass skips these
+  // paths (projectOwnedPaths), so this loop is the only way a fresh consumer
+  // receives them; once present they are never overwritten, not even with
+  // --force. Recorded under the bare .agents key, the same channel a copy would
+  // have used — resolvePruneEntry short-circuits on project-owned paths.
+  for (const relativePath of projectOwnedAgentStubs) {
+    const sourceFile = resolve(sourceAgentsDir, relativePath)
+    const targetFile = resolve(targetAgentsDir, relativePath)
+
+    if (!existsSync(sourceFile) || existsSync(targetFile)) {
+      continue
+    }
+
+    if (isVerbose) console.error(`  … scaffolding: .agents/${relativePath}`)
+    if (!dryRun) {
+      ensureParentDirectory(targetFile)
+      copyFileSync(sourceFile, targetFile)
+      if (isRegularFile(targetFile)) {
+        manifest.files[relativePath] = hashFile(targetFile)
+      }
+    }
     scaffolded += 1
   }
 
@@ -793,11 +834,13 @@ export function syncProject(context) {
     let didScaffold = false
 
     if (!existsSync(targetFile)) {
-      ensureParentDirectory(targetFile)
       if (isVerbose) console.error(`  … scaffolding: ${fileName}`)
-      writeFileSync(targetFile, fileContent, 'utf8')
+      if (!dryRun) {
+        ensureParentDirectory(targetFile)
+        writeFileSync(targetFile, fileContent, 'utf8')
+        didScaffold = true
+      }
       scaffolded += 1
-      didScaffold = true
     }
 
     // Only hash what this run created, and only if it is a regular file: a
@@ -833,8 +876,10 @@ export function syncProject(context) {
 
   if (existsSync(exampleMcpFile) && !existsSync(targetMcpFile)) {
     if (isVerbose) console.error('  … scaffolding: opencode.json from example')
-    copyFileSync(exampleMcpFile, targetMcpFile)
-    manifest.files[mcpTrackedKey] = hashFile(targetMcpFile)
+    if (!dryRun) {
+      copyFileSync(exampleMcpFile, targetMcpFile)
+      manifest.files[mcpTrackedKey] = hashFile(targetMcpFile)
+    }
     scaffolded += 1
   }
 

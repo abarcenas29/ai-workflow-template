@@ -1,6 +1,6 @@
 ---
 title: "Agent skills and configuration"
-description: "Discovery pointer for the scoping skills, the scope agent, and domain documentation locations."
+description: "Discovery pointer for the scoping skills, the scope agent, the quality-gate declaration, and domain documentation locations."
 ---
 
 ## Why this file exists
@@ -62,6 +62,14 @@ or the docs it names are absent, the skill proceeds silently.
 `npx ai-workflow-setup` and `/setup-matt-pocock-skills` both create missing labels idempotently, and
 the command is what the vendored `wayfinder`, `to-tickets`, and `to-spec` skills tell users to run.
 When no tracker is configured, maps and tickets fall back to `.scratch/wayfinder/`, which is gitignored.
+
+## Quality gates
+
+`.agents/config/quality-gates.md` is the only declaration of a project's gates: the gate
+table, the optional count contract, coverage thresholds, and ordering rules. `unit-tester`
+reads it; nothing else declares a gate. It ships empty, so every gate is `NOT DECLARED`
+until the project fills it in. A gate that is not declared there is reported, never
+invented.
 
 ## Research skill
 
