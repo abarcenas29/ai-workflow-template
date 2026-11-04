@@ -15,7 +15,8 @@
 //  10. Phase 7 — Knowledgebase (register with centralized knowledgebase, unless --skip-knowledgebase)
 //  11. Phase 8 — Tracker (create missing GitHub labels, unless --skip-tracker)
 //  12. Render summary table via ui.summary()
-//  13. Determine exit code and return it
+//  13. Print the local OpenCode V2 migration notice (advisory, never fatal)
+//  14. Determine exit code and return it
 //
 // Each phase is wrapped in try/catch. Only discovery failure is fatal.
 // All other phase errors are logged and the pipeline continues (REQ-04).
@@ -44,6 +45,7 @@ import { runSyncPhase } from './sync-phase.js'
 import { runSkillsPhase } from './skills-phase.js'
 import { registerKnowledgebase } from './knowledgebase.js'
 import { runTrackerPhase } from './tracker-phase.js'
+import { printLocalUpdateNotice } from './local-update.js'
 
 // ── Package version (lazy, cached) ───────────────────────────────────────────
 
@@ -193,6 +195,15 @@ export async function main(argv) {
     if (!flags.quiet) summary(phases)
     return EXIT_CODES.FATAL
   }
+
+  // ── Local OpenCode V2 migration notice ──────────────────────────────────
+  // Advisory only: the detector reads two git-ignored files that a package
+  // upgrade cannot repair. It prints nothing when they are already correct
+  // and never changes the exit code.
+  printLocalUpdateNotice({
+    consumerRoot: context.consumerRoot,
+    quiet: !!flags.quiet,
+  })
 
   // ── CI mode banner ──────────────────────────────────────────────────────
   if (context.isCI && !flags.quiet) {
