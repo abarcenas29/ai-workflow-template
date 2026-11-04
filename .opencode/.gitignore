@@ -1,0 +1,6 @@
+# Local developer-environment state for OpenCode.
+# The plugin SDK pin and its lockfile are machine-local: they are created by
+# `npm install` inside .opencode/ and must never be committed or published.
+/node_modules/
+/package.json
+/package-lock.json
