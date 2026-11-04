@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.3.0 — 2026-11-04
+
+### Fixed
+
+- **The graphify plugin now uses the V2 default-definition API.**
+  `.opencode/plugins/graphify.js` default-exports a definition with a stable
+  `id` and a `setup` function, instead of the V1 named-export factory that
+  OpenCode rejected at load with a `PluginModule.LoadError` logged only at WARN
+  level — which is why the plugin never fired and nothing complained. The
+  2.2.0 tarball still carried the V1 shape; run `npx ai-workflow-setup` to
+  receive the corrected file.
+
 ## 2.0.0 — 2026-10-31
 
 ### Breaking changes
