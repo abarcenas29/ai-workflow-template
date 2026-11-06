@@ -67,6 +67,8 @@ Rules for the shape above:
 - `## Fix commands` follows the findings and repeats their order. Each entry is a `# <ID> — <intent>` comment plus copy-pasteable commands. A finding with no mechanical fix gets a comment naming the manual step and no command.
 - The last line carries the verdict. Its grammar is fixed; only the counts vary.
 
+The `FAIL` branch of M5 uses the same line with `[FAIL]` in place of `[WARN]`; its fix command appends the missing variable to `.env.example` (`echo 'X=' >> .env.example`) rather than exporting it.
+
 | Verdict | Condition |
 |---|---|
 | `PASS` | 0 blockers and 0 warnings |
