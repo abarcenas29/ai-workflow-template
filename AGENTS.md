@@ -40,6 +40,7 @@ Put project-specific agent rules in `AGENTS.project.md` at the repository root. 
 | Instructions files | `.agents/instructions/instructions.instructions.md` |
 | Agent safety | `.agents/instructions/agent-safety.instructions.md` |
 | AI safety | `.agents/instructions/ai-prompt-engineering-safety.instructions.md` |
+| Setup health | `.agents/instructions/health-check.instructions.md` |
 | Context7 | `.agents/instructions/context7.instructions.md` |
 | HTML/CSS styling | `.agents/instructions/html-to-css-guide.instructions.md` |
 | Communication style | `.agents/instructions/communication.instructions.md` |

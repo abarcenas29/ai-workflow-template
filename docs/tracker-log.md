@@ -2845,3 +2845,95 @@ The table lists the substantive files; the diff is **18 tracked files (+617/−2
 - **No outstanding defects.** The two MINOR and two COSMETIC items from the approving pass were closed in the polish pass, with no permission or doctrine change.
 - **The orchestrator log was the one process gap:** this pipeline never appended a live entry, so the timeline came from the handoff and the plan. **Repaired:** the missing record was appended retroactively as `docs/.orchestrator-log.md` Pipeline 21, and the fix — delegate the log write to the tracker at pipeline end — is recorded there. Record the next run live.
 - **`memory_search` / `knowledgebase_search`:** **NOT executed** — no memory-bank or knowledgebase tool was exposed in this session's MCP catalog. Context came from the plan, the repository files, and the existing learned-knowledge journal read directly. Not retried and not treated as a task failure.
+
+---
+
+## Feature Pipeline: `/health` Setup Audit — New Command, 47-Check Checklist, and Two Follow-Up Corrections
+
+**Date:** 2026-11-06
+**Status:** ✅ SUCCESS — `npm run test:unit` → **31 files / 906 tests, 0 failures**; reviewer **0 blockers / 8 minor** (6 applied, 2 declined as out of scope); `GATES: NOT DECLARED`. **Nothing was committed, pushed, or synced.**
+**Pipeline:** coder (command + checklist + discoverability) → reviewer (0 blockers, 8 minors) → coder (review fixes + two follow-ups) → verification → tracker (this entry)
+**Branch:** `fix/health-check-followups`
+**Record source:** the two new files and the four edited files on disk, plus the verification run reported to this step. `docs/.orchestrator-log.md` carries no entry for this work, so none is cited or invented.
+
+### Summary
+
+A project that has just run `npx ai-workflow-setup` had no way to ask whether the result actually works. `/health` is that question as a command: it audits the OpenCode surface (MCP config and env vars, plugins, agent and command frontmatter, skills and the skills lock), sync integrity, hooks and runtime, the memory bank and knowledgebase, tracker readiness, and — in maintainer mode only — packaging. It prints one report and stops. It never edits, installs, repairs, creates a label, writes to the memory bank, or writes a report file.
+
+The command is deliberately thin. `.opencode/commands/health.md` (56 lines) resolves the mode, names the read-only commands it may run, and defers every definition of what a check *means* to `.agents/instructions/health-check.instructions.md` (197 lines). That checklist holds **47 checks across 7 categories** (M1–M10, O1–O8, S1–S7, H1–H8, K1–K6, T1–T5, D1–D3), a **4-status severity contract** whose `FAIL` list is closed at **7 items**, an exact terminal report shape, a **9-server probe table**, and a "what this command never does" section. The split is what keeps the two files from drifting: the command cannot restate a check it does not own.
+
+Two corrections landed on top of the first pass. `M5` had the severity backwards — a `{env:X}` referenced by an enabled server but *absent from `.env.example`* is now `FAIL` (the config promises a dependency the project never declares), while *documented but unset in the current shell* is `WARN` (the fix is an export, not a repo change). The old rule blocked a run on any machine without an exported token, which is not a defect in the repository being audited. `docs/.architecture-context.md` was then re-derived from disk rather than adjusted arithmetically: instruction files **24 → 25**, `updated:` → **2026-11-06**. Every other count held (41 skills, 12 agent specs, 3 orchestrators, 7 commands, 1 plugin).
+
+### Execution Steps
+
+| # | Step | Status | Result |
+|---|---|---|---|
+| 1 | Command | ✅ | `.opencode/commands/health.md` — 56 lines; frontmatter `agent: build`, `subtask: true`; arguments `--probe`, `--probe-all`, `--consumer`, `--maintainer`; five steps (read checklist → detect mode → run categories → probe when asked → print report) and a five-bullet constraints block. An unrecognised argument becomes a `[WARN] ARGS` finding, never a silent ignore. |
+| 2 | Checklist | ✅ | `.agents/instructions/health-check.instructions.md` — 197 lines; 47 check IDs across 7 categories; severity contract with the 7-item closed `FAIL` list; exact report grammar; 9-server probe table; "What this command never does". Ships to consumers through `.agents/`. |
+| 3 | Discoverability | ✅ | One `Setup health` row added to `AGENTS.md`'s Instructions Reference (`:43`), pointing at `.agents/instructions/health-check.instructions.md`; the `README.md` directory tree comment now reads `# Slash commands (incl. /health, /setup-matt-pocock-skills)` (`:124`). |
+| 4 | Reviewer | ✅ 0 blockers / 8 minor | No blocker and no major. Eight minor findings: report-example ordering, a missing Category 3 preamble, the `__project__` namespace in `D2`, an `O2` shadow-config case, `M9` needing a mode split, and `FAIL`-bullet wording, plus two out-of-scope observations. |
+| 5 | Review fixes | ✅ | Six accepted and applied: example ordering **M5 → O8 → S7**; Category 3 preamble stating S1–S7 vs maintainer mode; `D2` exempts the scaffold-only `__project__` namespace; `O2` gains the shadow-config test; `M9` splits maintainer known-drift from consumer actual-mismatch; `FAIL` bullet wording tightened. Two declined — see Review Findings. |
+| 6 | Follow-up 1 (`M5`) | ✅ | Severity inverted: referenced-but-undocumented is `FAIL`, documented-but-unset is `WARN`; `M5`'s table row and the Category 1 closing paragraph now state both halves, and the `health.md` example carries the `WARN` form. |
+| 7 | Follow-up 2 (counts) | ✅ | `docs/.architecture-context.md` re-derived from disk: instruction files 24 → 25, `updated: "2026-11-06"`. All other counts verified unchanged rather than assumed. |
+| 8 | Verification | ✅ | `npm run test:unit` → **31 files / 906 tests, 0 failures**. `opencode.json`, `package.json`, `scripts/`, and `.opencode/plugins/` untouched. `.agents/config/quality-gates.md` still declares no gates. |
+| 9 | tracker | ✅ | This entry. No source, test, plan, or memory-bank file was edited. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.opencode/commands/health.md` | **NEW** — 56 lines. Report-only audit command: `agent: build`, `subtask: true`; four documented arguments plus a rule that anything else becomes a `[WARN] ARGS` finding; mode detection from `bin/setup.js` + `scripts/setup/index.js` + `package.json` `name` with explicit override; an explicit list of the read-only `!` commands it may run; a probe step that marks the two browser servers skipped under plain `--probe`; and constraints that reserve `FAIL` for the checklist's closed list. |
+| `.agents/instructions/health-check.instructions.md` | **NEW** — 197 lines. The authoritative checklist: mode table; 4-status severity contract (`FAIL` / `WARN` / `SKIP` / `OK`) with `FAIL` closed to 7 named conditions; verbatim report shape and verdict grammar; 47 checks in 7 categories (M1–M10, O1–O8, S1–S7, H1–H8, K1–K6, T1–T5, D1–D3); 9-server probe table with per-server cost and notes; and six prohibitions under "What this command never does". |
+| `AGENTS.md` | **MODIFIED** — one `Setup health` row in the Instructions Reference (`:43`), mapping to `.agents/instructions/health-check.instructions.md`. |
+| `README.md` | **MODIFIED** — `:124` tree comment now lists `/health` beside `/setup-matt-pocock-skills`. |
+| `docs/.architecture-context.md` | **MODIFIED** — instruction-file count 24 → 25 (`:77`); `updated:` → `2026-11-06` (`:4`). All other counts re-checked and left as they were. |
+
+**Deliberately not changed:** `opencode.json`, `opencode.mcp.example.json`, `package.json`, `scripts/`, `.opencode/plugins/`, and `tests/` — the change surface is two documentation artifacts plus discoverability and a count refresh. `.agents-sync-manifest.json` was not hand-edited either; see the follow-up below.
+
+### Key Decisions
+
+- **Report-only, and the report goes to the terminal.** An audit that can mutate what it measures is not an audit. The command never edits or creates a file, never installs, never runs setup or a `--force` sync, never touches a GitHub label, never writes the memory bank, and never writes a report file. *Cost:* findings must be copied out by hand. *Benefit:* running `/health` on a suspect project cannot change the evidence or the outcome.
+- **Two layers, with one owner per fact.** The command owns orchestration and the argument surface; the checklist owns every definition of a check. `health.md` states "this file does not restate it", so a check's meaning exists in exactly one place. *Cost:* one extra read at run time. *Risk:* a consumer who has the command without the checklist — both ship through the same setup run, so they arrive together.
+- **`FAIL` is a closed list of seven.** Only an unparseable `opencode.json`, a `{env:X}` the project never documents, a missing core memory-bank file, a missing `AGENTS.md`, a broken Husky hook marker, Node below 22, or a failing `npm run test:unit` in maintainer mode may block. Everything else is `WARN`. *Cost:* some genuinely broken setups pass with warnings. *Benefit:* a health run is not failed by machine-local state, so a green `PASS` means something.
+- **`M5` severity inverted because the first version measured the wrong thing.** The old rule failed the audit whenever a referenced variable was unset in the current shell — which is true of every machine that has not exported a token, and is not a property of the repository. The defect worth blocking is the opposite: a config that promises a dependency the project never declares in `.env.example`. *Cost:* an unset-but-documented variable is only a warning. *Benefit:* the blocker now follows the repo, not the shell.
+- **`SKIP` is never `OK`.** A check with no readable evidence states its reason; `OK` must name what was read or run to prove it. The report's `O8` row is permanently `SKIP` offline, on purpose.
+- **Probing is opt-in and fail-soft.** Static checks are the default because they are free; `--probe` calls one read-only tool per server, and `--probe-all` adds the two browser-backed servers that launch a browser. One retry maximum, then record the failure and continue; a failed probe is a warning, never a blocker.
+- **Mode detection is evidence-stated, not inferred silently.** Maintainer mode requires both setup paths *and* the package name; the report names which paths existed and which name matched, and says when the mode was forced by a flag.
+- **Category 3 and Category 7 are alternatives, not both.** In maintainer mode S1–S7 report `SKIP` with reason "maintainer mode" because D1 already covers packaging; running both would double-report the same tree with different rules.
+- **Counts re-derived from disk, never adjusted by arithmetic.** The architecture-context refresh read the instruction directory rather than adding one to a remembered number, and every other count was re-checked before being left alone.
+
+### Review Findings
+
+| Disposition | Finding | Resolution |
+|---|---|---|
+| Applied | Report example ordered M5 → O8 → S7 | The example now appears in the order the checklist defines (category order, then check-ID order). |
+| Applied | Category 3 lacked a preamble | A preamble above the table now states that consumer mode runs S1–S7 while maintainer mode runs Category 7 and reports S1–S7 as `SKIP` with reason "maintainer mode". |
+| Applied | `D2` would flag the scaffold-only `__project__` namespace | `__project__` entries are scaffolded files, not synced directories — explicitly exempted. |
+| Applied | `O2` did not cover a shadowing `.opencode/opencode.json` | Check now rejects deprecated V1 keys *and* a conflicting `mcp`/`permission` block; a `$schema`-only file is correct. |
+| Applied | `M9` was one rule for two modes | Split: maintainer known drift (knowledgebase enabled but absent from the example file) vs consumer actual mismatch only. |
+| Applied | `FAIL` bullet wording conflated the list with its consequences | Reworded so the closed list is stated as the only `FAIL` source and warnings are stated never to fail the run. |
+| Declined | Prettier-only reflow of the architecture-context tables | Outside this change: formatting churn in a file that was opened for a count refresh, with no reader benefit. |
+| Declined | "Only JS elsewhere" claim contradicted by `tests/*.test.js` | Pre-existing and unrelated to `/health`; fixing it would pull an untouched paragraph into this branch's diff. Recorded, not edited. |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `npm run test:unit` | ✅ **31 files / 906 tests**, 0 failures |
+| `opencode.json`, `package.json`, `scripts/`, `.opencode/plugins/` | ✅ Untouched by this work |
+| `.agents/config/quality-gates.md` | ✅ `GATES: NOT DECLARED` — header-only gate table, unchanged |
+| Checklist arithmetic | ✅ 47 IDs: 10 + 8 + 7 + 8 + 6 + 5 + 3 |
+| `FAIL` list | ✅ 7 conditions, matching the severity contract's closed list |
+| Probe table | ✅ 9 probed servers + 2 disabled `example-*` rows |
+| Architecture context | ✅ instruction files **25** (was 24), `updated: "2026-11-06"`; 41 skills / 12 agent specs / 3 orchestrators / 7 commands / 1 plugin unchanged |
+| `AGENTS.md` / `README.md` discoverability | ✅ One row each (`:43`, `:124`) |
+| New files in `.agents-sync-manifest.json` | ⚠️ Neither path is present yet — see follow-up |
+| Reviewer verdict | ✅ 0 blockers, 0 majors, 8 minor |
+
+### Notes / Follow-up
+
+- **Neither new file is in `.agents-sync-manifest.json` yet,** so consumer projects receive `.opencode/commands/health.md` and `.agents/instructions/health-check.instructions.md` on the next `npx ai-workflow-setup` — both through the existing `__opencode__` and `.agents/` sync channels, with no manifest entry written by hand.
+- **Nothing was committed, pushed, or synced.** The work sits in the working tree on `fix/health-check-followups`.
+- **`memory-bank/activeContext.md` and `memory-bank/progress.md` were intentionally left untouched.** Both carry unrelated uncommitted changes from a 2026-11-04 deploy run that must stay out of this branch's diff, so this record lives in `docs/tracker-log.md` only.
+- **One pre-existing inaccuracy is recorded, not fixed:** `docs/.architecture-context.md:93` claims `bin/setup.js` and the single plugin file are "the only JS elsewhere", which `tests/*.test.js` contradicts. It survived this pass because the file was opened for a count refresh, not a fact-check of every sentence.
+- `memory_search` executed — results returned no `/health` precedent. `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` is not configured); reported per the graceful-failure contract, not retried.
