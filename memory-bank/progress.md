@@ -1,7 +1,7 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-11-02"
+updated: "2026-11-04"
 
 tags: [architect, coder, implementer, deployer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, agents, env-var-shadowing, mcp-config, restart, refactor, configuration]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
@@ -3100,3 +3100,47 @@ The plan is now complete (T1–T30). Everything below works and was exercised; n
 - **Verification:** `npm run test:unit` → 28 files / **835 tests passed** (0 skipped); `npm run test:unit:coverage` → 96.51% / 93.89% / 97.08% / 96.75%, all ≥90 and no config change; `npx playwright test` → **7 passed / 1 skipped**; upstream lock re-fetch → **10/10 entries, 15/15 files, 0 mismatches**; corrupt-hash mutation failed as expected and was restored.
 - **Known issue / not executed:** T30(f) live `/setup-matt-pocock-skills` idempotency run was **not executed** — creating six real labels needs operator consent, which was withheld. T16 proves the same property against a fake `gh` state (second run: 0 created). `npx ai-workflow-setup --dry-run` in this worktree reports `Tracker: skipped — not a git repository`, because `discover()` tests for a `.git` **directory** and a worktree uses a `.git` file — pre-existing discovery behaviour, outside this plan.
 - **Deviations:** the three flag-enumerating unit tests and `index.test.js` were updated because a new supported flag and a new phase legitimately change their inventories; no threshold, skip, or exclusion was touched (CON-10). `--knowledgebase` also sets `skipTracker` so its "ONLY knowledgebase" contract still holds.
+
+### 2026-11-04 — Deployer: local OpenCode V2 replay after PR #42 (`7b3c0cf`)
+
+The V2 plugin port is on `main`, but the two files the V2 loader actually reads are
+git-ignored, so the merge could not update them and the running config was still V1-shaped.
+
+- **Why the merge could not fix it.** `.opencode/opencode.json` is ignored by root `.gitignore:2`
+  (`opencode.json`); `.opencode/package.json` and `.opencode/package-lock.json` are ignored by
+  `.opencode/.gitignore:5-6`, and `/node_modules/` by `:4`. All three are untracked
+  (`git ls-files` returns nothing), so this replay is a local operation and no tracked file moved.
+- **`opencode.json` before → after.** Before: `{"$schema": "...", "plugin": [".opencode/plugins/graphify.js"]}`.
+  After: `{"$schema": "https://opencode.ai/config.json"}` — no `plugin`, no `plugins`. The singular
+  key made the V2 loader treat the file path as an npm package name and try to install
+  `~/.opencode/plugins/graphify.js/package.json`; V2 auto-discovers every file in
+  `.opencode/plugins/`, so removing the key is the fix, not renaming it to `plugins`.
+- **`package.json` before → after.** Before: `{"dependencies": {"@opencode-ai/plugin": "1.14.39"}}`.
+  After: `{"type": "module", "dependencies": {"@opencode/plugin": "2.2.5"}}`. `type: module` removes
+  the `MODULE_TYPELESS_PACKAGE_JSON` warning on plugin import; `@opencode/plugin@2.2.5` is a
+  **different package** from `@opencode-ai/plugin` (which has no 2.x line at all), so the old one
+  had to be removed rather than supplemented.
+- **Install.** `npm install --prefix .opencode` → `added 272 packages, removed 17 packages`.
+  `npm ls @opencode/plugin` → `2.2.5`; `npm ls @opencode-ai/plugin` → `(empty)`; the on-disk
+  `node_modules/@opencode-ai/plugin` directory is gone and the lockfile has no entry for it. One
+  empty `node_modules/@opencode-ai/` scope directory survived npm's cleanup and was removed with
+  `rmdir` so the filesystem matches the claim.
+- **Import smoke test.** `node -e "import('./.opencode/plugins/graphify.js')..."` from the workspace
+  root prints `object graphify function` and emits **no** `MODULE_TYPELESS_PACKAGE_JSON` warning.
+- **Hook harness (end-to-end proof).** A fake ctx recording `ctx.tool.hook` shows exactly **one**
+  registration named `execute.before`, and `setup` returns `undefined`. A
+  `{tool: "shell", input: {command: "echo hi"}}` event is mutated to the reminder + `&& echo hi`;
+  `{tool: "bash", ...}` is left untouched; the per-setup `reminded` latch leaves a second shell call
+  unmutated; a non-string `command` is a silent no-op. `HARNESS: PASS`.
+- **Which branch fired.** **MUTATION.** Precondition: `graphify-out/graph.json` exists
+  (2,699,640 B, 2026-11-01 00:24), so `existsSync(join(ctx.location.directory, "graphify-out",
+  "graph.json"))` is true. A second harness pointed at `/tmp/definitely-no-graphify-here` confirmed
+  the opposite branch: one hook still registers, and the command is returned unchanged.
+- **Git safety.** `git status --short` → empty. `git diff --cached --stat` → empty.
+  `git diff --stat` → empty. Nothing was staged, committed, or stashed, and no tracked file changed.
+- **Restart required.** The long-lived `opencode serve` reads config and plugin discovery at startup,
+  so the current session still runs the old loader path. OpenCode must be restarted to pick this up.
+- **Retrieval:** `memory_search` executed and surfaced `docs/research/v2-plugin-contract-verification.md`
+  (package identity + auto-discovery evidence); `knowledgebase_search` NOT executed — the tool replied
+  "Knowledgebase not available: DATABASE_URL is not configured", so the PG vector layer is unavailable
+  in this `opencode serve` parent and the documented graceful-degradation path applied.
