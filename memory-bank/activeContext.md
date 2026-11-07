@@ -1,7 +1,7 @@
 ---
 id: "activeContext"
 title: "Active Context"
-updated: "2026-11-04"
+updated: "2026-11-07"
 tags: [coder, architect, implementer, deployer, knowledgebase, pgvector, mcp, embeddings, implementation-planning, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, bootstrap, npm, package-structure, readme, feature-vocab-sync, pre-commit, vocabulary, knowledge-vector-gaps, graceful-failure, agents, orchestrator, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, documentation, verification, implementation, discovery, env-var-shadowing, mcp-config, restart, reviewer, refactor, configuration]
 entities: [vitest, graphify, memory-bank, husky, opencode, architecture-context, knowledgebase, pgvector, npm]
 category: "context"
@@ -1064,3 +1064,32 @@ Completed the remaining five batches of `plan/feature-matt-skills-expansion-v1.m
 **Batch H/I.** `npm install` exit 0 (258 packages). `npm run test:unit` → 28 files / 835 tests passed. `npm run test:unit:coverage` → 96.51% statements, 93.89% branches. `npx playwright test` → 7 passed / 1 skipped. Live upstream re-fetch → 10/10 pinned entries, 15/15 files, 0 mismatches. T30(f) live label creation **not executed** (operator consent withheld); idempotency proven against a fake `gh` state instead.
 
 **Retrieval:** memory-bank and knowledgebase MCP tools unavailable in this runtime; files were read directly. `knowledgebase_search` NOT executed (MCP tool absent).
+
+## Current focus — 2026-11-07
+
+- Agentic-workflow latency was diagnosed as structural overhead (per-spawn context bootstrap + serial human gates), not model-only.
+- Next: apply the top-three config changes (delete Step 7, Step 0 shell check, conditional instruction reads), then re-measure one TDD pipeline end to end and compare spawn count and input tokens.
+
+## Reviewer — C1/C2/C3 review — 2026-11-07
+
+**Status:** ⚠️ CHANGES REQUESTED (no BLOCKING) — range `128eab2..HEAD`, 2 commits, 18 files, +239/−157.
+
+**Verified:** C1 clean in all three orchestrators (`grep "Step 7"` → 0), and its justification holds — `tracker.md:20,27` appends a `## Session:` entry. C2's bootstrap block is retained verbatim (no `+`/`−` inside the fence) with `Base path: "{basePath}"` and covers all three trio members. C3 consistent across 8 agent specs; `documentation-handoff` mandatory in 8 specs + 3 digest blocks, `quality-gates` in unit-tester/reviewer/digest. No `tools:`/`permissions:` row changed; no `tests/` file touched; pinned parity counts re-derived by grep (2 / 6 / 2).
+
+**Two MAJOR (both Step 0):** (1) the trio check is cwd-relative while `basePath` is a declared parameter — a non-cwd run checks the wrong tree; (2) `test -s` proves non-empty, not "real content", so a template-only file skips the regeneration the retained bootstrap block still requires. **MINOR:** `README.md:165,167` still describe the old first-run/lessons flow; `reviewer.md:292` says "two exemptions" (three exist) and lacks the `exempt (subagent→orchestrator)` recording clause; deleted Step 6 took TDD Session fields (`Coverage`, `TDD Iterations`) out of every spec; TEST-09 now passes on pointer prose alone (no test asserts Step 2b/3b exists); the `memory-bank.instructions.md` trigger misses `activeContext`/`progress` writes; both `updated:` fields stale at 2026-11-04.
+
+**Not run / not verifiable here:** the trio command (reviewer allowlist has no `test` — substituted `wc -c`, all three non-empty), YAML parse (no parser), and the 31 files / 906 tests figure (cited from coder/deployer, unverified). GATES: NOT DECLARED. `knowledgebase_search` skipped (DATABASE_URL unset); `memory_search` executed, 3 results, none specific.
+
+**Versioning:** 2.6.0 → 2.7.0 → 2.8.0 for one logical change (pre-commit hook; no `SKIP_BUMP`). Expected hook behaviour, contrary to the batch intent — squash pre-push to 2.7.0. Nothing published.
+
+## Coder — reviewer-fix pass, 8 findings — 2026-11-07
+
+**Status:** ✅ SUCCESS — all eight findings closed; nothing staged, committed, or pushed.
+
+**MAJOR (Step 0, all three orchestrators):** the probe now interpolates `{basePath}` and adds a template-only guard — `test -s "{basePath}/docs/.architecture-context.md" && grep -q '^## ' "{basePath}/docs/.architecture-context.md" && test -f "{basePath}/memory-bank/progress.md" && test -f "{basePath}/memory-bank/activeContext.md"`. Measured here: exit 0 against `basePath="."` and the absolute path, exit 1 for an empty architecture-context and for one holding text but no `##` heading. A clause states `{basePath}` defaults to the current working directory; the two "reads no file content" claims (intro line, Guidelines bullet) were corrected to "existence and headings only".
+
+**MINOR (six):** `README.md` run-flow and bootstrap bullets rewritten to the inline-probe / non-zero-exit delegation semantics, dropping the `learned-knowledge.instructions.md` write claim; `reviewer.md` "two exemptions" → "three exemptions" plus a new `**Exemption.**` recording bullet for `exempt (subagent→orchestrator)`; the digest block in all three orchestrators extends the `memory-bank.instructions.md` trigger to "before creating or updating any file under `memory-bank/`"; `tracker.md` names the three Session ledger fields (`Pipeline`, `Coverage`, `TDD Iterations`); both frontmatter `updated:` fields bumped to 2026-11-07; `tests/spec-orchestrator-parity.test.js` gained three digest-block assertions (heading present + `memory_search` + `memory-bank/tasks/` + `learned-knowledge`), proven non-vacuous by deleting the `feature-pipeline.md` heading (1 failed / 13 passed) and restoring it (14 passed).
+
+**Verification:** `npm run test:unit` → 31 files, 909 tests, 0 failures (906 before the 3 added cases). `node scripts/validate-memory-schema.js` exit 0. Pinned parity counts unchanged by grep: orchestrator 2, feature-pipeline 2 `knowledgebase_knowledgebase_search`, tdd 6.
+
+**Deliberately not changed:** the `deployer.md` per-spawn read cost and the 2.7.0 versioning squash — both are follow-on work, not review findings against this range.

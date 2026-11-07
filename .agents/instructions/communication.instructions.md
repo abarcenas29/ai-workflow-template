@@ -117,7 +117,7 @@ The standard binds chat replies in full, and reaches markdown artifacts
 through their prose only.
 
 - Chat replies carry the full envelope: all four slots, fixed order, caps
-  respected.
+  respected. A subagent→orchestrator reply is the single exception (Exemption 3).
 - Markdown artifacts keep their existing skeletons and only their prose
   follows these rules (see `## Artifacts`).
 - `memory-bank/*.md` (the agent context store) is excluded (see `## Artifacts`).
@@ -181,7 +181,8 @@ exactly one reference line.
 ## The Envelope
 
 Every chat reply is four literal `##` headings, in a fixed order, with no
-renaming, no substitutions, and no extra slots.
+renaming, no substitutions, and no extra slots. The one exception is a reply whose reader
+is the orchestrator that spawned it — Exemption 3, under `### Exemptions`.
 
 If a slot has nothing to report, keep the heading and write a single bullet
 `None.` — never drop the heading. A dropped heading is indistinguishable from
@@ -254,7 +255,7 @@ answers "what should we do, and what does each option cost".
 
 ### Rules common to both variants
 
-- Overall cap: 40 lines per chat reply.
+- Overall cap: 40 lines per chat reply, except a reply under Exemption 3.
 - Tables and verbatim quotes do not count toward the 40 lines, but stay inside
   the slot they belong to.
 - Caps are maxima; slot 1 is a range of 1–3 sentences.
@@ -275,7 +276,20 @@ line count, are the real guard.
 - **Exemption 2 — verbatim relays.** When relaying sub-agent (an agent the
   orchestrator launched for one step) or user text verbatim, the 40-line cap
   is lifted.
-- Both exemptions require one line stating that the reply exceeds the cap and
+- **Exemption 3 — subagent→orchestrator replies.** A reply whose reader is the
+  orchestrator that spawned the step is exempt from the four-slot envelope and from the
+  40-line cap. The orchestrator is a machine consumer: it captures the summary, applies a
+  returned `### Documentation handoff`, and relays the text. Four headings and a
+  `**Communication:**` line buy that relay nothing, and the cap cuts exactly the detail the
+  orchestrator needs. Unlike Exemptions 1 and 2, no overrun declaration is required: this
+  exemption is structural — it follows from who the reader is, not from a judgement about
+  the reply — so it cannot be claimed by relabelling a user-facing reply. A direct
+  invocation by the user, and every orchestrator reply to the user, stay fully bound, and
+  an agent spec may bind its own reply more tightly than this exemption (the reviewer does,
+  at `.opencode/agents/reviewer.md`). The reviewer's `### Communication standard check`
+  still runs; a sampled upstream reply that sits under this exemption is recorded as
+  `exempt (subagent→orchestrator)`, never as a finding.
+- Exemptions 1 and 2 require one line stating that the reply exceeds the cap and
   which exemption applies. An undeclared overrun is a violation; a declared
   one is not.
 - An exemption lifts the per-slot cap on the slot it affects and the overall

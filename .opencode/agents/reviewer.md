@@ -168,12 +168,9 @@ finding stops the merge; the orchestrator routes the repair to a coder.
 
 ## Approach
 
-0. **Check Knowledge**: Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol.
-   Use `memory_bank_memory_search`/`memory_bank_memory_get` for project context and known issues.
-   Skim `.agents/instructions/learned-knowledge.instructions.md` for review patterns, known bug classes, and security gotchas.
-   Call `knowledgebase_knowledgebase_search` with review-relevant queries (common vulnerability patterns, recurring code-quality issues).
-   State the result in your final summary.
-   - **Communication:** Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output.
+0. **Context Retrieval (conditional reads)**: Follow the 3-layer knowledge-retrieval protocol in `.agents/instructions/knowledge-retrieval.instructions.md`. Start with `memory_bank_memory_search`/`memory_bank_memory_get`. Read `.agents/instructions/memory-bank.instructions.md` ONLY when you are about to create or edit a task file under `memory-bank/tasks/`. Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when this review matches a prior session — name the matching session (date and title) before reading; if you cannot name one, skip it. Call `knowledgebase_knowledgebase_search` with review-relevant queries (common vulnerability patterns, recurring code-quality issues). State the result in your final summary.
+   - **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader, or when you run the `### Communication standard check`, which needs the envelope definition — your `change-framed` envelope applies when you write for the user. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
+   - **Mandatory, never conditional:** `.agents/config/quality-gates.md` (gate status reporting) and `.agents/instructions/documentation-handoff.instructions.md` (the handoff block you return).
 1. **Understand Scope**: Determine what code needs review (files, diff, or full module). If the scope is a **merge**, establish the merge base and both tips first — the review subject is the resolution, not the resolved files (see "Merge reviews" below).
 2. **Read Thoroughly**: Read all relevant files completely before forming opinions.
 3. **Analyze Systematically**: Check in order: correctness → security → performance → style → test quality.
@@ -286,13 +283,16 @@ exactly the hole it fills: reply text is never in a diff, so nothing else counts
 - **Record.** Extend that same line — `**Communication:** ✅ spot-check pass (implementer, stage 3)` or
   `**Communication:** ⚠️ N findings; spot-check fail S2 (implementer, stage 3)` — and add one
   `## Evidence` bullet with the line count. Quote the sample by reference, stage and agent, never pasted.
+- **Exemption.** A sampled upstream reply whose reader is the orchestrator that spawned it (Exemption 3 in
+  the communication standard's `### Exemptions`) is recorded as `exempt (subagent→orchestrator)`, never as a
+  finding: the envelope and line cap do not bind it, so its slot count and length are not pass/fail criteria.
 - **On fail.** A 🔵 minor finding naming the producing agent, plus the sample reference in your slot 4 next
   step so the user can open it. It blocks nothing and never changes the verdict.
 
 1. **Slots present.** The four headings for the producer's variant appear, literally, in the fixed order
    defined in the `## The Envelope` section of the communication standard.
 2. **Caps respected.** 1–3 sentences / ≤8 bullets / ≤5 bullets / ≤5 bullets, and ≤40 lines overall — or the
-   overrun is declared, with a reason that is one of the two exemptions.
+   overrun is declared, with a reason that is one of the three exemptions.
 3. **Vocabulary.** Every term is glossed in ≤10 words or anchored to a path/line on first use; identifiers,
    paths, and API names are followed by a one-line plain-language clause.
 4. **Evidence.** Every claim carries an evidence marker.

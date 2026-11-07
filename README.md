@@ -162,9 +162,9 @@ Invoke the orchestrator with `@orchestrator` followed by your task:
 @orchestrator fix the pagination bug in the search results component
 ```
 
-- **Run flow:** auto-bootstraps architecture on first run → builds a pipeline → executes agents sequentially (confirm/skip each step, or enable auto-confirm) → tracker documents to `docs/tracker-log.md` → persists new knowledge.
+- **Run flow:** checks architecture context inline (a `test`/`grep` probe over `docs/.architecture-context.md` and the two core memory-bank files) → builds a pipeline → executes agents sequentially (confirm/skip each step, or enable auto-confirm) → tracker documents to `docs/tracker-log.md` → persists new knowledge.
 - **Scope step (conditional, runs first):** inserted at the front of the pipeline only when the request is underspecified — `scope` runs grilling rounds against a draft file, writes `docs/spike-<feature>.md`, then hands off to `researcher` or `implementer`. Always interactive (auto-confirm cannot skip it) and has **no command-execution permission** — prototypes are delegated to `coder` (logic) or `designer` (UI).
-- **First run only:** runs the architecture-blueprint-generator skill to detect tech stack/patterns, writing context to `docs/.architecture-context.md` and `.agents/instructions/learned-knowledge.instructions.md`; later runs skip this.
+- **Bootstrap (conditional):** the architecture-blueprint-generator skill runs only when that probe exits non-zero — `docs/.architecture-context.md` is missing, empty, or template-only (no `##` section), or a core memory-bank file is missing. It writes `docs/.architecture-context.md`; a probe that exits 0 skips the delegation entirely, so later runs never reach it.
 
 ### MCP Tooling
 

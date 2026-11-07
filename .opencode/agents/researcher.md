@@ -69,12 +69,11 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 
 ### 0a. Check Knowledge
 
-- Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol
-- Use `memory_bank_memory_search`/`memory_bank_memory_get` for project context
-- Skim `.agents/instructions/learned-knowledge.instructions.md` for relevant research patterns and ecosystem findings
+- Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol. Start with `memory_bank_memory_search`/`memory_bank_memory_get`. Read `.agents/instructions/memory-bank.instructions.md` ONLY when you are about to create or edit a task file under `memory-bank/tasks/`. Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when this spike matches a prior session — name the matching session (date and title) before reading; if you cannot name one, skip it.
 - Call `knowledgebase_knowledgebase_search` with queries relevant to the spike's technology domains, past patterns, and known gotchas
 - State the result in your final summary
-- **Communication:** Read `.agents/instructions/communication.instructions.md` and follow the `decision-framed` envelope for all user-facing output.
+- **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader (a direct invocation, or text you write for the user) — that is when your `decision-framed` envelope applies. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
+- **Mandatory, never conditional:** `.agents/instructions/documentation-handoff.instructions.md` — read it before composing a reply that returns a handoff block.
 
 ### 0b. Investigation Planning
 

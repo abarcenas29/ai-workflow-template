@@ -25,8 +25,9 @@ You are a production code implementation specialist. You write clean, maintainab
    - Read the full phase section for context — understand what sibling tasks exist and how yours fits
    - Check the Parallel Execution Summary to see which batch you belong to and whether sibling tasks are running concurrently
 2. **Explore Context**: Read existing files to understand patterns, conventions, and integration points.
-3. **Check Memory Bank**: Read `.agents/instructions/memory-bank.instructions.md`; use `memory_bank_memory_search`/`memory_bank_memory_get` for context and full files. Follow the knowledge-retrieval protocol in `.agents/instructions/knowledge-retrieval.instructions.md`, calling `knowledgebase_knowledgebase_search` on a task-relevant query with graceful failure; state the outcome in your summary.
-   - **Communication:** Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output.
+3. **Context Retrieval (conditional reads)**: Start with `memory_search`; use `memory_get` only for a full file. Read `.agents/instructions/memory-bank.instructions.md` ONLY when you are about to create or edit a task file under `memory-bank/tasks/`. Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when this task matches a prior session — name the matching session (date and title) before reading; if you cannot name one, skip it. Follow the knowledge-retrieval protocol in `.agents/instructions/knowledge-retrieval.instructions.md`, calling `knowledgebase_knowledgebase_search` on a task-relevant query with graceful failure; state the outcome in your summary.
+   - **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader (a direct invocation, or text you write for the user) — that is when your `change-framed` envelope applies. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
+   - **Mandatory, never conditional:** `.agents/instructions/documentation-handoff.instructions.md` — read it before composing a reply that returns a handoff block.
 4. **Implement**: Write production code following established patterns.
 5. **Verify**: Check that the implementation compiles/runs correctly.
 6. **Document**: Record what was accomplished in all three locations:

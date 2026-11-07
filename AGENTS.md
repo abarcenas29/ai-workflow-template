@@ -218,7 +218,7 @@ Always ask user permission before: creating files, running commands, modifying t
 
 ### Feature Pipeline — Stripped-Down Sequential Pipeline
 
-Use this when you want a fixed, opinionated pipeline: **implementer → designer → coder → tracker**. It bootstraps architecture context, supports step-by-step confirmation, logs progress, and persists lessons learned.
+Use this when you want a fixed, opinionated pipeline: **implementer → designer → coder → tracker**. It checks architecture context with an inline existence test, supports step-by-step confirmation, and logs progress.
 
 The agent file is at `.opencode/agents/orchestrator/feature-pipeline.md`.
 
