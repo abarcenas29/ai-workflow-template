@@ -1,7 +1,7 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-11-04"
+updated: "2026-11-07"
 
 tags: [architect, coder, implementer, deployer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, agents, env-var-shadowing, mcp-config, restart, refactor, configuration]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
@@ -3144,3 +3144,53 @@ git-ignored, so the merge could not update them and the running config was still
   (package identity + auto-discovery evidence); `knowledgebase_search` NOT executed — the tool replied
   "Knowledgebase not available: DATABASE_URL is not configured", so the PG vector layer is unavailable
   in this `opencode serve` parent and the documented graceful-degradation path applied.
+
+## 2026-11-07 — Agentic workflow latency diagnosis
+
+- Confirmed per-spawn prelude: each delegation re-reads ~2,000–2,300 lines (~24–27k tokens) of instructions before any task work; pipelines run 6–12 delegations.
+- Ranked bottlenecks: per-spawn context bootstrap (35–50% of model time), human pauses (unbounded, `autoConfirm:false` default + stacked gates), duplicate Step 7 tracker pass, Step 0 bootstrap spawn, per-agent reindex churn.
+- Confirmed mismatch: TDD default `minCoverage: 90` vs `.agents/config/quality-gates.md` declaring no coverage threshold — the loop can re-run RED/GREEN three times against an unset number.
+- Recommended surgical fixes: delete Step 7, replace Step 0 with a shell existence check, make instruction reads conditional, default `autoConfirm: true`, one reindex per step.
+- No files changed: read-only investigation.
+
+## 2026-11-07 — Reviewer: C1/C2/C3 review
+
+- **Range:** `128eab2..HEAD` — 2 commits, 18 files, +239/−157.
+- **Verdict:** push after two MAJOR Step-0 fixes; nothing BLOCKING.
+- **MAJOR 1:** Step 0's trio check (`orchestrator.md:46`, `feature-pipeline.md:39`, `tdd-orchestrator.md:62`) is cwd-relative, but `basePath` is a declared parameter — a non-cwd run checks the wrong tree and can skip bootstrap for the target.
+- **MAJOR 2:** `test -s` cannot distinguish template-only from real content, while the retained bootstrap block (`orchestrator.md:66`) still says to regenerate a template-only file — the check can mask the condition it exists to fix.
+- **C1** is sound: Step 7/5/6 removed from all three orchestrators, `tracker.md:20,27` already appends the `## Session:` entry. Cost: the deleted tdd Step 6 was the only spec naming `Coverage:` and `TDD Iterations:` for that entry.
+- **C2** capability check PASS: bootstrap block retained verbatim, covers architecture context and memory-bank core files, keeps `Base path: "{basePath}"`.
+- **C3** consistent across `architect`, `coder`, `designer`, `implementer`, `researcher`, `reviewer`, `tracker`, `unit-tester`; `documentation-handoff` and `quality-gates` remain mandatory. `reviewer.md:292` still says "two exemptions" though three now exist.
+- **Test integrity:** no `tests/` file changed; pinned counts re-derived by grep (2 / 6 / 2) so the parity tests still pass their exact-count assertions — but TEST-09 now passes on pointer prose alone, and no test asserts Step 2b/3b exists.
+- **Residual cost:** `deployer.md` still reads `learned-knowledge` (773 lines) + `communication` (414 lines) per spawn, ~2 spawns per pipeline — the highest-value remaining target. `e2e-tester.md` and `scope.md` secondary.
+- **Versioning:** 2.6.0 → 2.7.0 (`2d19d3f`) → 2.8.0 (`HEAD`) for one logical change; pre-commit hook with no `SKIP_BUMP`. Squash pre-push; nothing published.
+
+## 2026-11-07 — Coder: reviewer-fix pass (8 findings)
+
+- **Status:** ✅ SUCCESS — 8/8 findings fixed across 7 files; nothing staged or committed.
+- **Step 0 (MAJOR, ×3 files):** probe is now `test -s "{basePath}/docs/.architecture-context.md" && grep -q '^## ' "{basePath}/docs/.architecture-context.md" && test -f "{basePath}/memory-bank/progress.md" && test -f "{basePath}/memory-bank/activeContext.md"`; exit 0 here, exit 1 for empty and heading-less files. Added a `{basePath}` = cwd default clause and corrected the "reads no file content" claims to "existence and headings only".
+- **README:** run-flow + bootstrap bullets now describe the inline trio probe and the non-zero-exit delegation; the false claim that bootstrap writes `learned-knowledge.instructions.md` is removed.
+- **reviewer.md:** "two exemptions" → "three exemptions"; new `**Exemption.**` spot-check bullet records a sampled upstream reply as `exempt (subagent→orchestrator)` rather than a finding.
+- **Digest blocks (×3):** `memory-bank.instructions.md` read trigger extended to any create/update under `memory-bank/`, not just `memory-bank/tasks/`.
+- **tracker.md:** the `## Session:` entry now names `**Pipeline:**`, `**Coverage:** {coverage}%`, `**TDD Iterations:** {N}` — the fields the deleted TDD Step 6 was the last spec for.
+- **Test integrity:** 3 digest-block assertions added to `tests/spec-orchestrator-parity.test.js`; pinned counts untouched (2 / 2 / 6). Suite 31 files / 909 tests / 0 failures; `validate-memory-schema.js` exit 0. Non-vacuity proven by removing the `feature-pipeline.md` heading (FAIL) and restoring (PASS).
+
+## 2026-11-07 — Deployer: branch collapsed to one commit (v2.7.0)
+
+- **What:** `perf/agentic-pipeline-latency` held two commits for one logical change — `2d19d3f` (docs diagnosis, v2.7.0) and `442c365` (perf fixes, v2.8.0) — because the pre-commit `bump-version.js` hook bumps a minor on every commit and no `SKIP_BUMP` was set.
+- **How:** `git reset --soft 128eab2` re-staged both commits and preserved the 9 uncommitted review-fix edits, then one commit `cee8a49` was made with `SKIP_BUMP=1` so the version stayed put. The 20-file set was staged by explicit path after diffing it against the expected list.
+- **Version:** settled to `2.7.0` in `package.json:3` and both `package-lock.json` entries (root + `packages[""]`); base `128eab2` was `2.6.0`, so this is exactly one minor bump.
+- **Contents:** 20 files, +361/−163 — three orchestrators, eight agent specs, `AGENTS.md`, `README.md`, both memory-bank files, `package.json`, `package-lock.json`, `tests/spec-orchestrator-parity.test.js`, and the two instruction files.
+- **Verification:** `npm run test:unit` → 31 files / 909 tests / 0 failures; `git status --porcelain` empty; `git rev-list --count origin/main..HEAD` = 1.
+- **Safety:** the branch was never pushed (`git ls-remote --heads origin` returned empty), so the rewrite touched no remote. Not pushed, not tagged, no PR — the operator pushes next.
+- **Rollback:** `git reset --hard 442c3653b658a7ce29a7dfd3c312350c76b74a5d` restores the pre-collapse tip.
+
+## 2026-11-07 — Implementer: deployer conditional-reads follow-up ticket
+
+- **Filed:** issue #45 — `perf(agents): make deployer per-spawn reads conditional` (open; label `enhancement`).
+- **Why:** `deployer.md` Approach step 3 (lines 25–29) still mandates flat reads of `learned-knowledge.instructions.md` (773 lines) and `communication.instructions.md` (414 lines) per spawn, and the deployer is spawned ~twice per pipeline. Named by the C1/C2/C3 review as the highest-value remaining target after `5b15342`.
+- **Scope:** deployer only. Non-goals: the three orchestrators, the eight already-conditional specs, `planner.md`. `e2e-tester.md` (~25/26), `scope.md` (~264/269), and `planner.md` (~92) are recorded as secondary inside the same ticket, not split.
+- **Finding — missing labels:** the tracker doc's `ready-for-agent` and `wayfinder:*` labels do not exist on `abarcenas29/ai-workflow-template` (only GitHub defaults). #45 carries `enhancement`; run `/setup-matt-pocock-skills` to create the declared labels, then add `ready-for-agent`.
+- **Finding — AC (e):** `deployer.md` has no `### Documentation handoff` text of its own and its `edit: "*"` grant covers `memory-bank/**`/`docs/**`, so the mandatory requirement lives in the orchestrator delegation template. AC (e) was written to verify that requirement stays unchanged, not to preserve text in `deployer.md`.
+- **Retrieval:** `memory_search` executed — 5 results; `knowledgebase_search` skipped (`DATABASE_URL` not configured).

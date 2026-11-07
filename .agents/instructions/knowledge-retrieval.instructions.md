@@ -9,14 +9,18 @@ This protocol is **mandatory to attempt** but **graceful to fail** — no layer 
 
 ## Layer 1: Memory Bank (always available — embedded SQLite)
 
-Read `.agents/instructions/memory-bank.instructions.md`. Use `memory_bank_memory_search`
-for semantic context retrieval and `memory_bank_memory_get` for full file reads.
+Start with `memory_bank_memory_search` for semantic context retrieval and
+`memory_bank_memory_get` for full file reads. Read
+`.agents/instructions/memory-bank.instructions.md` itself ONLY when you are about to create
+or edit a task file under `memory-bank/tasks/` — its conventions are load-bearing there and
+redundant elsewhere.
 
 ## Layer 2: Learned Knowledge (always available — git-committed markdown)
 
-Skim `.agents/instructions/learned-knowledge.instructions.md` for patterns, conventions,
-gotchas, and agent tuning notes relevant to your role and current task. Focus on sessions
-that match your pipeline type and agent role.
+Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when the current task
+matches a prior session. Decide by naming the matching session (date and title) in your
+reasoning; if you cannot name one, skip the file. When it does match, focus on the sessions
+that share your pipeline type and agent role.
 
 ## Layer 3: Cross-Project Knowledgebase (graceful — requires PG + pgvector)
 
@@ -63,7 +67,7 @@ derive it from `package.json` `name` the same way.
 ## Retrieval Order
 
 1. Memory bank (`memory_bank_memory_search` + `memory_bank_memory_get`)
-2. Learned knowledge (skim `.agents/instructions/learned-knowledge.instructions.md`)
+2. Learned knowledge (only when a prior session matches, per Layer 2)
 3. Knowledgebase (`knowledgebase_knowledgebase_search` with graceful failure)
 4. Project files (read specific source files as needed)
 5. Proceed with the task

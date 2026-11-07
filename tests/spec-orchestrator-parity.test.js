@@ -275,3 +275,45 @@ describe('documentation handoff receivers exist in every orchestrator', () => {
     }
   )
 })
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Per-spawn digest blocks — the policy must exist, not just be pointed at.
+// The delegation templates above only mention "the Step 3b/2b block", so they
+// keep passing if the block itself is deleted. This assertion pins the heading
+// and the three conditional-read terms inside it.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const DIGEST_BLOCKS = [
+  ['orchestrator.md', ORCHESTRATOR_PATH, '### Step 3b: Per-Spawn Context Digest and Read Policy'],
+  ['feature-pipeline.md', FEATURE_PIPELINE_PATH, '### Step 2b: Per-Spawn Context Digest and Read Policy'],
+  ['tdd-orchestrator.md', TDD_ORCHESTRATOR_PATH, '### Step 3b: Per-Spawn Context Digest and Read Policy'],
+]
+
+const DIGEST_POLICY_TERMS = ['memory_search', 'memory-bank/tasks/', 'learned-knowledge']
+
+describe('per-spawn context digest blocks exist with the read policy', () => {
+  it.each(DIGEST_BLOCKS)(
+    '%s digest block is present and carries memory_search + memory-bank/tasks/ + learned-knowledge',
+    (_label, path, heading) => {
+      const content = readRepoFile(path)
+      const headingIndex = content.indexOf(heading)
+
+      expect(
+        headingIndex,
+        `${path} must contain the digest heading '${heading}'`
+      ).toBeGreaterThan(-1)
+
+      // Extent of the block: the heading up to the next ## or ### heading.
+      const rest = content.slice(headingIndex + heading.length)
+      const nextSection = rest.search(/\n#{2,3} /)
+      const block = nextSection === -1 ? rest : rest.slice(0, nextSection)
+
+      for (const term of DIGEST_POLICY_TERMS) {
+        expect(
+          block.includes(term),
+          `digest block in ${path} must contain '${term}'`
+        ).toBe(true)
+      }
+    }
+  )
+})
