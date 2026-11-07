@@ -121,7 +121,7 @@ Post-install, your project receives this structure:
 └── prompts/        # Reusable prompt templates
 .opencode/
 ├── agents/         # Orchestrator + specialized sub-agents
-├── commands/       # Slash commands (incl. /setup-matt-pocock-skills)
+├── commands/       # Slash commands (incl. /health, /setup-matt-pocock-skills)
 └── plugins/        # graphify knowledge-graph plugin
 memory-bank/        # Persistent project context (+ tasks/)
 scripts/            # Sync, memory, and knowledgebase CLI helpers
