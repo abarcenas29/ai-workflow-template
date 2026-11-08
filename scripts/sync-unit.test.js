@@ -1563,6 +1563,17 @@ describe('project-owned files', () => {
     expect(example.instructions).toEqual(['AGENTS.project.md'])
   })
 
+  it('pins the third-party dcp plugin in the shipped example', () => {
+    const example = JSON.parse(
+      readFileSync(join(repoRoot, 'opencode.mcp.example.json'), 'utf8'),
+    )
+
+    // Exact-array equality is deliberate: it fails if the entry is dropped,
+    // re-unpinned to @latest, or if a local .opencode/plugins path is added,
+    // which would contradict D-7/D-13.
+    expect(example.plugins).toEqual(['@tarquinen/opencode-dcp@3.2.0'])
+  })
+
   it('scaffolds opencode.json with the project instructions entry', () => {
     const example = readFileSync(
       join(repoRoot, 'opencode.mcp.example.json'),

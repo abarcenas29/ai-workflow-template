@@ -72,6 +72,9 @@
       "enabled": true
     }
   },
+  "plugins": [
+    "@tarquinen/opencode-dcp@3.2.0"
+  ],
   "permission": {
     "ddg-search_*": "allow",
     "github_*": "allow",

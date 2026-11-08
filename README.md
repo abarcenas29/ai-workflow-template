@@ -122,7 +122,7 @@ Post-install, your project receives this structure:
 .opencode/
 ├── agents/         # Orchestrator + specialized sub-agents
 ├── commands/       # Slash commands (incl. /health, /setup-matt-pocock-skills)
-└── plugins/        # graphify knowledge-graph plugin
+└── plugins/        # graphify plugin (loaded automatically)
 memory-bank/        # Persistent project context (+ tasks/)
 scripts/            # Sync, memory, and knowledgebase CLI helpers
 AGENTS.md           # Master instruction file with agent guidance
@@ -249,6 +249,70 @@ All memory-bank files use YAML frontmatter (`id`, `title`, `updated`, `tags`, `e
 | --- | --- |
 | Read all memory files | ~5,000–15,000+ |
 | Semantic search | ~500–2,000 (top 3–5 chunks) |
+
+## OpenCode plugins
+
+Your project can load two plugins. One comes with this template. The other is a
+third-party plugin that setup adds to `opencode.json` if the file is missing.
+
+### graphify — ships with this template
+
+`npx ai-workflow-setup` copies a small plugin file to
+`.opencode/plugins/graphify.js`.
+
+OpenCode finds it by itself. It looks in `.opencode/plugins/` when it starts. You
+do not need to add anything to `opencode.json`.
+
+**What it does:** before the first shell command in a session, it adds a short
+reminder about `graphify-out/`. The reminder tells the agent to run
+`graphify query` instead of grepping raw files. It adds the reminder at most once
+each time OpenCode starts.
+
+**When it does nothing:** if your project has no `graphify-out/graph.json`, the
+plugin stops before it changes anything. Build a graph with `/graphify` — see
+[Knowledge Graph](#knowledge-graph-graphify).
+
+**To turn it off:**
+
+- Do nothing. Without a graph, the plugin has no effect.
+- To remove it for good, open `.opencode/plugins/graphify.js` and replace it with
+  a plugin that does nothing:
+
+  ```js
+  export default { id: "graphify", setup() {} };
+  ```
+
+  Setup skips files you have changed, so it will not put the plugin back unless
+  you pass `--force`. You also stop getting template updates for that file.
+- Deleting the file is not permanent. The next `npx ai-workflow-setup` copies it
+  again.
+
+### @tarquinen/opencode-dcp — third-party
+
+A new project's `opencode.json` declares this plugin:
+
+```json
+"plugins": ["@tarquinen/opencode-dcp@3.2.0"]
+```
+
+**What it does:** it removes old tool output from the conversation to save tokens.
+
+**Licence:** AGPL-3.0-or-later, a copyleft licence: share your changes if you
+redistribute it. The plugin is not bundled with this template. OpenCode fetches
+it from npm and caches it the first time your project starts.
+
+**To remove it:** delete the entry from the `plugins` array in `opencode.json`,
+then restart OpenCode. `opencode.json` belongs to your project — setup never
+rewrites it.
+
+### Requirements
+
+- **OpenCode V2.** The graphify plugin is written for V2. OpenCode V1 cannot load
+  it.
+- **Setup is the install step.** Installing the npm package copies nothing. There
+  is no `postinstall` script; run `npx ai-workflow-setup`.
+- **Restart OpenCode after setup or an upgrade.** Plugins load when OpenCode
+  starts.
 
 ## Knowledge Graph (graphify)
 
