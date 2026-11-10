@@ -1,7 +1,7 @@
 ---
 id: "activeContext"
 title: "Active Context"
-updated: "2026-11-07"
+updated: "2026-11-10"
 tags: [coder, architect, implementer, deployer, knowledgebase, pgvector, mcp, embeddings, implementation-planning, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, bootstrap, npm, package-structure, readme, feature-vocab-sync, pre-commit, vocabulary, knowledge-vector-gaps, graceful-failure, agents, orchestrator, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, documentation, verification, implementation, discovery, env-var-shadowing, mcp-config, restart, reviewer, refactor, configuration]
 entities: [vitest, graphify, memory-bank, husky, opencode, architecture-context, knowledgebase, pgvector, npm]
 category: "context"
@@ -1093,3 +1093,66 @@ Completed the remaining five batches of `plan/feature-matt-skills-expansion-v1.m
 **Verification:** `npm run test:unit` → 31 files, 909 tests, 0 failures (906 before the 3 added cases). `node scripts/validate-memory-schema.js` exit 0. Pinned parity counts unchanged by grep: orchestrator 2, feature-pipeline 2 `knowledgebase_knowledgebase_search`, tdd 6.
 
 **Deliberately not changed:** the `deployer.md` per-spawn read cost and the 2.7.0 versioning squash — both are follow-on work, not review findings against this range.
+
+
+**Doc-compaction spike + plan (2026-11-10, Implementer):** scope settled `docs/spike-doc-compaction.md`
+(13 decisions D-1…D-13, 4 deferrals O-1…O-4, frontier empty) and this step wrote
+`plan/feature-doc-compaction-prompt-v1.md` for the one-file deliverable
+`.agents/prompts/doc-compaction.prompt.md` (still absent — nothing implemented). The plan is 4 tasks
+in 3 batches and is deliberately **sequential**: the deliverable is one Markdown file, so batches are
+write phases (T1 stages eight body blocks → T2 assembles in one pass → T3 verifies against the D/REQ
+coverage tables → T4 gate), not workstreams. Six plan-level choices inside the spike's bounds are
+recorded as DR-01…DR-06; the two that will matter to the coder are DR-04 (six classification classes
+with a hard precedence order, because D-2 and D-10 overlap) and DR-03 (the `report.json` schema is
+fixed at plan time so TEST-06 can grep for field names). `docs/spike-doc-compaction.draft.md` is
+superseded and was not used as authority. Current focus: the plan is ready to execute top-to-bottom
+by a single coder; no packaging edit is needed because `.agents/` is already in `files` and the sync
+copy loop.
+
+**Doc-compaction prompt written (2026-11-10, Coder):** executed
+`plan/feature-doc-compaction-prompt-v1.md` T1→T4 with one agent and no fan-out, and created the
+deliverable `.agents/prompts/doc-compaction.prompt.md` (453 lines, absent before this step). It is
+the only file this work adds. Frontmatter is double-quoted `description` + `name` (folder convention
+overrides the instructions file's single-quote recommendation, per the carry-forward flag) with no
+`agent`/`tools`/`model` field. Body is the six mandated sections in order (`Mission`, `Scope &
+Preconditions`, `Inputs`, `Workflow`, `Output Expectations`, `Quality Assurance`) plus a trailing
+`## Guard rails` — exactly 7 `##` headings, TEST-01. All 13 decisions and 14 requirements have a
+visible home: read-only default and `.doc-compaction/report.json` in both modes (D-1/D-8), the six
+hard-excluded surfaces verbatim (D-10), the six classes with precedence `HARD-EXCLUDED > ARCHIVE >
+CORPUS-GENERATED > HISTORICAL > LIVE` and `AMBIGUOUS` as the no-match fallback (DR-04), the fixed
+`report.json` field list copied rather than re-derived (DR-03), the scored checklist `R1`–`R5` with
+threshold 3 and the "score 0 or no reason row is not a candidate" hard rule (D-4), `MAX_DOCUMENTS =
+200` with the `PARTIAL SCAN` banner in both outputs (D-12), and merge attribution + link/anchor halt
++ diff summary (D-13). Gate: TEST-01…TEST-10 pass; `npx vitest run` exit 0, 33 files / 1,049
+passed. TEST-11/RISK-04 note: TEST-09's `git status` leg was **not** empty — see `progress.md` for
+the two pre-existing entries and why they are not attributable to this step. Current focus: the
+prompt is authored and green; a human dry run in `report` mode against a real corpus is the next
+evidence step, and O-1…O-4 remain deferred by design.
+
+**Doc-compaction prompt review fix pass (2026-11-10, Coder):** the reviewer returned CHANGES
+REQUESTED with 1 BLOCKING / 3 MAJOR / 3 MINOR / 1 COSMETIC, all on
+`.agents/prompts/doc-compaction.prompt.md`; all eight are closed in place. **414 → 472 lines.** The
+blocker was that step 10 executed merges on step 7's checks, which also run in `report` mode against
+a proposal rather than final bytes — step 10 now **re-runs (a) attribution, (b) link/anchor
+verification, and (c) the per-merge diff against the final merged bytes immediately before each
+write**, treats a failed re-check as a per-merge halt identical to step 7's, and forbids writing on a
+`links_verified` value captured earlier in the run. Majors: each removal is now printed as the
+literal `rm '<path>'` / `git rm '<path>'` command one per line before acknowledgement (step 9 and the
+guard rail); the `PARTIAL SCAN` example no longer prints a third path constant (`<path-or-glob>`),
+and the self-contradicting "never silently default to a single root" is now "state the resolved
+roots; do not present a narrowed or single-root scan as a full discovery"; a five-row named
+historical-pattern table (`docs/spike-*`, `**/tracker-log.md`, `TRACKER-INDEX.md`,
+`plan/*-v*.md` complete, `docs/adr/**`) makes historical freeze checkable and bars those paths as
+MERGE targets. Minors: `total_found` added so the capped `file_count` no longer stands in for corpus
+size; `deletions`/`archives`/merge `sources` declared pairwise disjoint; the `null` vs `[]` rule now
+reads "`null` where a scalar value does not apply; list fields are `[]` when empty". Cosmetic: the
+bogus 453 line count corrected (414 pre-fix, 472 post-fix) in `progress.md`, and the RISK-07
+`prompt.instructions.md` relative link added to `Output Expectations`. Gate: TEST-01…TEST-08 plus
+TEST-10 pass, TEST-06 including the new field; `npx vitest run` exit 0, 33 files / 1,049 passed.
+Current focus: awaiting re-review; the human `report`-mode dry run is still the next evidence step.
+
+### Coder pass 3 — doc-compaction prompt cosmetic fix (2026-11-10)
+
+Moved the `**Disjointness.**` paragraph in `.agents/prompts/doc-compaction.prompt.md`
+from between the `archives` and `halted` field-rule bullets to directly below the
+`halted` bullet. The `report.json` field-rules list is now contiguous; the wording of

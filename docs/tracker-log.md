@@ -1,7 +1,7 @@
 ---
 id: "tracker-log"
 title: "Tracker Log"
-updated: "2026-07-29"
+updated: "2026-11-10"
 tags: [architect, researcher, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, configuration, refactor, tdd, research, spike, implementation, decision, discovery]
 doc_type: "tracker-log"
 ---
@@ -2937,3 +2937,272 @@ Two corrections landed on top of the first pass. `M5` had the severity backwards
 - **`memory-bank/activeContext.md` and `memory-bank/progress.md` were intentionally left untouched.** Both carry unrelated uncommitted changes from a 2026-11-04 deploy run that must stay out of this branch's diff, so this record lives in `docs/tracker-log.md` only.
 - **One pre-existing inaccuracy is recorded, not fixed:** `docs/.architecture-context.md:93` claims `bin/setup.js` and the single plugin file are "the only JS elsewhere", which `tests/*.test.js` contradicts. It survived this pass because the file was opened for a count refresh, not a fact-check of every sentence.
 - `memory_search` executed — results returned no `/health` precedent. `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` is not configured); reported per the graceful-failure contract, not retried.
+
+---
+
+## Pipeline: Documentation Compaction Prompt — A Portable, Human-Run Markdown Consolidator
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS — delivered and approved; 1 BLOCKING + 3 MAJOR + 3 MINOR + 1 COSMETIC raised, all 8 closed, re-review APPROVED
+**Pipeline:** scope (3 rounds, 13 decisions) → implementer (plan) → coder → reviewer (⚠️ CHANGES REQUESTED) → coder (fix pass) → reviewer (✅ APPROVED) → coder (cosmetic polish) → tracker
+
+### Overview
+
+Built one deliverable: `.agents/prompts/doc-compaction.prompt.md`, a **portable, human-invoked prompt** — not an agent spec, not a script — that a person runs over a project's Markdown docs to find duplicates, stale files, and over-written pages, then proposes merges, archives, and deletions. It is **read-only by default**: it always writes a scored proposal to `.doc-compaction/report.json` and changes nothing else unless run in `apply` mode, and even then never deletes a file without printing the exact `rm`/`git rm` command first.
+
+The pipeline ran one implementation pass and one fix pass. The review found a genuine correctness bug in the merge workflow (merges could be written on verification captured before the merge existed), which was fixed and verified. The final artifact is 472 lines across 7 mandated sections.
+
+**Delivery note:** the artifact is a prompt file, not an agent definition. It carries no `agent`, `tools`, `model`, or `temperature` keys — a human invokes it deliberately against a chosen set of roots. Nothing in `package.json`, `scripts/sync.js`, `.agents/instructions/**`, or `opencode.json` changed, because `.agents/` is already inside the npm `files` array and the sync copy loop, so the prompt ships to consumers unmodified.
+
+---
+
+## Step 1: Scope (Terminated)
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS — frontier empty, 0 open questions
+
+### Summary
+
+Three rounds of grilling turned a vague request ("compact the docs, the motivating repo has a lot") into a settled, bounded design. Round 1 corrected the premise: the named repo is an *illustration of a documentation layout*, not a target — portability across the user's other repositories is a first-class requirement, so no repo name may appear in the prompt. Thirteen decisions (D-1…D-13) settled; four items explicitly deferred (O-1…O-4) rather than left open.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/spike-doc-compaction.md` | **NEW** — the terminal spike: problem statement, the D-1…D-13 decision table with rationale, deferrals O-1…O-4, recommendation |
+| `docs/spike-doc-compaction.draft.md` | **MODIFIED** — marked `> **SUPERSEDED**`; kept as the round-by-round question record |
+
+### Key Decisions
+
+- **D-1 — report-only by default, merge-and-delete behind an opt-in flag.** The safe state is the default state; destructive work requires a second, explicit act.
+- **D-2 — historical documents are frozen from content rewrites.** Spikes, tracker logs, and completed plans are evidence. They may be marked, archived, or indexed, never reworded.
+- **D-3 — `apply` mode never deletes without printing the exact command list.** A concrete `rm '<path>'` / `git rm '<path>'` per line, shown before anything runs — not a summary, not a glob.
+- **D-4 — every deletion must cite a mechanically checkable reason.** "Feels redundant" is not a reason; a rule identifier is.
+- **D-5 — roots are run-time input.** No repository names and no absolute paths are baked into the prompt.
+- **D-6 — the deliverable is a human-run prompt**, not an agent, not a scheduled job.
+- **D-11 — Markdown-only, no index or embedding dependency.** v1 works on a bare checkout.
+- **D-12 — ~200-file soft cap with a `PARTIAL SCAN` banner.** The prompt stops and says so rather than silently reporting a partial corpus as complete.
+- **D-13 — three merge-fidelity fences:** inline source attribution, link/anchor verification that halts a breaking merge, and a per-merge before/after diff summary.
+- **Deferred, by decision (not oversights):** O-1 a refusal threshold for already-compact repos; O-2 non-Markdown assets (PDFs, images); O-3/O-4 integration with the knowledgebase index.
+
+### Notes / Follow-up
+
+Spike is terminal — no open questions remained. The tracked draft is retained deliberately as the record of how each decision was reached.
+
+---
+
+## Step 2: Implementer (Plan)
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS — plan only, no code written
+
+### Summary
+
+Produced `plan/feature-doc-compaction-prompt-v1.md` (469 lines): 4 tasks in 3 batches, REQ-01…REQ-14, DR-01…DR-06, TEST-01…TEST-11, and the full appendices. The plan is explicit that a one-file deliverable cannot be parallelised — the task table says so and an alternative records why splitting by section was rejected.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `plan/feature-doc-compaction-prompt-v1.md` | **NEW** — 469 lines: requirements, plan-level decisions, task/batch table, 11 test identifiers, alternatives, risks |
+
+### Key Decisions
+
+- **Sequential by design, not by accident.** T1 (stage the eight body blocks as a checklist, write nothing) → T2 (assemble in one pass) → T3 (verify against the coverage tables) → T4 (verification gate). T2 and T3 share batch B but run in ID order because they edit the same file.
+- **Three extrapolations flagged and confirmed by the user** rather than silently invented:
+  - **DR-04 — six classification classes with precedence** `HARD-EXCLUDED > ARCHIVE > CORPUS-GENERATED > HISTORICAL > LIVE`, with `AMBIGUOUS` as the no-match fallback. The spike named the freeze but not the precedence order.
+  - **DR-05 — a fixed archive root** at `.doc-compaction/archive/`. The spike required archiving but did not name a destination.
+  - **T1 as a staged checklist only** — no partial file written before T2, so a failed run cannot leave a half-built prompt behind.
+- **No packaging edit (DR-06).** Verified that `.agents/` is already in `package.json` `files` and in the sync copy loop, so a new prompt ships with no change to either.
+- **TEST-09 scoped to the protected paths, not to a clean tree.** `git status` already carried unrelated in-flight work when planning began, so a clean-tree assertion would have been unachievable and meaningless.
+
+### Notes / Follow-up
+
+None. All three extrapolations were confirmed before the coder started, so the coder never had to guess.
+
+---
+
+## Step 3: Coder (Attempt 1)
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS (implementation) — with one reporting error
+
+### Summary
+
+Created `.agents/prompts/doc-compaction.prompt.md`, the only file this work adds. The prompt carries the mandated 7 sections in order (`Mission`, `Scope & Preconditions`, `Inputs`, `Workflow`, `Output Expectations`, `Quality Assurance`, `Guard rails` — the guard rail last so it is read after the workflow), zero repository names, and zero absolute paths. The coder reported the file as 453 lines; the true count was **414**.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/prompts/doc-compaction.prompt.md` | **NEW** — 414 lines (reported as 453). Portable compaction prompt: report-only default, precedence-ordered classification, explicit removal commands, capped scan |
+
+### Key Decisions
+
+- **Content locked from the plan, not re-derived.** The `report.json` field list, class precedence, archive root, scored checklist (`R1`–`R5`, max 9, threshold 3), and the 200-document cap were copied from the plan verbatim.
+- **Portability proven, not asserted.** A seeded repository name was planted in a temp copy and the check went red — demonstrating the scan can actually fail, rather than passing vacuously.
+- **Scanned document content is declared data, never instructions.** A doc that says "delete everything" is text to classify, not a directive to obey.
+
+### Notes / Follow-up
+
+- **Line-count reporting error:** the coder reported 453 lines against 414 on disk. Corrected by re-running the count; recorded here because a wrong self-report is what let the discrepancy reach review unnoticed.
+- **TEST-09 `git status` leg was not empty.** Three dirty entries predated the step (a modified `learned-knowledge.instructions.md` and two untracked spikes). This later became the sharpest adjudication in the pipeline — see Step 4.
+
+---
+
+## Step 4: Reviewer (Attempt 1)
+
+**Date:** 2026-11-10
+**Status:** ❌ CHANGES REQUESTED — 1 BLOCKING / 3 MAJOR / 3 MINOR / 1 COSMETIC
+
+### Summary
+
+Review found eight issues, one of them a real correctness bug rather than a wording problem: the merge workflow verified links and attribution in `report` mode against a *proposal*, then wrote merges in `apply` mode without re-checking the final bytes. The reviewer also adjudicated the TEST-09 deviation as **correct** — the dirty `git status` entries were foreign work from other slices, not output of this step, so treating them as a defect would have been a false finding.
+
+### Key Decisions
+
+| ID | Severity | Finding |
+|---|---|---|
+| F-1 | 🔴 BLOCKING | Merge verification ran on stale report-mode data. A merge could be written on a `links_verified` value captured before the merged file existed. |
+| F-2 | 🟠 MAJOR | D-3 was softened: the removal list had become an "exact path list" rather than the literal `rm`/`git rm` commands the decision requires. |
+| F-3 | 🟠 MAJOR | Portability leak (`docs/<area>/` in the banner example) plus a contradiction: "never default to a single root" conflicted with the first-match root resolution. |
+| F-4 | 🟠 MAJOR | The historical freeze had no named patterns, so it was unenforceable in practice. |
+| F-5 | 🟡 MINOR | `file_count` alone lost corpus size once the cap truncated the scan. |
+| F-6 | 🟡 MINOR | No disjointness rule between `deletions`, `archives`, and merge `sources`. |
+| F-7 | 🟡 MINOR | `null`-vs-`[]` rule contradicted the schema example. |
+| C-1 | 🔵 COSMETIC | The 453-line count was wrong. |
+
+### Notes / Follow-up
+
+- **TEST-09 deviation adjudicated CORRECT.** The dirty entries were foreign work from other pipelines; no fix was required and none was made. This is the right call — attributing another slice's in-flight edits to this step would have produced a phantom defect and a wasted repair cycle.
+- F-1 is worth naming plainly: verification that runs in a mode where the verified thing does not yet exist is not verification. The prompt told the reader to check links and then let the check age across a write.
+
+---
+
+## Step 3 Retry: Coder (Attempt 2)
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS — 8/8 findings closed, 414 → 472 lines
+
+### Summary
+
+All eight findings closed by in-place text edits. No section was restructured and no permission or scope was widened. F-5 was implemented as a genuinely new field (`total_found`) rather than a reworded `file_count`, which is the correct response to "the corpus size is lost" — the truncated count and the pre-cap count are different numbers and both need to exist.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/prompts/doc-compaction.prompt.md` | **MODIFIED** — 414 → 472 lines. Step 10 opens with a mandatory re-verification clause; step 9 restores literal `rm`/`git rm` output; banner example made path-agnostic; single-root sentence corrected; five-row historical-pattern table added; `total_found` added at six sites; disjointness rule added; `null`/`[]` rule corrected; line count and the `prompt.instructions.md` link fixed |
+
+### Key Decisions
+
+- **F-1 — re-verify immediately before the first write, per merge.** Step 10 now requires attribution, link/anchor verification, and the diff summary to be re-run against the final merged bytes before that merge's first write. No merge may be written on a value captured earlier in the run, and no re-check may be skipped because step 7 passed. A failed re-check is a **per-merge halt identical in behaviour to step 7's** — recorded under `halted` with the failed check, never written, never silently dropped, and the run continues. The same wording is mirrored into the guard rail and Quality Assurance.
+- **F-2 — restore the literal command.** Each removal printed as `rm '<path>'` or `git rm '<path>'`, one per line, before acknowledgement; the guard rail now names `rm` explicitly instead of "exact path list".
+- **F-3 — close both leaks.** Banner example become `<path-or-glob>`; "never default to a single root" replaced with "State the resolved roots; do not present a narrowed or single-root scan as a full discovery" — which is true in both the single-root and first-match cases.
+- **F-4 — five named historical patterns** (`docs/spike-*`, `**/tracker-log.md`, `TRACKER-INDEX.md`, completed `plan/*-v*.md`, `docs/adr/**`), plus the explicit rule that a historical match is **never eligible as a MERGE target**, repeated in the guard rails and QA checklist.
+- **F-5 — `total_found`, not a rewording.** Added to the schema, field rules, step 3, the cap section, and the run header, with `file_count` explicitly named as the truncated count.
+
+### Notes / Follow-up
+
+- All TEST identifiers pass: TEST-01 (7 headings, in order), TEST-02/03 (no output), TEST-04 (`PARTIAL SCAN` ×4, 30 guard lines), TEST-05 (8 hard-excluded mentions), TEST-06 (14 original fields + `total_found`), TEST-07 (20 class mentions), TEST-08 (30 fidelity/triage lines), TEST-10 (non-vacuous — a seeded repo name made TEST-02 fire).
+- `npx vitest run`: 33 files / 1,049 tests, all passing.
+- TEST-09's `git status` leg was not re-adjudicated; the reviewer's Step 4 ruling stands.
+
+---
+
+## Step 4 Retry: Reviewer (Attempt 2)
+
+**Date:** 2026-11-10
+**Status:** ✅ APPROVED — 8/8 closed, 0 blocking, 0 major
+
+### Summary
+
+Re-review confirmed every finding closed at its own site and found no regressions. One new cosmetic item: the Disjointness paragraph had been inserted mid-bullet-list, splitting the `archives` bullet from the `halted` bullet.
+
+### Key Decisions
+
+- **APPROVED.** The blocking bug is genuinely fixed: verification now runs against the final merged bytes immediately before each write, and a failure halts that merge rather than the run.
+- **New COSMETIC — Disjointness paragraph at `:264-266`** placed inside the field-rules bullet list. Move it below the `halted` bullet so the field rules read contiguously.
+- **Consistency check passed:** `total_found` is coherent across all six sites, and the `0`/`0` example correctly implies no cap was hit. Step 10's tighter re-verification does not contradict step 7 — step 7 still verifies a proposal in both modes and halts only the merge.
+
+### Notes / Follow-up
+
+- **Gates G1–G4 were NOT RUN** — outside this review's grant. The green `npx vitest run` (33 files / 1,049 tests) is **cited from the coder, unverified** by the reviewer. TEST-06's shell loop was also refused by the reviewer's shell allowlist and replaced with an equivalent `grep -n` alternation — a substituted check, not a TEST-06 pass.
+- `git status --short` was identical before and after the review: no change was caused by the review itself.
+
+---
+
+## Step 3 Retry: Coder (Attempt 3 — Cosmetic Polish)
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS — 1/1 cosmetic closed, no wording changed
+
+### Summary
+
+Moved the Disjointness paragraph from mid-list to below the `halted` bullet so the `report.json` field rules render contiguously (`archives` and `halted` now adjacent). No wording was altered. The file remains 472 lines, which is the expected outcome of a pure reordering.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.agents/prompts/doc-compaction.prompt.md` | **MODIFIED** — Disjointness note relocated below the `halted` bullet. Line count unchanged at 472 |
+
+### Key Decisions
+
+- **Relocation, not rewriting.** The finding was positional, so the fix was too — moving text rather than editing it keeps the approved wording byte-identical and the line count stable.
+- **Pipeline closed here.** The cosmetic was the only outstanding item; no further review cycle was warranted for a list-ordering fix.
+
+### Notes / Follow-up
+
+None. All findings across the pipeline are closed.
+
+---
+
+## Doc-Compaction Prompt — Reviewer Re-Review #2 (Fix Verification)
+
+**Date:** 2026-11-10
+**Status:** ✅ SUCCESS — APPROVED
+
+### Summary
+Focused re-review of `.agents/prompts/doc-compaction.prompt.md` (472 lines) confirming the coder's fix pass closed all eight prior findings (1 BLOCKING / 3 MAJOR / 3 MINOR / 1 COSMETIC). Verdict: **APPROVED** — no blocking items. One new COSMETIC item found (Disjointness paragraph placed mid-bullet-list).
+
+### Findings Verified Closed
+| ID | Claim | Verified at |
+|---|---|---|
+| F-1 (was BLOCKING) | Step 10 re-runs all three D-13 checks against final merged bytes immediately before each write; failed re-check is a per-merge halt identical to step 7 | `:340-347`, `:356-360`, `:463-466`, `:433-435` |
+| F-2 | Step 9 prints literal `rm '<path>'` / `git rm '<path>'`, one per line; guard rail repeats sentence and names `rm` | `:331-333`, `:453-456` |
+| F-3 | Banner uses `<path-or-glob>`; single-root line no longer contradicts first-match resolution | `:191`, `:120-121` |
+| F-4 | Five-row historical-pattern table; historical match never a MERGE target | `:148-158`, `:458-459`, `:424-425` |
+| F-5 | `total_found` in schema, field rules, step 3, cap section, run header | `:212`, `:248-251`, `:288`, `:194-196`, `:377-379` |
+| F-6 | Pairwise disjointness of `deletions` / `archives` / merge `sources` | `:264-266`, `:426` |
+| F-7 | `null`-for-scalars / `[]`-for-lists matches schema example | `:201-202` |
+| C-1 | Line count 472 in `progress.md`; `prompt.instructions.md` link added | `progress.md:3697`, prompt `:369-371` |
+
+### New Findings
+| Severity | Location | Finding |
+|---|---|---|
+| 🔵 COSMETIC | `:264-266` | Disjointness paragraph inserted inside the field-rules bullet list, splitting `archives` from `halted`. Move it below the `halted` bullet. |
+
+### Consistency Checks
+- `total_found` coherent across all six sites; `0`/`0` example implies no cap hit.
+- Step 10 re-verification does not contradict step 7: step 7 still verifies a proposal in both modes and halts only the merge; step 10 tightens `apply` only.
+
+### Verification Notes
+- `wc -l` → 472 (confirmed).
+- TEST-06's shell `for` loop is refused by the reviewer shell allowlist; a single `grep -n` alternation was substituted and confirmed all 14 original schema keys plus `total_found` present. **Substituted check, not a TEST-06 pass** — TEST-06 result cited from coder.
+- `npx vitest run` green (exit 0, 33 files / 1,049 tests) **rests on the coder's claim** — not re-run.
+- `knowledgebase_knowledgebase_search` skipped — DATABASE_URL not configured.
+
+### Gate Status
+| Gate | Status |
+|---|---|
+| G1 `npx vitest run` | CITED from unit-tester (unverified) |
+| G2 `npx vitest run --coverage` | NOT RUN (not requested this step) |
+| G3 `npm test` | NOT RUN (not requested this step) |
+| G4 `node scripts/validate-memory-schema.js` | NOT RUN (not requested this step) |
+
+### Tree State
+`git status --short` identical before and after the review — 6 modified, 8 untracked, no change caused by this step.
+
+### Follow-up
+None blocking. Optional: move the Disjointness paragraph below the `halted` bullet.
