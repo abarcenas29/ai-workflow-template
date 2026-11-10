@@ -23,7 +23,7 @@ jobs:
         run: npm run test:unit
 
   playwright:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CI: true
       # The config defaults to headed mode; CI runners have no display.

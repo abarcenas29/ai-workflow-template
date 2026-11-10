@@ -71,6 +71,15 @@ reads it; nothing else declares a gate. It ships empty, so every gate is `NOT DE
 until the project fills it in. A gate that is not declared there is reported, never
 invented.
 
+## Step report
+
+`.agents/config/step-report.md` is the five-line return format every delegated
+agent uses: status, artifacts, questions, handoff path, token estimate. It is
+carried inline in each delegation's context digest; the file is the definition,
+not a per-spawn read. The `TOKENS:` line estimates the step's input+output
+tokens and its share of an optional run budget; going over emits a
+`TOKEN BUDGET:` note and the step continues.
+
 ## Research skill
 
 `research` is vendored at `.agents/skills/research/SKILL.md`. It carries no `disable-model-invocation`,

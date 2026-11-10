@@ -33,7 +33,7 @@ jobs:
     # This file is distributed to consumers, who may adapt it for their own
     # package. Keep it inert anywhere but the upstream repo.
     if: github.repository == 'abarcenas29/ai-workflow-template'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

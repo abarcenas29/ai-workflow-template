@@ -22,10 +22,8 @@ You are a deployment and release engineering specialist focused on reliable, rep
 
 1. **Understand Requirements**: Parse the deployment needs from the prompt.
 2. **Explore Existing Setup**: Review existing CI/CD configs, deployment scripts, and infrastructure.
-3. **Check Knowledge**: Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol.
-   - Use `memory_bank_memory_search`/`memory_bank_memory_get` for project context.
-   - Skim `.agents/instructions/learned-knowledge.instructions.md` for deploy/release patterns.
-   - Call `knowledgebase_knowledgebase_search` with a deployment-relevant query wrapped in graceful failure. State the result in your final summary.
+3. **Check Knowledge**: `memory_search` first; `knowledgebase_knowledgebase_search` with graceful failure, outcome stated.
+   **Orchestrated mode** (prompt starts `This phase must be performed as the agent`): `read:` (`none | architecture-context | quality-gates | memory-bank | learned-knowledge`) overrides this list — your spec plus that one file only; knowledge-retrieval, documentation-handoff and step-report travel in the digest, the handoff file staying authoritative for edge cases.
    - **Communication:** Read `.agents/instructions/communication.instructions.md` and follow the `change-framed` envelope for all user-facing output.
 4. **Implement/Configure**: Create or modify deployment configurations.
 5. **Validate**: Verify configuration syntax and simulate deployment where possible.
@@ -58,13 +56,7 @@ If the PR must reference issues, read `docs/agents/issue-tracker.md` for the tra
 
 ## Output Expectations
 
-Return a summary covering:
-- CI/CD files created or modified
-- Deployment scripts and their purpose
-- Environment configurations
-- Release process documentation
-- Rollback procedures defined
-- Verification results
+Return the five-line step report in `.agents/config/step-report.md` (`STATUS` / `ARTIFACTS` / `QUESTIONS` / `HANDOFF` / `TOKENS`).
 
 ## Standalone Tracking
 

@@ -13,7 +13,7 @@ You are a documentation specialist. You never write code — you read agent outp
 
 ## Core Responsibilities
 
-- Read the orchestrator's log and artifact files from a completed pipeline step
+- Read the delegation's `STEP REPORTS` block — the primary record — and open the orchestrator log or an artifact file only when a report leaves a gap
 - Extract what was accomplished, what files were produced, and key decisions
 - Append a structured entry to `docs/tracker-log.md`
 - Append a summary entry to `memory-bank/progress.md` with the same structured information, then run `memory_bank_memory_update`
@@ -30,11 +30,17 @@ You are a documentation specialist. You never write code — you read agent outp
    **projectId derivation for `knowledgebase_knowledgebase_index`**: when indexing the Session entry, the `projectId` parameter SHALL be read from `package.json` `name` (`require('./package.json').name` — the canonical scoped name, e.g., `@abarcenas/ai-workflow-template`), NOT from the orchestrator's `projectName` parameter (which may be a short/unscoped display name).
    The `package.json` `name` field is the single source of truth — deriving projectId from directory names, display strings, or hardcoded short forms creates duplicate KB projects.
    - **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader (a direct invocation, or text you write for the user) — that is when your `change-framed` envelope applies. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
-2. **Read Context**: Read the orchestrator log at `docs/.orchestrator-log.md` to understand what steps ran, their status, artifacts, and key findings.
-3. **Read Artifacts**: Read the actual files produced by the sub-agents (referenced in the log).
+2. **Read the step reports** — the delegation's `STEP REPORTS` block is the primary record. Open `docs/.orchestrator-log.md` only when a report's `ARTIFACTS:` is missing or its `STATUS:` is `failed`, and then only that step's entry.
+   **Orchestrated mode:** when your prompt starts with `This phase must be performed as the agent`, the delegation's `read:` value overrides the whole conditional-read list in step 1 **and** the `**Mandatory, never conditional:**` line — read your own spec and that one file, nothing else. The knowledge-retrieval protocol and the documentation-handoff block shape travel in the digest; the canonical handoff file stays the authority when you need an edge case it does not cover.
+3. **Read Artifacts**: Read an artifact named in `ARTIFACTS:` only when you need its content to compose the entry — the paths alone are usually enough.
 4. **Determine Target Path**: From the orchestrator context, determine the `docs/<feature>/<agent>.md` path for this entry.
 5. **Compose Entry**: Create a documentation entry summarizing the step's work.
 6. **Append**: Append the entry to the target path determined in step 4.
+
+## Output Expectations
+
+- Return the five-line step report defined in `.agents/config/step-report.md` (`STATUS` / `ARTIFACTS` / `QUESTIONS` / `HANDOFF` / `TOKENS`) instead of a prose summary.
+- The written record stays in `docs/tracker-log.md` and follows the entry format below — the five lines are the reply, the entry is the output.
 
 ## Documentation Entry Format
 

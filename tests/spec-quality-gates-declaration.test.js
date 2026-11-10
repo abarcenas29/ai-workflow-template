@@ -2,10 +2,11 @@
 // spec-quality-gates-declaration.test.js — the empty declaration is a real state
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// The shipped declaration has a gate table with zero data rows. That is the only
-// state a fresh consumer is ever in, and it must not be reported as an empty
-// table ("nothing to run"). It must be reported as `GATES: NOT DECLARED` — one
-// row, with the same consequence as an absent declaration.
+// A present declaration with zero data rows is a real state: it is the only state
+// a fresh consumer is ever in, and it must not be reported as an empty table
+// ("nothing to run"). It must be reported as `GATES: NOT DECLARED` — one row, with
+// the same consequence as an absent declaration. This repository declares four
+// gates (G1–G4), so the first assertion pins those IDs instead of the empty state.
 //
 // These assertions pin the reporting contract in every place that defines it:
 //   (a) the declaration itself (.agents/config/quality-gates.md)
@@ -55,11 +56,14 @@ function gateTableRows(content) {
 }
 
 describe('quality-gate declaration: zero declared gates is a first-class state', () => {
-  it('the shipped declaration has a gate table with zero data rows', () => {
+  it('the shipped declaration has a gate table with the four declared gates', () => {
     const rows = gateTableRows(readRepoFile(DECLARATION_PATH))
 
     expect(rows, 'the `| ID | Command |` gate table was not found').not.toBeNull()
-    expect(rows, 'the shipped declaration must ship no runnable gate rows').toEqual([])
+    expect(rows, 'the shipped declaration must declare exactly four gate rows').toHaveLength(4)
+
+    const gateIds = rows.map((row) => row.split('|')[1].trim())
+    expect(gateIds, 'the declared gate IDs must be G1, G2, G3, G4').toEqual(['G1', 'G2', 'G3', 'G4'])
   })
 
   it('the declaration reports a present-but-empty set as one GATES: NOT DECLARED row', () => {
