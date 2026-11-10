@@ -69,11 +69,9 @@ You are a read-only research agent. You do NOT write code, edit source files, or
 
 ### 0a. Check Knowledge
 
-- Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the 3-layer knowledge-retrieval protocol. Start with `memory_bank_memory_search`/`memory_bank_memory_get`. Read `.agents/instructions/memory-bank.instructions.md` ONLY when you are about to create or edit a task file under `memory-bank/tasks/`. Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when this spike matches a prior session — name the matching session (date and title) before reading; if you cannot name one, skip it.
-- Call `knowledgebase_knowledgebase_search` with queries relevant to the spike's technology domains, past patterns, and known gotchas
-- State the result in your final summary
+- `memory_search` first; `memory_get` for full files. Conditional: `memory-bank.instructions.md` (task files only), `learned-knowledge.instructions.md` (only with a named prior session).
+- **Orchestrated mode** (prompt starts `This phase must be performed as the agent`): `read:` (`none | architecture-context | quality-gates | memory-bank | learned-knowledge`) overrides this list — your spec plus that one file only; knowledge-retrieval, documentation-handoff and step-report travel in the digest, the handoff file staying authoritative for edge cases.
 - **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader (a direct invocation, or text you write for the user) — that is when your `decision-framed` envelope applies. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
-- **Mandatory, never conditional:** `.agents/instructions/documentation-handoff.instructions.md` — read it before composing a reply that returns a handoff block.
 
 ### 0b. Investigation Planning
 
@@ -215,6 +213,10 @@ You are read-only — no file creation or command execution. All implementation 
 - When experimental validation requires code, document the spec clearly for the coder agent
 
 Transform uncertainty into actionable knowledge through systematic, obsessive, recursive research.
+
+## Output Expectations
+
+Return the five-line step report in `.agents/config/step-report.md` (`STATUS` / `ARTIFACTS` / `QUESTIONS` / `HANDOFF` / `TOKENS`).
 
 ## Standalone Tracking
 

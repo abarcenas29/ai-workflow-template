@@ -17,21 +17,58 @@ report.
 
 | ID | Command | Proves | Preconditions | Order constraint |
 |----|---------|--------|---------------|------------------|
+| G1 | `npx vitest run` | The unit and spec suite is green: every `scripts/**/*.test.js` module test and every `tests/**/*.test.js` cross-file spec check passes. | `npm ci` has run — `vitest` is a devDependency. Run from the repository root. | none |
+| G2 | `npx vitest run --coverage` | The same suite is green **and** measured coverage of `scripts/**` meets the thresholds pinned in `vitest.config.ts`. | `npm ci` has run — `@vitest/coverage-v8` is a devDependency. Writes `coverage/`. | none — the run collects its own coverage |
+| G3 | `npm test` | The Playwright spec suite (`tests/**/*.spec.ts`, `chromium` project) is green. | `npx playwright install chromium` has run. The config defaults to headed mode, so prefix `HEADLESS=true` where there is no display (CI does this). | none |
+| G4 | `node scripts/validate-memory-schema.js` | Staged `memory-bank/**/*.md` frontmatter passes the memory-schema validator: every tag is known to `memory-bank/.vocabulary.json` and required fields are present. | Run from the repository root. It validates files staged in the git index; with a clean index it validates nothing and exits 0 vacuously. | none |
 
-No gates are declared by default. Until a row is added, the whole set is reported
-as `GATES: NOT DECLARED` — one row, with the same consequence as an absent file.
-A present-but-empty table is a declaration that no gate set exists; it is never
-reported as an empty table.
+These four rows are the gates this repository has. Each one was executed from the
+repository root on 2026-11-10 and recorded at the exit code it returned; a command
+that could not be run here is absent rather than approximated.
 
-```text
-<!-- EXAMPLE ONLY — replace or delete. No agent runs these rows. -->
-| G1 | <format check command>       | <what a green run proves>          | <what must be true first>        | <gate that must run before it> |
-| G2 | <unit test command>           | <what a green run proves>          | <what must be true first>        | <gate that must run before it> |
-| G3 | <coverage report command>     | <what a green run proves>          | <what must be true first>        | <gate that must run before it> |
-| G4 | <build command>               | <what a green run proves>          | <what must be true first>        | <gate that must run before it> |
-| G5 | <artifact inspection command> | <what a green run proves>          | <what must be true first>        | <gate that must run before it> |
-| G6 | <integration or security-rules command> | <what a green run proves> | <what must be true first>        | <gate that must run before it> |
-```
+Measured evidence from that run — **evidence, not pinned expectations**. No gate
+here asserts a count, so no count gate is declared and the count contract below
+does not apply:
+
+| Gate | Result on 2026-11-10 | Exit |
+|------|----------------------|------|
+| G1 | 1,049 passed, 0 failed, 33 files | **0** |
+| G2 | thresholds met (statements 96.44%, branches 93.49%, functions 97.21%, lines 96.70%) and 1,049 passed, 0 failed, 33 files | **0** |
+| G3 | 7 passed, 1 skipped (pre-existing skip), 0 failed | 0 |
+| G4 | clean index, zero files validated | 0 |
+
+**G1 and G2 are green as of this re-baseline.** When these four rows were first
+written, both gates were red, and `tests/spec-quality-gates-declaration.test.js`
+was the cause: its assertion "the shipped declaration has a gate table with zero
+data rows" (`expected [ …(4) ] to deeply equal []`) pinned the pre-declaration
+state of this very file, and it was the only failing test in the suite. That
+assertion now pins the declared set instead — exactly four data rows and the IDs
+`G1, G2, G3, G4` — with the rest of the reporting contract untouched. Both gates
+were then re-run from the repository root and returned exit 0 with the counts in
+the table above. The four gate commands, the 90 coverage threshold inherited from
+`vitest.config.ts`, and the G3 and G4 rows are unchanged.
+
+A present-but-empty table is still a declaration that no gate set exists: it is
+reported as `GATES: NOT DECLARED`, never as an empty table. A consumer project
+that has declared nothing is in the state described by the reader rules below.
+
+### Checked and not declared
+
+These candidates exist as habits, not as gates. They are deliberately absent, and
+the readers must report them as `NOT DECLARED` rather than substituting a
+near-equivalent.
+
+- **markdownlint** — no `package.json` script, no local dependency
+  (`npm ls markdownlint-cli2` → empty), and no `.markdownlint*` config anywhere.
+  An ad hoc `npx markdownlint-cli2` resolves from the npx cache under stock rules
+  and reports MD013 (line length) only on this file: stylistic noise, not a gate.
+- **lint** — no ESLint (or other linter) script, config, or dependency.
+- **typecheck / build** — no `tsconfig.json`, no `typescript` dependency, and no
+  `build` script. The package ships configuration and JavaScript; nothing compiles.
+- **coverage is enforced, not waived** — `@vitest/coverage-v8` is installed and
+  `npx vitest run --coverage` measures every threshold green today (96.70% lines).
+  Its thresholds are declared under `## Coverage thresholds` below; there is no
+  advisory fallback here.
 
 ## Count contract (optional)
 
@@ -60,7 +97,20 @@ above.
 
 | Target | Lines | Functions | Branches | Source artifact | Missing report |
 |--------|-------|-----------|----------|-----------------|----------------|
+| `scripts/**` | 90 | 90 | 90 | `coverage/coverage-final.json` (human-readable: `coverage/index.html`) | fails — names the target it could not find |
 
+The numbers above are the tool's own: they are copied from `coverage.thresholds` in
+`vitest.config.ts`, which also pins `statements: 90`. That column does not exist in
+this table, so a reader that needs statements should read it from the vitest config
+and treat it as declared — it is measured by the same run.
+
+Measured on 2026-11-10: lines **96.70%** (2404/2486) against the 90 declared here;
+statements 96.44% (2553/2647), functions 97.21% (279/287), branches 93.49%
+(1379/1475). Every declared threshold is met with margin, and
+`npx vitest run --coverage` exits 0 with 33 files / 1,049 tests passing.
+
+If the thresholds in `vitest.config.ts` change, this row changes in the same commit.
+`90` here is not an aspiration and not a default: it is the enforced number.
 A gate that reads a coverage report fails when the report is missing, and names the
 target it could not find. A target with no row here has **no** threshold declared: report
 it as "no coverage threshold declared", never as a default percentage.

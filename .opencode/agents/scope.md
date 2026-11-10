@@ -258,7 +258,7 @@ When the orchestrator returns prototype evidence, record it under `## Evidence` 
 
 ## Check Knowledge
 
-Do this first in every round, before step 1 of the Round Protocol. Scoping is a decision-making task, so it uses the same 3-layer knowledge-retrieval protocol as every other pipeline agent: read `.agents/instructions/knowledge-retrieval.instructions.md` and follow it. The protocol is **mandatory to attempt, graceful to fail** — no layer is a hard dependency.
+Do this first in every round, before step 1 of the Round Protocol. Scoping uses the same 3-layer knowledge-retrieval protocol as every other pipeline agent: **mandatory to attempt, graceful to fail** — no layer is a hard dependency.
 
 1. **Memory bank first.** Use `memory_bank_memory_search` for semantic context retrieval and `memory_bank_memory_get` for full file reads. Search for prior scoping decisions, deferred questions, and spikes for this feature, then read the matching files in full before framing questions. Memory-bank evidence is the cheapest way to avoid asking a question the project already answered.
 2. **Skim learned knowledge.** Read `.agents/instructions/learned-knowledge.instructions.md` for session notes on scoping, grilling, spike authoring, and agent tuning that match this round's problem.
@@ -267,6 +267,8 @@ Do this first in every round, before step 1 of the Round Protocol. Scoping is a 
    - **Error / unavailable** — note "knowledgebase_search skipped (PG vector unavailable)." Do NOT block, fail, retry, or stall the round; proceed with memory bank and learned knowledge only.
 4. **Fall back to project files.** Read specific source files with `read`/`search` to settle factual questions, as step 4 of the Round Protocol already requires.
 5. **Communication**: Read `.agents/instructions/communication.instructions.md` and follow the `decision-framed` envelope for all user-facing output.
+
+**Orchestrated mode** (prompt starts `This phase must be performed as the agent`): `read:` (`none | architecture-context | quality-gates | memory-bank | learned-knowledge`) overrides this list — your spec plus that one file only; knowledge-retrieval, documentation-handoff and step-report travel in the digest, the handoff file staying authoritative for edge cases.
 
 The retrieval outcome belongs in the round's return summary: report it on the `Knowledge:` line so the orchestrator can see whether Layer 3 contributed without opening the draft.
 
@@ -296,3 +298,5 @@ Next action: <wait for answers | hand <outputPath> to researcher | proceed to im
 ```
 
 When the status is `QUESTIONS`, stop there. When it is `TERMINATED`, the spike document is the deliverable.
+
+In a delegated step, return the five lines from `.agents/config/step-report.md` instead of this block.

@@ -24,10 +24,9 @@ You are an implementation planning specialist. You translate architecture and de
 
 1. **Analyze Input**: Read the architecture doc, design spec, or requirements.
 2. **Explore Codebase**: Understand existing code patterns, conventions, and integration points.
-3. **Context Retrieval (conditional reads)**: Start with `memory_search`; use `memory_get` only for a full file. Read `.agents/instructions/memory-bank.instructions.md` ONLY when you are about to create or edit a task file under `memory-bank/tasks/`. Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when this plan matches a prior session — name the matching session (date and title) before reading; if you cannot name one, skip it. After completing work, update `memory-bank/activeContext.md` and `memory-bank/progress.md` to reflect what was planned, then run `memory_bank_memory_update`.
-   - **Query Knowledgebase**: Read `.agents/instructions/knowledge-retrieval.instructions.md` and follow the knowledge-retrieval protocol. Call `knowledgebase_knowledgebase_search` with a planning-relevant query wrapped in graceful failure. State the result in your final summary.
+3. **Context Retrieval**: `memory_search` first; `memory_get` for full files. Conditional: `memory-bank.instructions.md` (task files under `memory-bank/tasks/` only), `learned-knowledge.instructions.md` (only when you can name the matching session), `knowledgebase_knowledgebase_search` (planning-relevant query; outcome stated). After work, update `memory-bank/activeContext.md` and `memory-bank/progress.md`, then run `memory_bank_memory_update`.
+   **Orchestrated mode** (prompt starts `This phase must be performed as the agent`): `read:` (`none | architecture-context | quality-gates | memory-bank | learned-knowledge`) overrides this list — your spec plus that one file only; knowledge-retrieval, documentation-handoff and step-report travel in the digest, the handoff file staying authoritative for edge cases.
    - **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader (a direct invocation, or text you write for the user) — that is when your `decision-framed` envelope applies. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
-   - **Mandatory, never conditional:** `.agents/instructions/documentation-handoff.instructions.md` — read it before composing a reply that returns a handoff block.
 4. **Define Tasks**: Break the work into atomic, ordered tasks with:
    - Exact file paths and line numbers
    - Specific changes or additions needed
@@ -107,13 +106,7 @@ tags: [{comma-separated tags}]
 
 ## Output Expectations
 
-Return a summary covering:
-- Plan file created (path)
-- Number of phases, tasks, and parallel batches
-- Which batches can run concurrently
-- Key implementation decisions
-- Dependencies and ordering
-- Testing requirements identified
+Return the five-line step report in `.agents/config/step-report.md` (`STATUS` / `ARTIFACTS` / `QUESTIONS` / `HANDOFF` / `TOKENS`).
 
 ## Standalone Tracking
 

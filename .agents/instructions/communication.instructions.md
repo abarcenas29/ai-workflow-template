@@ -135,6 +135,7 @@ decides what must appear.
 | Files reviewed, files created or changed | `## What changed, file by file` |
 | What was examined and what was found (the findings behind the change) | decision-framed slot 2, `## What I found and where` |
 | Measurements, citations, proofs, `path:line` references | `## Evidence` |
+| A five-line step report (`STATUS` / `ARTIFACTS` / `QUESTIONS` / `HANDOFF` / `TOKENS`, `.agents/config/step-report.md`) | `## Evidence`, as five literal lines with no headings of their own |
 | Options, trade-offs, risks, follow-ups, the verdict, the next action | slot 4 (`## Risks and next step` / `## Decision and options with cost/risk`) |
 
 The four `##` headings are the only top-level headings in a reply, and a returned
@@ -197,7 +198,9 @@ and it is a `###` heading, never a fifth `##` heading. It is not a slot: it carr
 cap of its own, its lines are transcribed text and do not count toward the 40-line cap,
 and the headings inside its fenced payload are text to append, not reply headings.
 Exempting a fifth `##` heading by name was the alternative and was rejected: it would
-open a hole any reply could claim by relabelling a section.
+open a hole any reply could claim by relabelling a section. An orchestrated reply returns
+the five step-report lines first and the handoff block last; that ordering is fixed in
+`.agents/config/step-report.md`.
 
 ### change-framed
 
@@ -386,7 +389,9 @@ orchestrator emits exactly this, in this order:
 - Four bold lines in that fixed order, then a `---` rule, then the sub-agent's
   output verbatim — no re-authoring, no paraphrase, no summary replacing the
   output.
-- Every file path and every finding survives the normalization.
+- Every file path and every finding the report carries survives the normalization: the
+  relay copies the captured lines, and the captured lines are already capped (see the
+  capture caps below).
 - `scope` gates: the block carries status and question count only — bottom
   line = status plus "N questions", Files = the draft path, Next = "answer
   Q1–QN". The questions follow unmodified; the orchestrator never answers,
@@ -394,11 +399,35 @@ orchestrator emits exactly this, in this order:
 - The final `## Pipeline Results` table is unchanged
   (`orchestrator.md:273-286`): no Communication column, no extra line, no new
   field.
+- The sub-agent's output at a gate is its five-line step report
+  (`.agents/config/step-report.md`), relayed verbatim after the `---` rule. The four bold
+  lines are derived from it — bottom line from `STATUS` plus one sentence, Files from
+  `ARTIFACTS`, Blocker from `QUESTIONS`, Next from the pipeline's next step — and nothing
+  else is re-emitted: no prose summary above the report, no restatement of it below.
+- The report is relayed in the form it was captured in. The caps apply at capture, before
+  the gate: `previous_step_summary` at 40 words, `QUESTIONS` at three numbered items,
+  `ARTIFACTS` as paths only (`.agents/config/step-report.md`, `## Caps`). The gate copies
+  those capped lines and never re-expands them, so it cannot become the place the full
+  prose reappears. When a field was cut, the gate carries one extra line, `CAPPED: {field}`,
+  naming the field — the same cut the orchestrator log records. Uncut, a gate is four bold
+  lines plus five report lines: nine of the forty a reply may use.
+- Two line shapes follow from the five `STATUS` values: a failed or blocked step reads
+  `Next: resume session {id}`, and a deferred step reads `Blocker: deferred — {unblocker}`
+  while the pipeline continues with the steps that do not depend on it. Neither shape adds
+  a bold line or re-authors the report.
+- This adds no exemption and lifts no cap. The saving comes from the producer emitting five
+  lines instead of prose; the relay is still byte-for-byte, so Exemption 2 still governs.
+  The report is lossy by design: "every finding survives" means every finding the report
+  carries, and `ARTIFACTS:` is what the tracker reads for everything behind it.
 
 Cost: the orchestrator cannot compress a rambling report, so the reader may
-see length the orchestrator is not allowed to fix. Risk: a relay is a copy
+see length the orchestrator is not allowed to fix — though a five-line report is already
+bounded, so that length is now nine lines rather than a transcript. Risk: a relay is a copy
 operation, so a truncated relay silently loses a finding — which is why "every
-finding survives" is stated as a rule and not as a suggestion.
+finding survives" is stated as a rule and not as a suggestion. The one deliberate
+truncation is the capture cap: it is declared in a `CAPPED: {field}` line rather
+than absorbed silently, and `ARTIFACTS:` still points the tracker at the file that holds
+what was cut.
 
 ## Project Override
 

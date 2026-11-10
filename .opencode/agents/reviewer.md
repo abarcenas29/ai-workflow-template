@@ -168,9 +168,10 @@ finding stops the merge; the orchestrator routes the repair to a coder.
 
 ## Approach
 
-0. **Context Retrieval (conditional reads)**: Follow the 3-layer knowledge-retrieval protocol in `.agents/instructions/knowledge-retrieval.instructions.md`. Start with `memory_bank_memory_search`/`memory_bank_memory_get`. Read `.agents/instructions/memory-bank.instructions.md` ONLY when you are about to create or edit a task file under `memory-bank/tasks/`. Read `.agents/instructions/learned-knowledge.instructions.md` ONLY when this review matches a prior session — name the matching session (date and title) before reading; if you cannot name one, skip it. Call `knowledgebase_knowledgebase_search` with review-relevant queries (common vulnerability patterns, recurring code-quality issues). State the result in your final summary.
+0. **Context Retrieval**: `memory_search` first; `memory-bank.instructions.md` only for task files; `learned-knowledge.instructions.md` only with a named prior session; `knowledgebase_knowledgebase_search` on review-relevant queries, outcome stated.
+   **Orchestrated mode** (prompt starts `This phase must be performed as the agent`): `read:` (`none | architecture-context | quality-gates | memory-bank | learned-knowledge`) overrides this list — your spec plus that one file only; knowledge-retrieval, documentation-handoff and step-report travel in the digest, the handoff file staying authoritative for edge cases.
    - **Communication:** Read `.agents/instructions/communication.instructions.md` ONLY when the user is your reader, or when you run the `### Communication standard check`, which needs the envelope definition — your `change-framed` envelope applies when you write for the user. A subagent→orchestrator reply is exempt from the four-slot envelope and the 40-line cap.
-   - **Mandatory, never conditional:** `.agents/config/quality-gates.md` (gate status reporting) and `.agents/instructions/documentation-handoff.instructions.md` (the handoff block you return).
+   - **Mandatory, never conditional:** `.agents/config/quality-gates.md` (gate status reporting).
 1. **Understand Scope**: Determine what code needs review (files, diff, or full module). If the scope is a **merge**, establish the merge base and both tips first — the review subject is the resolution, not the resolved files (see "Merge reviews" below).
 2. **Read Thoroughly**: Read all relevant files completely before forming opinions.
 3. **Analyze Systematically**: Check in order: correctness → security → performance → style → test quality.
@@ -243,7 +244,7 @@ the file and the reason and treat it as an **unverified claim** — not a pass.
 
 ## Output Expectations
 
-Return a report in this order:
+Return the five-line step report in `.agents/config/step-report.md` (`STATUS` / `ARTIFACTS` / `QUESTIONS` / `HANDOFF` / `TOKENS`); the ordered items below map onto its fields.
 
 1. **Verification basis** — shell availability, the exact commands run in this
    session, and every claim you could not verify, with the reason.

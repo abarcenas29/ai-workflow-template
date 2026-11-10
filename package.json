@@ -1,6 +1,6 @@
 {
   "name": "@abarcenas/ai-workflow-template",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "OpenCode scaffolding CLI for AI-assisted development workflows — syncs agent configurations, skills, memory bank, and reusable prompts into any project.",
   "bin": {
     "ai-workflow-setup": "./bin/setup.js"
