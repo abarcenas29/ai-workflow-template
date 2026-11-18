@@ -80,6 +80,23 @@ not a per-spawn read. The `TOKENS:` line estimates the step's input+output
 tokens and its share of an optional run budget; going over emits a
 `TOKEN BUDGET:` note and the step continues.
 
+## Agent models
+
+The per-agent model map lives in `.opencode/opencode.json` under a top-level `agents`
+object. Change a model there once and every sync carries it to all consumers.
+OpenCode merges a discovered `.opencode` config over the project-root `opencode.json`, so a
+consumer keeps its root `opencode.json` for local settings (MCP servers, permissions) while the
+managed map controls models.
+`opencode.mcp.example.json` carries the same map for fresh scaffolds: a new consumer's
+`opencode.json` is created from it. An existing consumer's root `opencode.json` is never
+rewritten by sync.
+The default model is `deepseek/deepseek-flash` for all agents, in `provider/model[#variant]` form.
+The map pins every agent to that one model, so a consumer must have DeepSeek authenticated in
+OpenCode or every agent fails to resolve a model. Because the discovered `.opencode` config wins,
+the model cannot be overridden from the consumer's root `opencode.json`. The ways out: edit the
+managed `.opencode/opencode.json` (every sync then reports `skipped locally modified opencode file`),
+or change the default in this template. `--force` reverts a local edit back to the template default.
+
 ## Research skill
 
 `research` is vendored at `.agents/skills/research/SKILL.md`. It carries no `disable-model-invocation`,

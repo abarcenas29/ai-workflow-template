@@ -1,7 +1,7 @@
 ---
 id: "tracker-log"
 title: "Tracker Log"
-updated: "2026-11-10"
+updated: "2026-11-18"
 tags: [architect, researcher, coder, implementer, tester, reviewer, tracker, orchestrator, bootstrap, setup, configuration, refactor, tdd, research, spike, implementation, decision, discovery]
 doc_type: "tracker-log"
 ---
@@ -3206,3 +3206,387 @@ Focused re-review of `.agents/prompts/doc-compaction.prompt.md` (472 lines) conf
 
 ### Follow-up
 None blocking. Optional: move the Disjointness paragraph below the `halted` bullet.
+
+---
+
+## Research: Offloading AI-Agent Work to GitHub Actions Runners
+
+**Date:** 2026-11-12
+**Status:** ✅ SUCCESS
+**Pipeline:** research-github-offload
+
+### Summary
+
+Investigated how this repository can hand parts of its agent workload to the GitHub-hosted runners it already uses. The answer is a smaller slice than it first appears: headless agent runs are a documented OpenCode feature, but GitHub Models was fully retired on 2026-07-30, so any runner-based agent needs a provider API key in repository secrets. The highest-value, lowest-risk win is not an agent at all — it is re-running two local-only Husky hooks (`validate-memory-schema`, `vocab-sync`) as plain CI steps, because contributors with hooks disabled or web-UI commits bypass them entirely.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/research-github-actions-agent-offload.md` | Full research report: what exists in the repo today, what is and is not offloadable, runner/security mechanics, cost math, and five proposed workflows |
+| `memory-bank/activeContext.md` | Updated to record the research outcome and next steps |
+
+### Key Decisions
+
+- **`opencode run --standalone --agent <role> --model <provider/model>` is the CI entry point**, backed by the packaged `anomalyco/opencode/github@latest` action. `--standalone` is the CI-critical flag because the default shared background server is a per-user service that a runner does not have.
+- **Three things are explicitly excluded from offload**: the orchestrator's `confirmationGates` (unattended runs hang or self-approve), `scope` grilling rounds (the spec forbids silence-as-consent), and Chrome-DevTools browser debugging (needs a live browser).
+- **Recommended sequencing** — `verify-local-hooks.yml` first (deterministic, no agent, zero risk), then `agent-review.yml` behind `workflow_dispatch` with `contents: read` and artifact-only output. The `reviewer` role is chosen first because it is already read-only by spec.
+- **Cost model**: standard runners are free and unlimited on public repositories, so model tokens are the only marginal cost.
+- **Five workflows proposed**: `verify-local-hooks`, `agent-review`, `agent-test-triage`, `agent-docs-drift`, `agent-issue-triage`.
+
+### Notes / Follow-up
+
+Three risks were flagged and should be treated as constraints on any later implementation:
+
+- **R1** — `unit-tester` may edit test files and holds `shell: allow *`. A CI triage job must therefore stay read-only; do not give it write scope.
+- **R2** — Never use `pull_request_target`; fork PRs receive no secrets, which is also why model-backed jobs cannot run on fork contributions.
+- **R3** — MCP servers are configured as `npx -y …@latest` and are unpinned; pin them before any CI job depends on them.
+
+Next action if this proceeds: implement `verify-local-hooks.yml` (no agent, no secret, exercises two existing scripts), then `agent-review.yml` as a dispatch-only trial.
+
+---
+
+## Research Pipeline 23: AI-in-CI Value Ranking + Doc Staleness/Pruning Feasibility
+
+**Date:** 2026-11-12
+**Status:** ✅ SUCCESS (research-only — no workflow files, no code, no tests touched)
+**Pipeline:** research-ai-workflow-value — researcher → tracker
+
+### Summary
+
+Answered the question "what is actually worth running with AI in a GitHub workflow — and is regular document sorting/pruning of stale docs one of them?" Twelve candidate jobs were ranked by value ÷ risk ÷ token cost. The headline result is subtractive: **seven of the twelve should not use a model at all**, because a deterministic tool already does the job better and cheaper. The doc-pruning case the user asked about splits in two, and the larger half is deterministic — eight exact checks costing zero tokens — while only four genuinely semantic questions need a model, and there the model is a good proposer and a poor decider. Two real defects in existing repo scripts were found while reading, both of which would corrupt doc dates if a workflow depended on them as-is.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/research-ai-doc-maintenance-workflows.md` | Full report — 12-candidate ranking with per-job V/R/T scoring (§1), doc-staleness deep dive with runnable checks (§2a–2f), verified tool table (§2c), pruning safety model (§2d), cost bounds (§3), three-item build order (§4), open questions O-1…O-4 (§5), cited external resources (§6) |
+| `memory-bank/activeContext.md` | Records the research outcome and next steps |
+| `memory-bank/progress.md` | Tracker summary appended |
+| `docs/tracker-log.md` | This entry |
+| `docs/TRACKER-INDEX.md` | Research Pipeline 23 row added |
+
+### Key Decisions
+
+- **Rank by "does a deterministic tool already do this?" before ranking by value.** The ranking deliberately places real-value jobs low when `D = yes`, because the value is real but the token spend is wasted. This produced the report's most actionable output — a "do not build" list — not just a build list.
+- **Split doc staleness into detection (script) and judgement (model).** Conflating the two is how doc-hygiene automation becomes destructive. Eight checks — last-commit date, frontmatter-vs-git drift, broken links, orphans, deleted paths/npm scripts, exact duplicates, stale TODO markers, doc-age-vs-subject-churn — are exact and free; four questions ("is this still true?", "does A supersede B?", "should these merge?", "which section?") are semantic.
+- **Reuse `doc-compaction.prompt.md`, do not invent a second opinion.** `docs/spike-doc-compaction.md` (D-1…D-13) already settled report-by-default, path-preserving `git mv` archival, the R1–R5 scored checklist (threshold ≥ 3), `MAX_DOCUMENTS = 200`, and the hard-excluded governance surfaces. The report treats this as its single most important constraint.
+- **Use a link checker, not a regex.** Hand-rolled link matching breaks on code blocks, reference-style links, and anchors; lychee (`--offline` for the internal subset, `--include-fragments` for anchors) is the verified tool.
+- **Deterministic checks are the cheapest way to cheapen the model job.** The staleness script narrows ~41 docs to a handful of flagged ones; only those become the model's `--file` input. Running the script first is both safer and an order of magnitude cheaper.
+- **Deletion is a proposed PR, never a scheduled auto-apply.** Agent proposes → PR with deletions → human reviews diff → merge. The propose step holds `contents: read` only; a separate human-triggered step carries `contents: write`.
+- **Build order puts the model job last** — 4.1 `docs-health.yml` (0 tokens), 4.2 mtime fix + schema widening (0 tokens), 4.3 `docs-compaction.yml` (dispatch-only, report-only). The only item that spends tokens is also the only one that could be wrong in a way that matters.
+
+### Two Real Defects Found
+
+1. **`scripts/normalize-memory.js` `getGitMtime()` never attempts git.** It is documented as "Fallback to filesystem mtime if git not available" but always calls `statSync(filePath).mtime` (`scripts/normalize-memory.js:115-124`). On a fresh CI checkout every file has today's mtime, so a run would stamp `updated: <today>` onto every doc it touches — manufacturing the exact drift the workflow exists to detect. **Must be fixed before any CI use.**
+2. **`scripts/validate-memory-schema.js` does not cover `docs/**`.** `getStagedMemoryFiles()` filters on `memory-bank/`, so the docs corpus (~42 files, only 22 of which carry frontmatter at all) is validated nowhere. Nothing currently validates `docs/**`.
+
+### Notes / Follow-up
+
+- **Explicitly not recommended**: dead-code detection (use Knip), dependency-bump explanation (Dependabot's own PR body is the deliverable), issue triage/labelling, KB re-index (existing npm scripts), flaky-test detection, architecture-context regeneration, and secret scanning (**never** put a model in the secrets path).
+- **Unverified, and stated as such rather than guessed**: per-token model pricing, Knip's licence (not on its landing page), and the staleness accuracy of a model — the last is what 4.3 proposes to measure on three real runs.
+- **`docs-health-action` (0 stars, 21 commits) is a reference to copy, not a dependency to trust** (O-3). `microsoft/hve-core`'s `ms.date` + 90-day-threshold pattern is the most credible production precedent found.
+- **This report builds on `research-github-actions-agent-offload.md` without re-deriving it** — plumbing, `--standalone`, and R1–R8 come from there; this report adds only the value question.
+- **Nothing was implemented.** §4 is a specification for `coder`/`deployer`, not a record of work done.
+
+---
+
+## Research Pipeline 24: Shipping GitHub Workflows to Consumer Repos — Included Is Done, Installed Is the Problem
+
+**Date:** 2026-11-12
+**Status:** ✅ SUCCESS (research-only — no workflow files, no scripts, no tests touched; `sync.js` explicitly must not change)
+**Pipeline:** research-ship-workflows (`research-ship-workflows:researcher` → `research-ship-workflows:tracker`)
+
+### Summary
+
+Answered a two-part question — "how do I have this be installed in my repositories? included in this npm module?" — where the two halves turned out to have opposite answers. **"Included" is already done:** `.github/workflows/` sits at `package.json:56` in the `files` allowlist, so `pr-test.yml` and `npm-publish.yml` already travel in the tarball to `node_modules/@abarcenas/ai-workflow-template/.github/workflows/`. **"Installed" is not done and is the whole problem:** nothing in `scripts/sync.js` or the eight setup phases ever writes to a consumer's `.github/workflows/`, and the README states that exclusion three times as a feature.
+
+The report's load-bearing finding is subtractive: the obvious fix — a new sync channel pointed at `.github/workflows/` — must not be built. The sync engine's single copy rule (copy when absent, overwrite when unmodified or `--force`, prune when the source vanished) applied to that directory means both existing workflows land in **every** consumer repo, `--force` overwrites consumer edits, and `--prune` deletes a consumer's verbatim copy. Ten concrete failure modes were tabulated, four of them red.
+
+The recommended design reuses a precedent the repo already has: ship **one template** at `templates/github-workflows/docs-health.yml` plus a new **Phase 9 `workflows-phase.js`** that copies it **create-if-absent only**, behind an explicit `--with-workflows=<name>` flag. The `projectOwnedAgentStubs` loop at `sync.js:289` / `sync.js:801-818` is exactly the "copy once, then never touch again" contract needed, and `--prune` is already safe against it today because `__github-workflows__/` is an unknown namespace that `resolvePruneEntry` maps to `null` (`sync.js:517-519`). Reusable workflows (`workflow_call`) were rejected for v1 — not for secrets, which do **not** leak — but because the consumer must still author a file and every template change would then execute inside their CI unreviewed, repeating the `refactor-agent-portability` defect this repo already fixed once.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/research-shipping-workflows-to-consumers.md` | **NEW** — 657-line research report: bottom line (§1), 20 verified repo facts (§2.1), per-workflow consumer impact (§2.2), six distribution options ranked (§3), shipped-set decision (§4), create-if-absent pattern against the real code (§5), honest drift/versioning story (§6), implementation spec for `coder` (§7), 8 risks with mitigations (§8), 4 deferred questions (§9), sourced external resources (§10), status history (§11) |
+| `docs/tracker-log.md` | **MODIFIED** — this entry |
+| `docs/TRACKER-INDEX.md` | **MODIFIED** — Research Pipeline 24 row + entry-location row + learned-knowledge session row |
+| `.agents/instructions/learned-knowledge.instructions.md` | **MODIFIED** — Session 2026-11-12 entry ("shipping vs installing"; the channel that fails `--force`; the drift story is the design's real cost) |
+| `memory-bank/progress.md` | **MODIFIED** — tracker summary with the same information |
+
+**Deliberately not modified:** every `.github/workflows/*.yml`, `scripts/sync.js` (the report's spec explicitly requires no `sync.js` change), `scripts/setup/*`, `package.json`, `README.md`. The report is a specification for a later `coder`/`deployer` step, not a record of work done.
+
+### Key Decisions
+
+- **Separate the two halves of the question before answering either.** "Included in the npm module" is verifiable and already true; "installed in my repositories" is a design question. Merging them is what produces a wrong answer, because the first is satisfied and the second is not, and the gap between them is the entire feature.
+- **Reject a `.github/workflows/` sync channel on mechanism, not on taste.** `collectFiles` recurses (`sync.js:419-436`), so a directory channel ships both existing workflows to every consumer; `forceOverwrite || isUntouched` (`sync.js:611`) then overwrites on the second run; `--prune` removes a consumer's unmodified copy (`sync.js:902-944`). Four of the ten failure modes are red — A1 name collision, A2 `--force` changes meaning, A5 scheduled model spend, A6 unagreed `contents: write`, A7 deleted CI.
+- **Reuse the create-if-absent precedent rather than invent a mechanism.** `projectOwnedAgentStubs` (`sync.js:289`) plus its loop (`sync.js:801-818`) is six lines with four properties worth preserving: the guard is `existsSync(target) → continue` (not a hash comparison), there is **no** force branch at all, the manifest key is the bare channel key, and the source is the package copy so there is no duplicated stub text to drift.
+- **Put it in a setup phase, not a sync pass.** A workflow file is executable privilege the moment it exists; creating one should be tied to a command the user actually typed, not to a routine sync that also runs inside prepare-adjacent flows. `tracker-phase.js` is the exact shape to copy: repo-side effect, `not-applicable` when the environment cannot support it, never throws.
+- **Ship exactly one file, and even it opt-in.** `docs-health.yml` is the only zero-token, zero-secret candidate, but it is still a **new gate on the consumer's PRs** that turns red when a link rots — a gate they never asked for. It must ship as the annotate-only variant (`fail: false`) with a comment showing how to make it blocking, per the value report's own deferred O-1.
+- **Do not call `validate-memory-schema.js` or `vocab-sync.js` from the shipped template.** Both are repo-specific, and `normalize-memory.js`'s mtime bug means a CI checkout would stamp *today's* date onto every doc. This converts value-report item 4.2 from a "next step" into a **blocker** for shipping: the template calls only tools the consumer actually has (lychee, markdownlint, git).
+- **Reject reusable workflows for a better reason than expected.** The anticipated blocker — a public reusable workflow leaking a consumer's secrets — is **not real**: secrets cross only if the caller passes them, and `secrets: inherit` is a caller-side declaration. The real disqualifiers are that the consumer still authors a file, and that every template change would run inside their CI with no change to their repository.
+- **`--with-workflows` is additive, not exclusive.** Unlike `--knowledgebase`, which sets every other skip flag (`index.js:155-162`), this flag installs one file and leaves the rest of setup untouched.
+- **No manifest entry, no `projectOwnedPaths`, no `requiredPrettierIgnorePatterns`.** A create-once file has no drift for the hash ledger to track; "project-owned" argues against the reads the drift report needs; and joining the prettier list would warn every existing consumer for a file whose formatting is irrelevant because nothing re-reads it.
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `.github/workflows/` in tarball allowlist | ✅ VERIFIED — `package.json:53-68`, entry at `:56` |
+| Workflows shipped but never installed | ✅ VERIFIED — no `.github` channel among the four (`sync.js:389-410`); exclusion stated at `README.md:91`, `:133`, `:368` |
+| `collectFiles` recurses (channel would ship both files) | ✅ VERIFIED — `sync.js:419-436`, used at `:581`, `:626` |
+| Create-if-absent precedent exists | ✅ VERIFIED — `projectOwnedAgentStubs` `sync.js:289`, loop `sync.js:801-818`, no force branch |
+| `--prune` is already safe for an unknown `__` namespace | ✅ VERIFIED — `sync.js:517-519` returns `null`; matrix row at `sync-unit.test.js:621-642` |
+| Reusable-workflow secret claim | ✅ VERIFIED against the GitHub reusing-workflows docs — secrets pass only when the caller passes them |
+| npm `files` semantics (tarball, not `node_modules` install) | ✅ VERIFIED against npmjs `package-json#files` + cross-checked via `context7` |
+| `npm pack --dry-run --json` | ⚠️ **NOT RUN** — read-only research agent; the "reaches `node_modules`" claim rests on three agreeing sources, and no file count is asserted |
+| `npx ai-workflow-setup` against a scratch consumer | ⚠️ **NOT RUN** — every phase claim is a reading of `scripts/setup/*.js`, not an observed execution |
+| `lycheeverse/lychee-action@v2` current major | ⚠️ Not re-checked; inherited as VERIFIED from the value report §2c (same date) |
+| Word count / line count | ✅ 657 lines; no per-run dollar figure appears anywhere (token pricing inherited as UNVERIFIED) |
+
+### Notes / Follow-up
+
+- **The identity of the two existing workflows is not an argument for shipping them.** `npm-publish.yml` is inert only because of its `github.repository` guard (`:35`) — a consumer who "adapts" it by deleting the guard gets a workflow that runs `npm ci`, `npx playwright install`, and `npm publish --provenance` with **their** `NPM_TOKEN`. `pr-test.yml` has no guard at all and hardcodes `npm run test:unit` / `npm test`, so it gives a consumer without those scripts a red check on their first PR. Any distribution design must ship **new** files and leave both where they are.
+- **The drift story is the design's real cost, and it was answered rather than hidden.** With create-if-absent, an already-copied workflow never updates. The mitigation is a first-line version stamp (`# ai-workflow-template:docs-health@X`, reusing the `HOOK_MARKER` idiom at `constants.js:21`) plus a **read-only compare** that reports `partial` (→ `warn`) when the consumer's copy differs — never `error`, because a differing file is a normal consequence of ownership and `error` returns `FATAL`.
+- **What to build, in order** (specified in §7, not implemented): add `templates/github-workflows/docs-health.yml`; add `scripts/setup/workflows-phase.js` + `.test.js` (12 named cases T1–T12); then change `package.json` `files`, `constants.js` `SUPPORTED_FLAGS`, `ui.js` help, `index.js` Phase 9 after `:446`, `README.md` at `:91`/`:133`/`:368`, and one `sync-unit.test.js` prune-null regression row. `scripts/sync.js` must **not** change.
+- **Four open questions were recorded as deferred, not left implicit**: annotate-only vs blocking (value report O-1 needs a week of real data); whether a reusable workflow becomes worth building once the release flow produces immutable tags; whether the deterministic checks ship as a composite action instead; and whether `templates/` should also hold the agent prompt files.
+- **One systemic risk worth carrying forward (D4/D7):** someone later "improving" the phase into a force-overwrite, or a template accidentally gaining a secret reference or `contents: write`, are both red. The mitigation is test-shaped — T3 asserts the consumer's bytes survive **with `--force` in the argument list**, T9 is a string scan for `secrets.`, `contents: write`, and `pull_request_target`, and T11/T12 pin prune safety.
+- This report builds on `research-github-actions-agent-offload.md` (plumbing) and `research-ai-doc-maintenance-workflows.md` (value ranking, `docs-health.yml` spec at 0 tokens) **without re-deriving either**; it adds only the distribution mechanism.
+- `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` is not configured); reported per the graceful-failure contract and not retried. Memory-bank semantic search executed — it returned the research artefact itself, which is why the entry cites the report's own evidence rather than restating it.
+
+---
+
+## Feature Pipeline 25: Central Agent Model Map — `.opencode/opencode.json`
+
+**Date:** 2026-11-18
+**Status:** ✅ SUCCESS — 33 files / 1,053 tests passing, 0 failures; 94.88% line coverage; all 4 declared gates green at verification
+**Pipeline:** implementer (plan) → coder (T1, T2, T3, T1b, T1c, T4, T5) → unit-tester (T6 verification) → coder (T7) → tracker (this entry)
+
+### Summary
+
+Gave the template one place to declare which model each of its 15 agents runs on, instead of leaving every consumer to set it per machine. The map now lives in `.opencode/opencode.json` — a new, git-tracked, npm-published file holding `$schema` plus an `agents` object of 15 IDs, every one pointed at `deepseek/deepseek-flash`. It is shipped intact to consumer projects by the sync engine, and it wins over the project-owned root `opencode.json` by OpenCode's own precedence rule. Three support changes made that possible: `.gitignore` was narrowed so only the root `opencode.json` is ignored, `package.json` `files` now carries the managed file, and `scripts/sync.js` learned a one-path exemption so the project-owned guard no longer silently swallows it. Documentation, the shipped example config, a README pointer, prettier protection and 4 new/extended test blocks cover the rest. Ten files changed; no agent markdown file was touched.
+
+### The Design Decision That Shaped Everything
+
+OpenCode V2 reads configuration **only** from `opencode.json(c)` files plus Markdown agents — there is no `extends`/`include` mechanism for arbitrary JSON. A standalone `agents-models.json` would therefore be an inert file that every consumer's OpenCode will ignore, which is precisely the failure a "central model map" is supposed to prevent. So the map had to live in a real config file that OpenCode already discovers:
+
+- `.opencode/opencode.json` is auto-discovered and merged **over** the direct/root `opencode.json` (OpenCode merges direct configs first, then `.opencode/` configs, farthest ancestor to nearest — so every `.opencode` document overrides every direct one).
+- The root `opencode.json` stays **project-owned** for consumer-local concerns (MCP servers, permissions, providers) and is never overwritten by sync.
+- The V2 key is **`agents`** (plural). V1's `agent` map was renamed in the V2 migration, and V1-era documentation still shows `agent` — this is the single easiest way to ship a map that validates in a doc example and does nothing in practice.
+
+Default for all 15 agents: `deepseek/deepseek-flash`.
+
+### Execution Steps
+
+| Step | Agent | Status | Result |
+|---|---|---|---|
+| 1 | implementer | ✅ | `plan/feature-central-agent-models-v1.md` — Batch A (config, example, docs), Batch B (README, tests), then verify. All 15 agent IDs enumerated from `.opencode/agents/` (including the three nested `orchestrator/*` IDs) and recorded in the plan. |
+| 2 | coder (T1) | ✅ | Rewrote `.opencode/opencode.json` — `$schema` + `agents` with all 15 IDs → `deepseek/deepseek-flash`. Validation: ok, 15 entries. |
+| 3 | coder (T2) | ✅ | Added the identical `agents` object to `opencode.mcp.example.json` (the scaffold source for consumers' root `opencode.json`); existing keys preserved; verified **byte-identical** `agents` object to `.opencode/opencode.json`. |
+| 4 | coder (T3) | ✅ | Added `## Agent models` to `.agents/config/README.md` — where the map lives, its precedence over the root config, a copy-paste example, and the do-not-rewrite rule for synced copies. |
+| 5 | coder (T1b) | ✅ | Fixed `.gitignore`: `opencode.json` → `/opencode.json`, so only the **root** project-owned file stays ignored and `.opencode/opencode.json` becomes publishable. |
+| 6 | coder (T1c) | ✅ | Added `.opencode/opencode.json` to `package.json` `files`; `npm pack --dry-run` confirms the file is in the tarball. |
+| 7 | coder (T4) | ✅ | `README.md` — Core Structure tree entry plus an Agents-table bullet naming the managed map as the single edit point, with merge-over-root semantics matching `.agents/config/README.md`. |
+| 8 | coder (T5) | ✅ | Coverage in `scripts/sync-unit.test.js`: copy-pass case, a `describe('central agent models')` repo-integrity block (managed map vs shipped example deep-equal, every agent `deepseek/deepseek-flash`, all 15 IDs covered), and pack assertions. **Discovered and fixed a real sync bug**: the project-owned check over-matched the managed path, so the map was silently skipped — resolved with `managedOpenCodePaths = new Set(['opencode.json'])` exempting it from the channel-agnostic guard. Suite green at 1,053. |
+| 9 | unit-tester (T6) | ✅ | All 4 declared gates GREEN. Independently proved the `sync.js` fix on a scratch consumer. Found one LOW-severity defect (managed file missing from prettier-ignore lists) — closed by T7. Full detail below. |
+| 10 | coder (T7) | ✅ | Added `.opencode/opencode.json` to `requiredPrettierIgnorePatterns` (in `scripts/sync.js`) and to the shipped `.prettierignore` plus its byte-identical `projectOwnedStubs` twin. Tests green at 1,053; coverage advisory clean. |
+| 11 | tracker | ✅ | This entry — pipeline record, progress summary, learned-knowledge session, TRACKER-INDEX rows. |
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.opencode/opencode.json` | **NEW** — the central map: `$schema` + `agents` with 15 IDs (`architect`, `coder`, `deployer`, `designer`, `e2e-tester`, `implementer`, `orchestrator/feature-pipeline`, `orchestrator/orchestrator`, `orchestrator/tdd-orchestrator`, `planner`, `researcher`, `reviewer`, `scope`, `tracker`, `unit-tester`), each `{ "model": "deepseek/deepseek-flash" }`. Managed (synced + published), not project-owned. |
+| `opencode.mcp.example.json` | **MODIFIED** — carries the identical `agents` object; this is the scaffold source for a consumer's root `opencode.json`. |
+| `.agents/config/README.md` | **MODIFIED** — new `## Agent models` section: location, precedence over the root config, example, and the rule that a synced copy is not edited in place. |
+| `README.md` | **MODIFIED** — Core Structure tree entry (marked managed/synced/overrides root) + one Agents-table bullet naming it the single edit point for per-agent models. |
+| `.gitignore` | **MODIFIED** — `opencode.json` → `/opencode.json`; root config stays ignored, `.opencode/opencode.json` becomes committable/publishable. |
+| `package.json` | **MODIFIED** — `.opencode/opencode.json` added to `files` (verified via `npm pack --dry-run`). |
+| `scripts/sync.js` | **MODIFIED** — `managedOpenCodePaths = new Set(['opencode.json'])` exempts the managed path from the project-owned guard (the guard was over-matching and silently skipping the map); `.opencode/opencode.json` added to `requiredPrettierIgnorePatterns` (T7). |
+| `.prettierignore` | **MODIFIED** — ignores the managed file, so a format pass cannot freeze the hash-tracked copy into a permanent "skipped locally modified". |
+| `scripts/sync-unit.test.js` | **MODIFIED** — copy-pass case, `describe('central agent models')` integrity block, pack assertions; 1,053 passing. |
+| `plan/feature-central-agent-models-v1.md` | Implementation plan — Batch A (config, example, docs), Batch B (README, tests), verify step. |
+
+**Deliberately not modified:** every `.opencode/agents/**` Markdown file (the map overrides models without touching agent specs), the root `opencode.json` (project-owned), and `.agents-sync-manifest.json` (derived, gitignored state).
+
+### Verification Detail (T6, handed off)
+
+| Gate | Result |
+|---|---|
+| `npx vitest run` | ✅ 33 files / **1,053 passed**, 0 failed |
+| Coverage | ✅ **94.88% lines** |
+| `npm test` | ✅ 7 passed / 1 **pre-existing** skip |
+| Memory schema validation | ✅ Green — vacuous for this change (no memory-bank frontmatter touched) |
+| Prettier | ⚠️ Failures proven **PRE-EXISTING at `HEAD`** — not caused by this pipeline (repo-wide markdown was already unformatted) |
+
+The `sync.js` fix was proven independently, not just unit-asserted: on a fresh scratch consumer (a) the managed map is copied, (b) the root `opencode.json` is never overwritten, and (c) the managed file survives `--prune` while a synthetic stale control file is pruned. That third check matters most — `--prune` deleting a file the package just installed would have been a silent, repeatable data loss for every consumer.
+
+T6 also flagged one **LOW** defect: the managed file was absent from the prettier-ignore lists, which would let a repo-wide format run mutate a hash-tracked file and freeze it as "locally modified" on every later sync. T7 closed it in `requiredPrettierIgnorePatterns`, the shipped `.prettierignore`, and its `projectOwnedStubs` twin (byte-identical).
+
+### Key Decisions
+
+- **Put the map in a real config file, not a bespoke JSON.** OpenCode V2 has no `extends`/`include` for arbitrary JSON, so `agents-models.json` would be inert by construction. `.opencode/opencode.json` is discovered, merged, and shipped.
+- **`.opencode/opencode.json` over the root `opencode.json`.** OpenCode merges every `.opencode` config *over* every direct config, which is exactly the precedence a managed template-level default needs — and it leaves the root file free for consumer-local MCP/permissions without a conflict.
+- **The key is `agents`, not `agent`.** V1→V2 renamed the map. V1-era docs still show `agent`, and a map under that key validates against an old example while doing nothing.
+- **Anchor the ignore instead of deleting it.** `.gitignore` keeps ignoring the project-owned root (`/opencode.json`) while letting the managed file be published; dropping the entry entirely would have started committing consumer-local config.
+- **Exempt the managed path from the project-owned guard rather than special-casing the caller.** The guard is channel-agnostic by design; a named exemption set keeps one rule for all channels and makes the exception visible at the rule, not at every call site.
+- **Guard the map with repo-integrity tests, not just a copy test.** The `describe('central agent models')` block asserts the managed map and the shipped example are deep-equal, every agent is `deepseek/deepseek-flash`, and all 15 `.opencode/agents` IDs are covered — so an agent added later without a model, or a drift between the two files, fails the suite.
+- **Protect the file from formatters.** A synced file tracked by hash must not be rewritten by a format pass; without the ignore, a consumer's first prettier run freezes it as "locally modified" forever.
+- **One default model for all 15 agents.** Deliberate: the map is a starting point consumers edit, so uniformity beats a per-role guess that would be wrong for most consumers.
+
+### Notes / Follow-up
+
+- 1,053 tests across 33 files, 0 failures; 94.88% line coverage; prettier failures are pre-existing at `HEAD` and were left alone (reformatting the repo was out of scope).
+- The managed map is per-repository, not per-machine: consumers get `deepseek/deepseek-flash` by default and edit `.opencode/opencode.json` to change it. Because it is synced, local edits to the managed copy are preserved by the unmodified-or-`--force` rule but are not the supported edit path — `.agents/config/README.md` says so.
+- Remaining LOW-severity item from T6 (prettier ignore) is **closed** by T7; no open defects were carried out of verification.
+- Review had not returned a final verdict when this record was written; the entry states verification facts only and makes no safety or merge-readiness claim.
+- Pipeline numbering: the previous research pipeline was recorded as 24, so this feature carries 25.
+- `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract and not retried. Context came from the step reports plus reads of `.opencode/opencode.json` and the OpenCode V2 config schema (used to confirm `agents` is the V2 key and that `.opencode/` configs override direct ones).
+
+---
+
+## Feature Pipeline 25 — Post-Review Fixes and Final Verification
+
+**Date:** 2026-11-18
+**Status:** ✅ SUCCESS — reviewer **APPROVE for merge, no blocking findings**; 2 MAJOR and 1 MINOR closed, 3 findings deferred; all 4 declared gates green at **33 files / 1,057 tests**
+**Pipeline:** reviewer (verdict) → coder (MAJOR-1, MAJOR-2, MINOR-3 fixes) → unit-tester (final gate verification) → tracker (this amendment)
+
+### Summary
+
+This amendment closes the loop the original entry left open: the reviewer's verdict arrived, two MAJOR findings were fixed, and the full gate set was re-run after the fixes. The main finding was a real safety defect — the managed map had been exempted from the project-owned guard on the **copy** path only, so `--prune` still saw it as project-owned and could have deleted a file the package had just installed. The exemption is now declared once inside the `.opencode/` channel branch and read by the shared guard, so copy and prune agree by construction. The second MAJOR was documentation rather than code: every agent is pinned to DeepSeek, and no file said so or explained the way out. Both are fixed and verified; three minor items were deliberately deferred. The original `## Feature Pipeline 25: Central Agent Model Map` entry above is unchanged — it records the pipeline as it stood before review, and this section records what changed after it.
+
+### Reviewer Verdict
+
+Session `ses_e1216bf42ffept0bu2CnOFflB7` — **APPROVE for merge, NO BLOCKING findings.**
+
+| ID | Severity | Finding | Disposition |
+|---|---|---|---|
+| MAJOR-1 | MAJOR | Prune/copy asymmetry — the managed map was exempted from the project-owned guard on the copy path, but `--prune` still classified it as project-owned and could delete it | ✅ **FIXED** |
+| MAJOR-2 | MAJOR | Provider lock-in undocumented — all 15 agents pinned to `deepseek/deepseek-flash` with no stated authentication requirement and no documented escape route | ✅ **FIXED** |
+| MINOR-3 | MINOR | Contradictory prose — `README.md` called the root `opencode.json` the model source while the map actually lives in `.opencode/`; the plan still described the pre-fix, channel-agnostic guard | ✅ **FIXED** |
+| MINOR-4 | MINOR | `discoverAgentIds` test is self-referential — it derives the expected agent list from the same source it asserts against, so a dropped agent would still pass | ⏸️ DEFERRED |
+| MINOR-5 | MINOR | The new **required** prettier-ignore pattern will make an existing consumer's sync report a warning; needs release-note wording for upgrades | ⏸️ DEFERRED |
+| COSMETIC | COSMETIC | Redundant `JSON.stringify` comparison at `scripts/sync-unit.test.js:1133` | ⏸️ DEFERRED |
+
+### MAJOR-1 — Prune/Copy Asymmetry (fixed)
+
+The exemption that made the managed map copyable was applied in a place prune never consulted. `isManagedOpencodeFile` is now declared once (`scripts/sync.js:515`) and set **only** inside the `__opencode__/` branch of `resolvePruneEntry` (`:530-531`), so prune and copy derive the same answer from the same rule. The shared project-owned guard reads:
+
+```js
+if (isProjectOwnedPath(relativePath) && !isManagedOpencodeFile) {
+  return null
+}
+```
+
+(`scripts/sync.js:564`). The exemption is therefore **channel-scoped**, not path-shaped — the same relative name in a different channel is still project-owned:
+
+| Path passed to the guard | Result |
+|---|---|
+| `__root__/opencode.json` | `null` — project-owned, untouched |
+| `__project__/opencode.json` | `null` |
+| `__scripts__/opencode.json` | `null` |
+| `__opencode__/AGENTS.project.md` | `null` |
+| untagged `.agents` `opencode.json` | `null` |
+| `__opencode__/opencode.json` | managed — resolvable, so copy **and** prune both act on it |
+
+The root `opencode.json` stays protected even under `--force`: verified by hash (unchanged) with sentinel content surviving the run.
+
+Tests added in `scripts/sync-unit.test.js`:
+
+- a `resolvePruneEntry` **resolution** case for the managed path (it must resolve rather than return `null`);
+- a **5-key negative** case covering each channel in the table above;
+- a `describe('managed .opencode model map pruning')` block with **prune-when-unmodified** (the managed file is removed when the package no longer ships it, with `agents/coder.md` as the positive control proving prune still works in the same run) and **keep-when-modified** (a locally edited copy survives).
+
+### MAJOR-2 — Provider Lock-In (fixed)
+
+The map is a hard pin, not a default, and nothing said so. Both configuration docs now state all four lock-in facts explicitly:
+
+- `README.md:156` — the managed map pins **all 15 agents** to `deepseek/deepseek-flash`;
+- a consumer **must have DeepSeek authenticated** in OpenCode, or every agent fails model resolution;
+- a consumer **cannot** override the model from their own root `opencode.json`, because the managed `.opencode` config wins the merge;
+- escape routes: edit the managed file (sync then reports `skipped locally modified opencode file` on every run) or change the template default — and `--force` reverts a local edit.
+
+`.agents/config/README.md:83-98` carries the same four facts, so the pointer file a consumer actually reads is not less honest than the top-level README.
+
+### MINOR-3 — Contradictory Prose (fixed)
+
+`README.md:99` and `README.md:413-414` now say **root** `opencode.json`, and state explicitly that the managed `.opencode/opencode.json` is shipped and synced — the opposite of the scaffolded-never-shipped rule, and the distinction that caused the confusion. `plan/feature-central-agent-models-v1.md` had its scope paragraph and **CON-01** amended to describe the channel-scoped exemption rather than the original channel-agnostic one, so a future reader of the plan is not told a guard shape that no longer exists.
+
+### Deferred (3, deliberate)
+
+| ID | Why deferred |
+|---|---|
+| MINOR-4 | Pinning the 15 IDs as a literal expected list turns the test into a second copy of the thing it checks. The right fix needs a decision about which source of truth is authoritative — a test-fixture list or `.opencode/agents/` — and that decision is larger than this pipeline. |
+| MINOR-5 | A release note is consumer-facing packaging work, not a code change. The behaviour is correct; what is missing is telling existing consumers that a new **required** ignore pattern will surface as a sync warning on their first run. |
+| COSMETIC | Dropping the redundant `JSON.stringify` at `scripts/sync-unit.test.js:1133` changes no assertion outcome. |
+
+None of the three affects correctness, and none is a merge precondition.
+
+### Final Verification (after the fixes)
+
+Run by the unit-tester in session `ses_e1210361fffeL4OWqcPiLxRtvE`. The full verification block was reported to the orchestrator as `## Unit Tester — central-agent-models final gate verification`; at the time of this amendment that heading was **not present in this file**, so the numbers below are transcribed from the delegation report rather than cross-referenced to a section on disk.
+
+| Gate | Command | Result |
+|---|---|---|
+| G1 | `npx vitest run` | ✅ 33 files / **1,057 passed** / 0 failed / 0 skipped |
+| G2 | coverage | ✅ met in **every** declared target — `scripts/**` lines **94.88%** vs 90 required; overall lines **96.70%** |
+| G3 | `HEADLESS=true npm test` | ✅ 7 passed + 1 **pre-existing** skip |
+| G4 | memory-schema validation | ✅ exit 0 — vacuous on a clean index |
+
+Test-count arithmetic: `HEAD` was **1,049** (1,047 passed + 2 skipped). The suite is now **1,057** — 8 new tests added, plus the 2 formerly-skipped tests now running against the managed file.
+
+### Outstanding Before Commit
+
+`.opencode/opencode.json` and `.opencode/package.json` are **untracked and not gitignored**. Both must be committed. If they are not, a clean-checkout tarball omits the model map entirely and the 2 plugin-contract tests revert to skipped — the feature would ship as documentation and the suite would look green while testing less.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `scripts/sync.js` | `isManagedOpencodeFile` declared once (`:515`), set only in the `__opencode__/` branch of `resolvePruneEntry` (`:530-531`), read by the shared guard (`:564`). Copy and prune now share one rule. |
+| `scripts/sync-unit.test.js` | `resolvePruneEntry` resolution case, 5-key channel negative case, and `describe('managed .opencode model map pruning')` with prune-when-unmodified (control `agents/coder.md`) and keep-when-modified. |
+| `README.md` | `:156` states the four lock-in facts; `:99` and `:413-414` corrected to **root** `opencode.json` and now state that the managed `.opencode/opencode.json` is shipped and synced. |
+| `.agents/config/README.md` | `:83-98` — the same four lock-in facts, in the file consumers are pointed at. |
+| `plan/feature-central-agent-models-v1.md` | Scope paragraph and **CON-01** amended to the channel-scoped exemption. |
+| `docs/tracker-log.md` | This amendment. |
+| `memory-bank/progress.md` | Post-review entry + final gate numbers. |
+| `docs/TRACKER-INDEX.md` | Pipeline row refreshed; amendment session added. |
+| `.agents/instructions/learned-knowledge.instructions.md` | `## Session: 2026-11-18 — Central Agent Model Map: Post-Review Fixes`. |
+
+### Key Decisions
+
+- **Fix the rule, not the call sites.** The prune defect came from an exemption that existed on one code path. Adding the same exemption to prune would have created two rules that can drift again; declaring it once inside the channel branch means both paths read it and neither can be forgotten.
+- **Exempt by channel, not by filename.** `opencode.json` is a common name. Scoping the exemption to `__opencode__/` keeps every other channel's `opencode.json` project-owned, which is what the guard was protecting in the first place.
+- **Document the lock-in instead of softening it.** The pin is intentional (uniform default, one edit point). Pretending it is a soft default would have been worse than stating it plainly with the escape routes and the `--force` consequence.
+- **Defer rather than guess.** MINOR-4 needs a source-of-truth decision; MINOR-5 is release packaging; the cosmetic is cosmetic. None blocks the merge, and inventing an answer for MINOR-4 inside a fix pass would have replaced a weak test with a duplicate one.
+- **Leave the original entry alone.** The prior record is accurate for its moment; the post-review state belongs in its own section, so the review trail stays readable as a sequence rather than being rewritten in place.
+
+### Notes / Follow-up
+
+- **Blocking for release, not for merge:** commit `.opencode/opencode.json` and `.opencode/package.json`. Both are untracked and not gitignored; a clean checkout loses the map and two tests.
+- **Deferred and still open:** MINOR-4 (literal ID list decision), MINOR-5 (release-note wording for the new required prettier-ignore pattern), COSMETIC (`sync-unit.test.js:1133`).
+- **Unverified here:** the prettier gate was not part of the four declared gates. The prior entry records its failures as **pre-existing at `HEAD`**; this amendment makes no new claim about formatting.
+- `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract and not retried. Context came from the delegation report plus targeted reads of `scripts/sync.js`, `scripts/sync-unit.test.js`, `README.md`, and the original entry.
+
+## Unit Tester — central-agent-models final gate verification
+
+**Date:** 2026-11-18
+**Status:** ✅ SUCCESS
+
+### Summary
+Re-ran all four declared gates after the reviewer's two MAJOR fixes (`resolvePruneEntry` managed-`.opencode` exemption, confined to that channel) and the MINOR-3 fix. Every gate passed: G1 1057 passed / 33 files, G2 all coverage thresholds ≥ 90 (lines 96.70%), G3 7 passed with 1 pre-existing skip, G4 exit 0 vacuously on a clean index. All five claims made after the review fixes were independently verified, including an end-to-end prune against a throwaway consumer and a mutation-based discrimination proof.
+
+### Files Produced / Modified
+| File | Description |
+|------|-------------|
+| (none) | Verification only — repository tree unchanged (14 modified / 10 untracked, identical before and after) |
+
+### Key Decisions
+- Applied G3's declared precondition (`HEADLESS=true`) because `DISPLAY` is unset; this is the declaration's own instruction for headless environments, not a substituted command.
+- Reported G4 as PASSED-but-vacuous rather than meaningful, since a clean index validates zero files.
+- Proved discrimination by mutating a `/tmp` copy of `scripts/sync.js` (guard at line 564 only) instead of editing the repository, satisfying the "mutate a copy, restore, state the proof" rule.
+
+### Notes / Follow-up
+- Test count arithmetic: HEAD 1049 (1047 passed + 2 skipped) → working 1057 (1057 passed + 0 skipped). `1057 = 1049 + 8` new tests; the 2 skips flipped to running because `.opencode/opencode.json` and `.opencode/package.json` now exist locally but are still untracked — commit them or a fresh clone will skip PLUG-002/PLUG-003 again.
+- `docs/tracker-log.md`, `docs/TRACKER-INDEX.md`, `memory-bank/activeContext.md` and `memory-bank/progress.md` should record that the prune exemption is channel-scoped and that root `opencode.json` survives even `--force`.

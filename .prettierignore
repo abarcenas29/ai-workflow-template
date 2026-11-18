@@ -6,6 +6,7 @@
 .agents/
 .opencode/agents/
 .opencode/commands/
+.opencode/opencode.json
 
 # Managed root files
 AGENTS.md

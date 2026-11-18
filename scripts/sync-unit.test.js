@@ -618,6 +618,38 @@ describe('resolvePruneEntry', () => {
     }
   })
 
+  it('resolves the managed .opencode model map as a prune entry', () => {
+    const ctx = context()
+
+    const entry = resolvePruneEntry('__opencode__/opencode.json', ctx)
+
+    // The copy pass ships and hash-tracks this file, so prune must see it too.
+    expect(entry).not.toBeNull()
+    expect(entry.packagePaths).toEqual([
+      join(ctx.pruneChannels.opencode.packageDir, 'opencode.json'),
+    ])
+    expect(entry.consumerPath).toBe(
+      join(ctx.pruneChannels.opencode.consumerDir, 'opencode.json'),
+    )
+  })
+
+  it('keeps opencode.json project-owned outside the .opencode channel', () => {
+    const ctx = context()
+
+    // The managed exemption is channel-scoped: the ROOT, scaffold-only, scripts
+    // and .agents keys that happen to be named opencode.json all stay null, as
+    // does the project-owned AGENTS.project.md that shares the .opencode channel.
+    for (const key of [
+      '__root__/opencode.json',
+      '__project__/opencode.json',
+      '__scripts__/opencode.json',
+      'opencode.json',
+      '__opencode__/AGENTS.project.md',
+    ]) {
+      expect(resolvePruneEntry(key, ctx), key).toBeNull()
+    }
+  })
+
   it.each([
     ['unknown internal namespace', '__future__/thing.md'],
     ['scaffold-only project namespace', '__project__/AGENTS.project.md'],
@@ -651,6 +683,10 @@ const AGENTS_FILES = {
 }
 const OPENCODE_FILES = {
   'agents/coder.md': 'coder agent\n',
+  // The managed central agent model map. It ships from the package, unlike the
+  // project-owned ROOT opencode.json, which is only ever scaffolded.
+  'opencode.json':
+    '{\n  "agents": {\n    "coder": { "model": "deepseek/deepseek-flash" }\n  }\n}\n',
   'node_modules/dep/index.js': 'dependency\n',
   'nested/node_modules/keep.js': 'nested kept\n',
   'package.json': '{"name":"pkg"}\n',
@@ -686,8 +722,10 @@ describe('runSync copy passes', () => {
     const result = runSync({ packageRoot, consumerRoot })
 
     expect(result.exitCode).toBe(0)
-    expect(result.copied).toBe(9)
-    expect(result.added).toBe(9)
+    // 4 .opencode files (including the managed opencode.json), 2 .agents files,
+    // 2 scripts and 2 root files.
+    expect(result.copied).toBe(10)
+    expect(result.added).toBe(10)
     expect(result.scaffolded).toBe(10)
     expect(result.skipped).toBe(0)
     expect(errorSpy).not.toHaveBeenCalled()
@@ -816,7 +854,7 @@ describe('runSync copy passes', () => {
     runSync({ packageRoot, consumerRoot })
     const second = runSync({ packageRoot, consumerRoot })
 
-    expect(second.copied).toBe(9)
+    expect(second.copied).toBe(10)
     expect(second.added).toBe(0)
     expect(second.scaffolded).toBe(0)
     expect(second.skipped).toBe(0)
@@ -916,6 +954,31 @@ describe('runSync copy passes', () => {
     )
   })
 
+  it('ships the managed .opencode/opencode.json map without touching the root config', () => {
+    const { packageRoot, consumerRoot } = createCopyFixture()
+
+    runSync({ packageRoot, consumerRoot })
+
+    // The managed map is a template file, so it is copied into .opencode/.
+    const managedPath = join(consumerRoot, '.opencode', 'opencode.json')
+    expect(existsSync(managedPath)).toBe(true)
+    const managed = JSON.parse(readFileSync(managedPath, 'utf8'))
+    expect(managed.agents.coder.model).toBe('deepseek/deepseek-flash')
+
+    const manifest = readConsumerManifest(consumerRoot)
+    expect(manifest.files['__opencode__/opencode.json']).toBe(
+      hashFile(managedPath),
+    )
+
+    // The ROOT config is project-owned: the managed map must never overwrite
+    // it, so it still holds the scaffolded example byte-for-byte.
+    expect(readFileSync(join(consumerRoot, 'opencode.json'), 'utf8')).toBe(
+      MCP_EXAMPLE,
+    )
+    expect(manifest.files['__project__/opencode.json']).toBe(sha256(MCP_EXAMPLE))
+    expect(manifest.files['__root__/opencode.json']).toBeUndefined()
+  })
+
   it('logs progress details when AI_WORKFLOW_VERBOSE=1', () => {
     const { packageRoot, consumerRoot } = createCopyFixture()
 
@@ -957,8 +1020,8 @@ describe('runSync copy passes', () => {
       env: {},
     })
 
-    expect(result.copied).toBe(9)
-    expect(result.added).toBe(9)
+    expect(result.copied).toBe(10)
+    expect(result.added).toBe(10)
     // Copy passes are suppressed.
     expect(existsSync(join(consumerRoot, '.agents', 'skills', 'alpha', 'SKILL.md'))).toBe(false)
     expect(existsSync(join(consumerRoot, '.opencode', 'agents', 'coder.md'))).toBe(false)
@@ -1016,6 +1079,77 @@ describe('runSync copy passes', () => {
         'utf8',
       ),
     ).toBe('deep\n')
+  })
+})
+
+// ── Central agent models ─────────────────────────────────────────────────────
+
+const CENTRAL_AGENT_MODEL = 'deepseek/deepseek-flash'
+
+function readRepoAgents(fileName) {
+  const config = JSON.parse(readFileSync(join(repoRoot, fileName), 'utf8'))
+  expect(config).toBeTypeOf('object')
+  expect(config.agents).toBeTypeOf('object')
+  return config.agents
+}
+
+// Discovers the agent IDs OpenCode would load: every *.md directly under
+// .opencode/agents/, plus one level down (orchestrator/feature-pipeline.md
+// becomes "orchestrator/feature-pipeline").
+function discoverAgentIds() {
+  const agentsDir = join(repoRoot, '.opencode', 'agents')
+  const discovered = []
+
+  for (const entry of readdirSync(agentsDir, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith('.md')) {
+      discovered.push(entry.name.slice(0, -'.md'.length))
+      continue
+    }
+    if (!entry.isDirectory()) continue
+
+    for (const nested of readdirSync(join(agentsDir, entry.name), {
+      withFileTypes: true,
+    })) {
+      if (nested.isFile() && nested.name.endsWith('.md')) {
+        discovered.push(
+          `${entry.name}/${nested.name.slice(0, -'.md'.length)}`,
+        )
+      }
+    }
+  }
+
+  return discovered
+}
+
+describe('central agent models', () => {
+  it('keeps the managed map and the shipped example deep-equal', () => {
+    const managed = readRepoAgents('.opencode/opencode.json')
+    const example = readRepoAgents('opencode.mcp.example.json')
+
+    // A consumer's scaffolded root config is copied from the example, so the
+    // two maps must not drift: the example is what a new project receives, the
+    // managed file is what an existing project gets on sync.
+    expect(managed).toEqual(example)
+    expect(JSON.stringify(managed)).toBe(JSON.stringify(example))
+  })
+
+  it('pins every agent to exactly the central model', () => {
+    const managed = readRepoAgents('.opencode/opencode.json')
+    const example = readRepoAgents('opencode.mcp.example.json')
+
+    for (const map of [managed, example]) {
+      for (const [agentId, entry] of Object.entries(map)) {
+        expect(entry, agentId).toEqual({ model: CENTRAL_AGENT_MODEL })
+      }
+    }
+  })
+
+  it('covers every shipped agent definition and nothing else', () => {
+    const agents = readRepoAgents('.opencode/opencode.json')
+    const discovered = discoverAgentIds()
+
+    expect(discovered).toHaveLength(15)
+    expect(new Set(discovered)).toEqual(new Set(Object.keys(agents)))
   })
 })
 
@@ -1596,6 +1730,8 @@ describe('project-owned files', () => {
     )
     expect(packageManifest.files).not.toContain('AGENTS.project.md')
     expect(packageManifest.files).not.toContain('opencode.json')
+    // The managed .opencode map is not the project-owned root config: it ships.
+    expect(packageManifest.files).toContain('.opencode/opencode.json')
     expect(packageManifest.files).toContain('.prettierignore')
 
     // This package is a scaffold, not a library: no dangling entry point and
@@ -1612,6 +1748,7 @@ describe('project-owned files', () => {
     const files = JSON.parse(packed.stdout)[0].files.map((file) => file.path)
     expect(files).toContain('.prettierignore')
     expect(files).toContain('LICENSE')
+    expect(files).toContain('.opencode/opencode.json')
     expect(files).not.toContain('AGENTS.project.md')
     expect(files).not.toContain('opencode.json')
     expect(files).not.toContain('CONTRIBUTING.md')
@@ -1977,6 +2114,114 @@ describe('--prune decision matrix', () => {
     expect(
       manifest.files['__agents-instructions__/learned-knowledge.instructions.md'],
     ).toBeDefined()
+  })
+})
+
+// ── Managed .opencode model map pruning ──────────────────────────────────────
+
+describe('managed .opencode model map pruning', () => {
+  const MODEL_MAP =
+    '{\n  "agents": {\n    "coder": { "model": "deepseek/deepseek-flash" }\n  }\n}\n'
+  const CODER_AGENT = 'coder agent\n'
+
+  // Package has stopped shipping BOTH opencode.json and agents/coder.md, so any
+  // surviving consumer copy is stale. `modifyModelMap` writes different local
+  // contents while keeping the manifest hash at the original, simulating a
+  // consumer edit.
+  function createManagedOpencodeFixture({ modifyModelMap = false } = {}) {
+    const packageRoot = createPackage({
+      agents: { 'skills/shipped/SKILL.md': 'shipped\n' },
+      opencode: { 'agents/shipped.md': 'shipped agent\n' },
+      scripts: { 'memory-cli.js': '// cli\n' },
+      root: { 'AGENTS.md': '# agents\n' },
+      mcpExample: MCP_EXAMPLE,
+    })
+    const consumerRoot = createTempDir()
+
+    writeFixtureFile(
+      consumerRoot,
+      '.opencode/agents/shipped.md',
+      'shipped agent\n',
+    )
+    writeFixtureFile(
+      consumerRoot,
+      '.opencode/opencode.json',
+      modifyModelMap ? '{\n  "agents": {}\n}\n' : MODEL_MAP,
+    )
+    writeFixtureFile(consumerRoot, '.opencode/agents/coder.md', CODER_AGENT)
+
+    const manifest = {
+      version: 1,
+      files: {
+        '__opencode__/agents/shipped.md': sha256('shipped agent\n'),
+        '__opencode__/opencode.json': sha256(MODEL_MAP),
+        '__opencode__/agents/coder.md': sha256(CODER_AGENT),
+      },
+    }
+    writeFixtureFile(
+      consumerRoot,
+      '.agents-sync-manifest.json',
+      `${JSON.stringify(manifest, null, 2)}\n`,
+    )
+
+    return { packageRoot, consumerRoot }
+  }
+
+  it('prunes an unmodified managed model map once the package stops shipping it', () => {
+    const { packageRoot, consumerRoot } = createManagedOpencodeFixture()
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--prune'],
+      env: {},
+    })
+
+    // The managed model map and the sibling agent file both go; the still-shipped
+    // file stays. The agent file is the control proving this is a live prune path.
+    expect(result.pruned).toBe(2)
+    expect(existsSync(join(consumerRoot, '.opencode/opencode.json'))).toBe(false)
+    expect(existsSync(join(consumerRoot, '.opencode/agents/coder.md'))).toBe(
+      false,
+    )
+    expect(existsSync(join(consumerRoot, '.opencode/agents/shipped.md'))).toBe(
+      true,
+    )
+
+    const manifest = readConsumerManifest(consumerRoot)
+    expect(manifest.files['__opencode__/opencode.json']).toBeUndefined()
+    expect(manifest.files['__opencode__/agents/coder.md']).toBeUndefined()
+    expect(manifest.files['__opencode__/agents/shipped.md']).toBeDefined()
+    expect(outputOf(logSpy)).toContain('Pruned 2 stale file(s)')
+  })
+
+  it('keeps a locally modified managed model map', () => {
+    const { packageRoot, consumerRoot } = createManagedOpencodeFixture({
+      modifyModelMap: true,
+    })
+
+    const result = runSync({
+      packageRoot,
+      consumerRoot,
+      argv: ['--prune'],
+      env: {},
+    })
+
+    // Only the untouched control file is pruned; the edit is protected.
+    expect(result.pruned).toBe(1)
+    expect(existsSync(join(consumerRoot, '.opencode/opencode.json'))).toBe(true)
+    expect(
+      readFileSync(join(consumerRoot, '.opencode/opencode.json'), 'utf8'),
+    ).toBe('{\n  "agents": {}\n}\n')
+    expect(existsSync(join(consumerRoot, '.opencode/agents/coder.md'))).toBe(
+      false,
+    )
+
+    const manifest = readConsumerManifest(consumerRoot)
+    expect(manifest.files['__opencode__/opencode.json']).toBe(sha256(MODEL_MAP))
+    expect(outputOf(warnSpy)).toContain(
+      'Skipped pruning locally modified file: .opencode/opencode.json',
+    )
   })
 })
 

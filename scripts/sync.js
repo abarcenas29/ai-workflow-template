@@ -22,8 +22,8 @@ export const excludedRelativePaths = new Set([
 // Files the consumer owns outright. Sync never copies, overwrites, or prunes
 // them — not even with --force — because local edits are the point, not drift.
 // Matching is channel-agnostic: every copy pass compares its own relative path
-// against this set, so a root entry such as "opencode.json" also protects
-// ".opencode/opencode.json" and ".agents/opencode.json". That over-match is
+// against this set, so a root entry such as ".prettierignore" also protects
+// ".opencode/.prettierignore" and ".agents/.prettierignore". That over-match is
 // intentional and conservative. The original learned-knowledge exclusion is
 // spread in so there is one rule, not two parallel checks.
 export const projectOwnedPaths = new Set([
@@ -44,6 +44,20 @@ export const projectOwnedPaths = new Set([
 export function isProjectOwnedPath(relativePath) {
   return projectOwnedPaths.has(relativePath)
 }
+
+// One over-match of the channel-agnostic rule above is deliberately cancelled:
+// ".opencode/opencode.json" is a managed template file, not consumer state. It
+// ships from the package so every consumer receives the same central agent
+// model map, so the ".opencode" copy pass exempts it from the project-owned
+// check AND resolvePruneEntry exempts it from the project-owned prune guard
+// (both exemptions are scoped to the "__opencode__/" channel only). Prune must
+// be exempt too: the file is hash-tracked and overwritten by the copy pass, so
+// if it were unprunable a stale model pin would survive --prune forever once the
+// package stopped shipping it. The ROOT "opencode.json" stays project-owned on
+// every channel and is only ever scaffolded create-if-absent from
+// opencode.mcp.example.json, so the managed map can never overwrite a consumer's
+// root config.
+export const managedOpenCodePaths = new Set(['opencode.json'])
 
 export const openCodeExcluded = new Set([
   'node_modules',
@@ -81,6 +95,9 @@ export const requiredPrettierIgnorePatterns = [
   '.agents/',
   '.opencode/agents/',
   '.opencode/commands/',
+  // The managed model map ships from the package and is hash-tracked, so a
+  // format pass must not touch it either.
+  '.opencode/opencode.json',
   ...rootFiles,
   ...scriptsToSync.map((script) => `scripts/${script}`),
 ]
@@ -310,6 +327,7 @@ export const projectOwnedStubs = {
 .agents/
 .opencode/agents/
 .opencode/commands/
+.opencode/opencode.json
 
 # Managed root files
 AGENTS.md
@@ -491,6 +509,10 @@ export function isPathInside(baseDir, candidatePath) {
 export function resolvePruneEntry(manifestKey, { pruneChannels }) {
   let channel
   let relativePath
+  // Whether this key is a managed `.opencode` file (see managedOpenCodePaths).
+  // Only set inside the "__opencode__/" branch, so the project-owned prune guard
+  // over-match is cancelled for that channel and nowhere else.
+  let isManagedOpencodeFile = false
 
   // Scaffold-only namespace for project-owned files. There is no package source
   // to compare against and nothing here may ever be deleted.
@@ -501,6 +523,12 @@ export function resolvePruneEntry(manifestKey, { pruneChannels }) {
   if (manifestKey.startsWith('__opencode__/')) {
     channel = pruneChannels.opencode
     relativePath = manifestKey.slice(channel.prefix.length)
+    // Managed `.opencode` template files (e.g. "opencode.json") are exempt from
+    // the project-owned rule on this channel — the same exemption the copy pass
+    // applies. They ship from the package and are hash-tracked, so they must be
+    // prunable once the package stops shipping them.
+    isManagedOpencodeFile =
+      isProjectOwnedPath(relativePath) && managedOpenCodePaths.has(relativePath)
     // Never touch paths the .opencode copy pass deliberately ignores (e.g. node_modules).
     if (
       openCodeExcluded.has(relativePath) ||
@@ -527,8 +555,13 @@ export function resolvePruneEntry(manifestKey, { pruneChannels }) {
   }
 
   // Project-owned files survive every prune, even when the package no longer
-  // ships a same-named path. This is the single check for all four channels.
-  if (isProjectOwnedPath(relativePath)) {
+  // ships a same-named path. This is the single check for all four channels —
+  // with one deliberate exception: managed `.opencode` files (see
+  // managedOpenCodePaths) are copied and hash-tracked like any shipped template
+  // file, so they fall through to the normal prune rule instead of surviving
+  // unconditionally. The exception is channel-scoped; the ROOT "opencode.json"
+  // and ".agents/opencode.json" keys still return null here.
+  if (isProjectOwnedPath(relativePath) && !isManagedOpencodeFile) {
     return null
   }
 
@@ -628,7 +661,8 @@ export function syncProject(context) {
     for (const sourceFile of openCodeFiles) {
       const relativePath = relative(sourceOpenCodeDir, sourceFile)
       if (
-        isProjectOwnedPath(relativePath) ||
+        (isProjectOwnedPath(relativePath) &&
+          !managedOpenCodePaths.has(relativePath)) ||
         openCodeExcluded.has(relativePath) ||
         openCodeExcluded.has(relativePath.split('/')[0])
       ) {

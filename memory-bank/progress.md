@@ -1,7 +1,7 @@
 ---
 id: "progress"
 title: "Progress"
-updated: "2026-11-10"
+updated: "2026-11-18"
 
 tags: [architect, coder, implementer, deployer, tester, reviewer, tracker, orchestrator, bootstrap, setup, tdd, feature-pipeline, normalization, implementation, discovery, documentation, verification, agent-exercise, knowledgebase, pgvector, mcp, dotenv, chunk-parser, bug-fix, spike, float32array, learned-knowledge, npm, package-structure, readme, security, env-remediation, git, credential, test-hardening, commit, pipeline-follow-up, agents, env-var-shadowing, mcp-config, restart, refactor, configuration]
 entities: [vitest, playwright, graphify, memory-bank, husky, tdd-orchestrator, mcp-server, opencode, npm, architecture-context, knowledgebase, pgvector]
@@ -20,6 +20,45 @@ category: "progress"
 - **KB Consolidation + Standardization — `plan/process-kb-consolidation-1.md` — STATUS: ✅ COMPLETED 2026-08-03 (ALL 10 TASKS / 4 PHASES DONE — T10 docs/status finalized in Phase 4)** — 10 tasks / 4 phases. Consolidate duplicate KB projects (re-index `@abarcenas/ai-workflow-template` from source → delete `ai-workflow-template`) and standardize projectId derivation (always use `package.json` `name`). **T1 ✅ 2026-08-03**: canonical scoped project re-indexed (16 chunks, +1). **T3 ✅ 2026-08-03**: `.opencode/agents/tracker.agent.md` "Check Knowledge" step gained projectId derivation guidance (line 30) — `knowledgebase_index` `projectId` SHALL be `require('./package.json').name` (scoped `@abarcenas/ai-workflow-template`), NOT orchestrator `projectName`; 14/14 existing spec-wiring tests pass. **T4 ✅ 2026-08-03**: `knowledge-retrieval.instructions.md` gained `### Canonical projectId` subsection (package.json name = single source of truth). **T5 ✅ 2026-08-03**: `knowledgebase.instructions.md` `knowledgebase_index` row `projectId` now "(required — from `package.json` `name` field)" + tool-detail sentence (scoped package name, single canonical project); **T7 (restart note) ✅ 2026-08-03** (dispatched with T5 — same FILE-03): added `### MCP Server Restart After Configuration Changes` subsection (after graceful-degradation section) + "Restart OpenCode after code changes" cross-reference in the `knowledgebase_search` tool description. **T6 (re-batched) ✅ 2026-08-03**: all 3 orchestrator `projectName` descriptions now read `(extracted from user request (prefer package.json "name" for the canonical scoped projectId))` — `orchestrator.agent.md:25` by the T6 agent; `feature-pipeline.agent.md:20` + `tdd-orchestrator.agent.md:20` by the "T7" coder instance (satisfies T9 spec test #4). **T8 ✅ 2026-08-03**: full Vitest suite `npx vitest run` → **14 files / 273 tests / 0 failures** (REQ-06 exact match); setup sub-suite `npx vitest run scripts/setup` → **6 files / 104 tests / 0 failures** — zero regressions from the additive doc changes (VALIDATION ONLY, no files edited). Remaining: T9 (spec test, Batch B parallel), T10 (memory bank + plan complete). No production code changes.
 
 ## What Works
+
+### 2026-11-18: Tracker — Post-review fixes + final verification (Feature Pipeline 25)
+
+The reviewer approved the central model map for merge with no blocking findings, both MAJOR findings were fixed, and the suite grew to 1,057 passing tests with all four declared gates green. Prune and copy now agree on which files are managed.
+
+- **Prune would have deleted the file copy just installed.** The managed map was exempted from the project-owned guard on the copy path only; `--prune` still saw it as project-owned. `isManagedOpencodeFile` now lives once inside the `__opencode__/` branch of `resolvePruneEntry` (`scripts/sync.js:530-531`) and the shared guard reads it (`:564`), so the exemption is **channel-scoped**: `__root__/`, `__project__/`, `__scripts__/` and untagged `.agents` `opencode.json` all still return `null`, and root `opencode.json` survives `--force` with its hash and sentinel content unchanged. Tests: a resolution case, a 5-key negative case, and `describe('managed .opencode model map pruning')` with prune-when-unmodified (control `agents/coder.md`) plus keep-when-modified.
+- **The lock-in is now documented as a lock-in.** All 15 agents are pinned to `deepseek/deepseek-flash`; a consumer must have DeepSeek authenticated or every agent fails model resolution, cannot override it from their root `opencode.json` because the managed `.opencode` config wins, and can escape only by editing the managed file (sync then reports `skipped locally modified opencode file`) or changing the template default — `--force` reverts a local edit. Stated at `README.md:156` and `.agents/config/README.md:83-98`.
+- **The contradictory prose is gone.** `README.md:99` and `:413-414` now say **root** `opencode.json` and state that the managed map is shipped and synced; the plan's scope paragraph and CON-01 now describe the channel-scoped exemption.
+- **Gates after the fixes:** `npx vitest run` → 33 files / **1,057 passed** / 0 failed / 0 skipped; coverage met in every declared target (`scripts/**` lines 94.88% vs 90; overall 96.70%); `HEADLESS=true npm test` → 7 passed + 1 pre-existing skip; memory-schema exit 0 (vacuous on a clean index). Arithmetic: `HEAD` 1,049 (1,047 + 2 skipped) → 1,057 (8 new, 2 formerly-skipped now running).
+- **Deferred:** MINOR-4 (self-referential `discoverAgentIds` test — pin 15 IDs literally), MINOR-5 (release-note wording for the new required prettier-ignore pattern), COSMETIC (`sync-unit.test.js:1133` redundant `JSON.stringify`).
+- **Blocking before release:** `.opencode/opencode.json` and `.opencode/package.json` are **untracked and not gitignored**. Uncommitted, a clean-checkout tarball omits the model map and 2 plugin-contract tests revert to skipped.
+- **Environment:** `knowledgebase_search` NOT executed (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract and not retried.
+- **Records:** `docs/tracker-log.md` (`## Feature Pipeline 25 — Post-Review Fixes and Final Verification`), `docs/TRACKER-INDEX.md`, and a `## Session: 2026-11-18 — Central Agent Model Map: Post-Review Fixes` entry in `.agents/instructions/learned-knowledge.instructions.md`.
+
+
+### 2026-11-18: Coder — Managed model map added to the npm `files` array (T1c)
+
+`npm pack` now includes `.opencode/opencode.json`, so the central model map reaches consumers through the published package instead of only through a local checkout.
+
+- **What shipped:** one added entry, `".opencode/opencode.json"`, in `package.json:61`, placed directly after `".opencode/plugins/"` so the `.opencode/` entries read as one block. Nothing else changed — no version bump, no dependency edit, no reordering, no key added or removed (`git diff` is +1/−0).
+- **Why it was needed:** npm publishes only what `files` lists (plus always-included metadata). `.opencode/agents/`, `.opencode/commands/`, and `.opencode/plugins/` were listed; the managed `opencode.json` was not, so the tarball would have carried every plugin but not the model map.
+- **Verification:** the slice's check `node -e "…files.includes('.opencode/opencode.json')…"` → `ok 15` (exit 0); `JSON.parse` succeeds, 2-space indent and trailing newline intact; `npm pack --dry-run --json | grep .opencode/opencode.json` → present (`npm pack` exit 0).
+- **Mirror check:** the repo keeps **no** `.npmignore`. `scripts/sync-unit.test.js:1593-1624` and `:1626-1641` do assert on `package.json` `files` and on `npm pack` output, but only for `AGENTS.project.md` (absent), root `opencode.json` (absent), `.prettierignore`, `LICENSE`, and `bin/setup.js` (present) — the new entry neither conflicts nor needs a new assertion there, and that file belongs to T5.
+
+### 2026-11-18: Coder — Agent models documented in config README (T3)
+
+`.agents/config/README.md` now explains the central model map, so a consumer reading the config pointer learns where models come from and what sync will and will not touch.
+
+- **What shipped:** a new `## Agent models` section (`README.md:83-93`, 11 lines) before `## Research skill`, in the file's existing heading-plus-prose style. It states the map is the top-level `agents` object in `.opencode/opencode.json` (one edit, carried to every consumer by sync); that OpenCode merges discovered `.opencode` config **over** the project-root `opencode.json`, so consumers keep root settings such as MCP and permissions while the managed map owns models; that `opencode.mcp.example.json` carries the same map for fresh scaffolds, and an existing consumer's root `opencode.json` is never rewritten by sync; and that the default is `deepseek/deepseek-flash` in `provider/model[#variant]` form.
+- **Verification:** `grep -n "Agent models"` → `83:`; `npx prettier --check .agents/config/README.md` → **All matched files use Prettier code style!**
+- **No unrelated sections restructured.** Sibling tasks T1/T2 own `.opencode/opencode.json` and `opencode.mcp.example.json`.
+
+### 2026-11-18: Coder — Central agent model declaration (T1)
+
+`.opencode/opencode.json` now pins every agent to one model from a single place, so the 15 specs no longer depend on whatever default the runtime picks.
+
+- **What shipped:** the file is exactly two keys — `$schema` (`https://opencode.ai/config.json`, unchanged) and `agents`, a map of all 15 agent IDs (`architect`, `coder`, `deployer`, `designer`, `e2e-tester`, `implementer`, `orchestrator/feature-pipeline`, `orchestrator/orchestrator`, `orchestrator/tdd-orchestrator`, `planner`, `researcher`, `reviewer`, `scope`, `tracker`, `unit-tester`) each `{ "model": "deepseek/deepseek-flash" }`. No extra keys, 2-space indent, trailing newline.
+- **Verification:** the slice's `node -e` check → `ok 15` (count and every `model` value asserted); `Object.keys` → `['$schema','agents']`; trailing newline confirmed with `od -c`.
+- **Caveat:** `.opencode/opencode.json` is git-ignored (root `.gitignore:2`), so this is local/consumer state rather than a tracked file. Sibling tasks T2/T3 own `opencode.mcp.example.json` and `.agents/config/README.md`.
 
 ### 2026-11-02: Tracker — Agent Definition Portability recorded (Pipeline 21)
 
@@ -3250,3 +3289,209 @@ Reviewer returned CHANGES REQUESTED on the file from the entry above. All eight 
 - **Gate honesty:** G1–G4 were not run at review; the green suite is cited, not verified. TEST-06's shell loop was refused by the review allowlist and replaced with an equivalent check — recorded as a substitution, not a pass.
 - **Deferred by decision:** O-1 refusal threshold for already-compact repos; O-2 non-Markdown assets; O-3/O-4 knowledgebase index integration.
 - **Retrieval:** `knowledgebase_knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract, not retried. `memory_search` executed (5 results — the spike, its superseded draft, and the three progress entries for this feature).
+
+---
+
+## 2026-11-12 — Research: Offloading AI-Agent Work to GitHub Actions Runners
+
+**Pipeline:** research-github-offload (researcher → tracker)
+**Status:** ✅ COMPLETE (research only — no code, no workflow files created)
+**Coverage:** N/A (research deliverable; `npx vitest run` suite untouched)
+**TDD Iterations:** 0 (non-TDD pipeline)
+
+### Summary
+
+Answered how this repo can offload agent work to its GitHub-hosted runners. The usable slice is narrower than it looks: headless runs are a documented OpenCode feature (`opencode run --standalone`, plus the `anomalyco/opencode/github@latest` action), but GitHub Models was fully retired 2026-07-30, so a runner-based agent needs a provider API key in secrets. The orchestrator's confirmation gates, `scope` grilling, and DevTools browser sessions cannot be offloaded at all.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/research-github-actions-agent-offload.md` | Full report — current repo state, offload classification, mechanics, cost math, five proposed workflows |
+| `memory-bank/activeContext.md` | Records the research outcome and next steps |
+| `docs/tracker-log.md` | Documentation entry for this pipeline |
+
+### Key Findings
+
+- **`--standalone` is the CI-critical flag** — the default shared background server is a per-user service absent on runners.
+- **The best first change involves no AI at all**: the three Husky hooks are local-only and bypassable by disabled hooks or web-UI commits; re-running `validate-memory-schema` and `vocab-sync` as plain CI steps (proposed `verify-local-hooks.yml`) is the highest-value zero-risk move.
+- **Recommended first agent step** is `agent-review.yml` — the `reviewer` role is already read-only by spec; run it `workflow_dispatch`-only with `contents: read` and artifact output.
+- **Cost:** standard runners are free/unlimited on public repos; model tokens are the only marginal cost.
+
+### Risks That Constrain Any Implementation
+
+- **R1** — `unit-tester` may edit test files and holds `shell: allow *`; CI triage must remain read-only.
+- **R2** — Never use `pull_request_target`; fork PRs receive no secrets.
+- **R3** — MCP servers use unpinned `npx -y …@latest`; pin before CI depends on them.
+
+### Next Steps (not yet started)
+
+1. `verify-local-hooks.yml` — deterministic, no secret, exercises two existing scripts.
+2. `agent-review.yml` — dispatch-only trial of the `reviewer` role.
+
+**Retrieval:** `knowledgebase_knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract. Nothing blocking.
+
+---
+
+## 2026-11-12 — Research: AI-in-CI Value Ranking + Doc Staleness/Pruning Feasibility
+
+**Pipeline:** research-ai-workflow-value (researcher → tracker)
+**Status:** ✅ COMPLETE (research only — no workflow files, no code)
+**Coverage:** N/A (research deliverable; `npx vitest run` suite untouched)
+**TDD Iterations:** 0 (non-TDD pipeline)
+
+### Summary
+
+Ranked twelve candidate "AI in a GitHub workflow" jobs by value ÷ risk ÷ token cost, and answered whether regular document sorting/pruning of stale docs is worth building. The answer: it is worth doing and is mostly **not** an AI job. Seven of the twelve candidates have a deterministic tool that already does the job better (lychee, markdownlint, Knip, Dependabot, `git log`); recommending an agent for those pays tokens for a worse answer. The doc-staleness problem splits cleanly: eight detection checks are deterministic and free, and only four questions ("is this still true?", "does A supersede B?", "should these merge?", "which section?") need a model — where it is a good proposer and a poor decider.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/research-ai-doc-maintenance-workflows.md` | Full report — 12-candidate ranking (§1), doc-staleness deep dive with runnable checks (§2a–2f), tool verification table (§2c), cost bounds (§3), three-item build order (§4), open questions O-1…O-4 (§5), sourced references (§6) |
+| `memory-bank/activeContext.md` | Records the research outcome and next steps |
+| `docs/tracker-log.md` | Documentation entry for this pipeline |
+| `docs/TRACKER-INDEX.md` | Research Pipeline 23 row |
+
+### Key Findings
+
+- **Most of the twelve jobs should not use a model at all.** Five rank above the line (docs health, PR diff review, test-failure triage, doc-staleness judgement, changelog drafting — the last as marginal); seven rank below. Three are named explicitly: dead-code detection → use **Knip**, dependency-bump explanation → Dependabot's own PR body is the deliverable, secret scanning → **never** put a model in the secrets path. Same verdict for flaky-test detection, issue labelling, KB re-index (existing npm scripts), architecture-context regeneration.
+- **The user's doc-pruning case splits in two, and the larger half is deterministic.** Detection — last-commit date, frontmatter-vs-git drift, broken links (lychee, not a regex), orphans, references to deleted paths/npm scripts, exact duplicates, stale TODO markers, and doc-age-vs-subject-churn — is eight exact, free checks. Judgement is the smaller, riskier half.
+- **This repo already designed the pruning half.** `docs/spike-doc-compaction.md` (D-1…D-13) plus `.agents/prompts/doc-compaction.prompt.md` already encode report-by-default, path-preserving `git mv` archival, the scored R1–R5 deletion checklist (threshold ≥ 3) and the hard-excluded governance surface list. Any new workflow must **reuse that prompt, not invent a second opinion**.
+- **Cost insight:** the deterministic checks are the cheapest way to make the expensive job cheaper. Running the staleness script first narrows ~41 docs to a handful of flagged ones, which becomes the model's `--file` input.
+
+### Two Real Defects Found (fix before any workflow depends on them)
+
+1. **`scripts/normalize-memory.js` `getGitMtime()` never calls git** — documented as a git-with-mtime-fallback but always uses `statSync(filePath).mtime` (`scripts/normalize-memory.js:115-124`). On a fresh CI checkout every file carries *today's* mtime, so a run would stamp `updated: <today>` onto every doc it touches and manufacture the exact drift the report is meant to detect. **Do not run this in CI as-is.**
+2. **`scripts/validate-memory-schema.js` only inspects `memory-bank/**`** — `getStagedMemoryFiles()` filters on that prefix, so `docs/**` (~42 files, of which only 22 carry frontmatter at all) is not validated anywhere. Nothing currently validates the docs corpus.
+
+### Build Order (specified, not implemented)
+
+1. **4.1 `docs-health.yml`** — deterministic doc gate on PRs touching `**/*.md` plus a weekly drift report. lychee-action + markdownlint + `validate-memory-schema` + a new `scripts/docs-staleness.js`. `contents: read`, no secrets, `ubuntu-slim`, **0 tokens**.
+2. **4.2 Fix the mtime bug, then extend schema validation to `docs/**`** — still 0 tokens; prerequisite for trusting any `updated:` date.
+3. **4.3 `docs-compaction.yml`** — `workflow_dispatch`-only, report-only, reusing `doc-compaction.prompt.md` with `--file` restricted to the flagged files. No writes, no PR creation, no schedule.
+
+### Notes / Follow-up
+
+Not verified and not to be asserted: per-token model pricing, Knip's licence (not stated on its landing page), and the staleness *accuracy* of a model — that is precisely what 4.3 proposes to measure on three real runs. `docs-health-action` (0 stars, 21 commits) is a reference implementation to copy, not a dependency to trust (O-3). Open question O-1: whether the doc gate should fail a PR or only annotate needs one week of real data.
+
+**Retrieval:** `knowledgebase_knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract and not retried.
+
+---
+
+## 2026-11-12 — Research: Shipping GitHub Workflows to Consumer Repos
+
+**Pipeline:** research-ship-workflows (researcher → tracker)
+**Status:** ✅ COMPLETE (research only — no workflow files, no code, no tests; `sync.js` must not change)
+**Coverage:** N/A (research deliverable; `npx vitest run` suite untouched)
+**TDD Iterations:** 0 (non-TDD pipeline)
+
+### Summary
+
+Answered "how do I have this be installed in my repositories? included in this npm module?" — and the two halves have opposite answers. **Included is already done:** `.github/workflows/` is at `package.json:56`, so `pr-test.yml` and `npm-publish.yml` already travel in the tarball to `node_modules/@abarcenas/ai-workflow-template/.github/workflows/`. **Installed is not done, and is the whole problem:** no sync channel and none of the eight setup phases ever writes to a consumer's `.github/workflows/`, and the README states that exclusion three times.
+
+The report's main output is a **do-not-build** decision: a sync channel pointed at `.github/workflows/` would ship both existing workflows to every consumer (because `collectFiles` recurses), `--force` would overwrite consumer edits, and `--prune` would delete a consumer's verbatim copy. Ten failure modes tabulated, four red.
+
+Recommended instead: one template at `templates/github-workflows/docs-health.yml` plus a new **Phase 9 `workflows-phase.js`** copying it **create-if-absent only** behind `--with-workflows=<name>` — reusing the `projectOwnedAgentStubs` precedent (`sync.js:289`, loop `:801-818`), which has no force branch at all. `--prune` is already safe for it today (`__github-workflows__/` → `null` at `sync.js:517-519`).
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `docs/research-shipping-workflows-to-consumers.md` | **NEW** — 657-line report: 20 verified facts, six distribution options ranked, shipped-set decision, create-if-absent spec against real code, drift/versioning story, implementation spec, 8 risks, 4 deferrals, sourced docs |
+| `docs/tracker-log.md` | Research Pipeline 24 entry |
+| `docs/TRACKER-INDEX.md` | Pipeline row + entry-location row + learned-knowledge session row |
+| `.agents/instructions/learned-knowledge.instructions.md` | Session 2026-11-12 entry |
+| `memory-bank/progress.md` | This summary |
+
+**Deliberately not modified:** every `.github/workflows/*.yml`, `scripts/sync.js`, `scripts/setup/*`, `package.json`, `README.md`. The report is a specification for a later `coder`/`deployer` step.
+
+### Key Findings
+
+- **The obvious fix is the one that must not be built.** Sync's copy rule (copy-when-absent / overwrite-when-unmodified-or-`--force` / prune-when-source-vanished) is correct for configuration and wrong for executable privilege. A1 name collision, A2 `--force` changes meaning, A5 scheduled model spend, A6 unagreed `contents: write`, A7 deleted CI are each individually disqualifying.
+- **The correct mechanism already exists three lines away.** `projectOwnedAgentStubs` is "copy from the package once, then never touch again" — exactly a workflow file's contract. Four properties must survive: `existsSync(target) → continue` guard, **no** force branch, bare-channel manifest key, source is the package copy (no duplicated stub text to drift).
+- **Reusable workflows were rejected for a better reason than expected.** The anticipated secret-leak risk is **not real** — secrets cross only if the caller passes them, and `secrets: inherit` is caller-side. The real disqualifiers: the consumer still authors a file, and every template change then executes in their CI unreviewed — the `refactor-agent-portability` defect, fixed once already.
+- **Even the zero-token workflow must be opt-in.** `docs-health.yml` is a **new gate on the consumer's PRs** that fails them when a link rots. Ship annotate-only (`fail: false`) with a commented blocking line, matching value report O-1.
+- **The shipped template must not call `validate-memory-schema.js` or `vocab-sync.js`.** Both are repo-specific, and `normalize-memory.js`'s mtime bug would stamp today's date on every doc in a CI checkout. This turns value-report item 4.2 from a next step into a **blocker**.
+- **The drift story is the design's real cost, answered rather than hidden.** A copied workflow never updates; the mitigation is a first-line version stamp plus a read-only compare reporting `partial` → `warn` (never `error`, which returns `FATAL`).
+
+### Build Order (specified, not implemented)
+
+1. `templates/github-workflows/docs-health.yml` (annotate-only, `contents: read`, no secrets, version stamp).
+2. `scripts/setup/workflows-phase.js` + `.test.js` (12 cases T1–T12).
+3. Then changes only: `package.json` `files`, `constants.js` `SUPPORTED_FLAGS`, `ui.js` help, `index.js` Phase 9 after `:446`, `README.md` `:91`/`:133`/`:368`, one `sync-unit.test.js` prune-null regression row. **`scripts/sync.js` unchanged.**
+
+### Notes / Follow-up
+
+`npm pack --dry-run --json` and a scratch-consumer `npx ai-workflow-setup` were **not run** (read-only research); the "reaches `node_modules`" claim rests on three agreeing sources and no file count is asserted. Token pricing and `lychee-action@v2`'s current major remain inherited-unverified. Deferred: annotate-only vs blocking (O-1), reusable-workflow revisit once tags are immutable, composite-action variant, and whether `templates/` should hold agent prompts.
+
+**Retrieval:** `knowledgebase_knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured); reported per the graceful-failure contract and not retried. Memory-bank semantic search executed.
+
+### 2026-11-18 — T2
+- Works: `opencode.mcp.example.json` now carries the central 15-entry `agents` model map identical to `.opencode/opencode.json`.
+- Known issues: none.
+
+### 2026-11-18 — T1b
+- Works: `.opencode/opencode.json` (central 15-key model map) is now committable/publishable — root `.gitignore` anchors the ignore at `/opencode.json`, so only the project-owned root file stays hidden.
+- Known issues: none.
+
+### 2026-11-18 — T4
+- Works: `README.md` advertises the managed model map — the Core Structure tree lists `.opencode/opencode.json   # Managed agent model map (synced; overrides root opencode.json)` (`:125`) and one bullet below the Agents table (`:156`) names it as the single edit point for per-agent models, with the merge-over-root-`opencode.json` semantics matching `.agents/config/README.md` `## Agent models`.
+- Known issues: `npx prettier --check README.md` fails **pre-existing** — the whole file (and all repo markdown) is unformatted under prettier 3.10.1, proven by `git show HEAD:README.md | npx prettier --check --stdin-filepath README.md` exiting 1; the T4 additions themselves add zero prettier diff lines. Reformatting README was deferred as out of scope (~200 unrelated table lines).
+
+### 2026-11-18 — T5
+- Works: the managed `.opencode/opencode.json` now actually ships on sync — `scripts/sync.js` exempts it from the channel-agnostic project-owned rule while the root `opencode.json` stays scaffold-only from `opencode.mcp.example.json`. `scripts/sync-unit.test.js` proves the copy, its manifest hash, and the untouched root config, and adds a repo-integrity block asserting the managed map and the shipped example are deep-equal, every agent is `deepseek/deepseek-flash`, and all 15 `.opencode/agents` IDs are covered (`npx vitest run`: 33 files / 1,053 passed).
+- Known issues: none. The mutation check (removing `"coder"`) failed the coverage assertion as intended and the file was restored byte-identical.
+
+### 2026-11-18 — T7
+- Works: the managed `.opencode/opencode.json` is now protected from formatters — it is in `requiredPrettierIgnorePatterns` (`scripts/sync.js`) so consumers are warned when their `.prettierignore` omits it, and the shipped `.prettierignore` (plus its `projectOwnedStubs` twin) ignores it, so a format pass can no longer freeze the hash-tracked file into a permanent "skipped locally modified".
+- Known issues: none. `npx prettier --check scripts/sync.js` fails **pre-existing** (the file has never been prettier-formatted; `git show HEAD:scripts/sync.js` fails the same check), so the T7 additions match the file's existing hand-written style rather than triggering a repo-wide reformat.
+
+---
+
+## 2026-11-18 — Feature Pipeline 25: Central Agent Model Map (`.opencode/opencode.json`)
+
+**Pipeline:** implementer (plan) → coder (T1, T2, T3, T1b, T1c, T4, T5) → unit-tester (T6 verification) → coder (T7) → tracker
+**Status:** ✅ COMPLETE — 33 files / 1,053 tests passing, 0 failures; 94.88% line coverage; 4/4 declared gates green
+**Coverage:** 94.88% lines
+**TDD Iterations:** 0 (non-TDD pipeline — implementation, then independent verification)
+
+### Summary
+
+The template now declares per-agent models in exactly one place: `.opencode/opencode.json`, a new git-tracked and npm-published file holding `$schema` plus an `agents` object of 15 IDs, all set to `deepseek/deepseek-flash`. It syncs intact to consumer projects and outranks the project-owned root `opencode.json` by OpenCode's own merge order. Ten files changed; no agent Markdown file was touched.
+
+### Design decision
+
+OpenCode V2 reads config **only** from `opencode.json(c)` files plus Markdown agents — no `extends`/`include` for arbitrary JSON — so a standalone `agents-models.json` would be inert. The map therefore lives in a config file OpenCode already discovers: `.opencode/opencode.json` is auto-discovered, merged **over** the direct root config, and shipped by sync. The root `opencode.json` stays project-owned for consumer-local MCP/permissions. The V2 key is **`agents`** (plural); V1's `agent` was renamed, and V1 docs still show the old key.
+
+### Files Produced / Modified
+
+| File | Description |
+|---|---|
+| `.opencode/opencode.json` | **NEW** — 15 agent IDs → `deepseek/deepseek-flash`; managed + published |
+| `opencode.mcp.example.json` | `agents` object added (byte-identical to the managed map) |
+| `.agents/config/README.md` | New `## Agent models` — location, precedence, example, no-rewrite rule |
+| `README.md` | Core Structure tree entry + Agents-table bullet naming the single edit point |
+| `.gitignore` | `opencode.json` → `/opencode.json` (root stays ignored; managed file publishable) |
+| `package.json` | `.opencode/opencode.json` added to `files` (confirmed by `npm pack --dry-run`) |
+| `scripts/sync.js` | `managedOpenCodePaths` exemption (project-owned guard was silently skipping the map) + `requiredPrettierIgnorePatterns` entry |
+| `.prettierignore` | Ignores the managed file (with byte-identical `projectOwnedStubs` twin) |
+| `scripts/sync-unit.test.js` | Copy-pass case, `describe('central agent models')` integrity block, pack assertions |
+
+### Verification
+
+- `npx vitest run` → 33 files / **1,053 passed**, 0 failed; coverage **94.88% lines**; `npm test` 7 passed / 1 pre-existing skip; memory-schema validated (vacuous for this change).
+- Prettier failures proven **pre-existing at `HEAD`** — not caused by this pipeline.
+- `sync.js` fix proven on a scratch consumer, not just unit-asserted: managed map copied; root `opencode.json` never overwritten; managed file survives `--prune` while a synthetic stale control **is** pruned.
+- T6's one **LOW** defect (managed file missing from prettier-ignore lists) was closed by T7 in `requiredPrettierIgnorePatterns`, the shipped `.prettierignore`, and its `projectOwnedStubs` twin.
+
+### Notes / Follow-up
+
+Review had not returned a final verdict when this record was written — the entry makes no safety/merge-readiness claim. Consumers get `deepseek/deepseek-flash` by default and edit `.opencode/opencode.json` to change it (the unsupported path is editing a synced copy in place). `knowledgebase_search` **NOT executed** (PG vector unavailable — `DATABASE_URL` not configured).
+
+### 2026-11-18 — T8 (reviewer MAJOR fixes)
+
+- **Works:** the managed `.opencode/opencode.json` is now prunable, not just copyable. `resolvePruneEntry` cancels the project-owned over-match only inside the `__opencode__/` branch (`managedOpenCodePaths`), so a consumer whose template stopped shipping the map has the stale file removed when it is content-unmodified — and keeps it when locally edited, under the normal untouched rule. Root `opencode.json`, `.agents` `opencode.json`, `__project__/*` and `.opencode/AGENTS.project.md` still return `null`, so nothing project-owned became prunable.
+- **Works:** provider lock-in is documented in both voices — `README.md` per-agent-models bullet and `.agents/config/README.md` `## Agent models`: DeepSeek auth prerequisite, no override from the consumer root config, edit-managed-file vs change-template-default as the ways out, and `--force` reverting local edits.
+- **Gate:** `npm run test:unit` exit 0 — 33 files / **1,057 passed** (+4 new). Mutation check proved the new prune test discriminates: the unconditional short-circuit fails both new cases, the restored file is byte-identical.
+- **Known issues:** none new. Repo-wide prettier defaults still fail at `HEAD` (pre-existing); neither file was reformatted, only the targeted paragraphs edited.
