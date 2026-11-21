@@ -96,7 +96,7 @@ npm run sync                # Normal sync
 
 `AGENTS.project.md` is the supported home for project-specific agent rules. It is created if absent, then treated as project-owned: sync never overwrites or prunes it, `--force` cannot replace it, and deleting it recreates it on the next sync. New projects load it through `"instructions": ["AGENTS.project.md"]` in `opencode.json`; a project created before that entry existed must add it once, because sync never rewrites an existing `opencode.json`.
 
-The same ownership rule protects `opencode.json`, `.prettierignore`, and `.agents/instructions/learned-knowledge.instructions.md`. `.agents-sync-ignore` is also protected from overwrite and deletion, but sync does **not** read or honour its contents yet — do not rely on it.
+The same ownership rule protects root `opencode.json`, `.prettierignore`, and `.agents/instructions/learned-knowledge.instructions.md`. `.agents-sync-ignore` is also protected from overwrite and deletion, but sync does **not** read or honour its contents yet — do not rely on it.
 
 `__project__/<file>` entries in `.agents-sync-manifest.json` are reporting metadata written only when sync creates the file. Files that already existed before the upgrade are intentionally absent, because sync has no managed baseline for them.
 
@@ -122,6 +122,7 @@ Post-install, your project receives this structure:
 .opencode/
 ├── agents/         # Orchestrator + specialized sub-agents
 ├── commands/       # Slash commands (incl. /health, /setup-matt-pocock-skills)
+├── opencode.json   # Managed agent model map (synced; overrides root opencode.json)
 └── plugins/        # graphify plugin (loaded automatically)
 memory-bank/        # Persistent project context (+ tasks/)
 scripts/            # Sync, memory, and knowledgebase CLI helpers
@@ -151,6 +152,8 @@ skills-lock.json    # Pinned skill versions
 | Reviewer | `.opencode/agents/reviewer.md` | Code review, security audit |
 | Deployer | `.opencode/agents/deployer.md` | CI/CD, deployment scripts |
 | Tracker | `.opencode/agents/tracker.md` | Documentation recorder |
+
+- **Per-agent models:** set in `.opencode/opencode.json` under a top-level `agents` object — changing a model there once is the single edit point, and every sync carries it to all consumers. The managed map pins every agent to `deepseek/deepseek-flash`, so a consumer must have DeepSeek authenticated in OpenCode or every agent fails to resolve a model. OpenCode merges that managed `.opencode` config over a consumer's project-root `opencode.json`, so local settings such as MCP servers and permissions stay in the root file while the managed map controls models — and, because the managed config wins, a consumer cannot override the model from their own root `opencode.json`. The ways out are to edit the managed `.opencode/opencode.json` (sync then reports `skipped locally modified opencode file` on every run) or to change the default in this template; `--force` reverts a local edit back to the template default.
 
 ### How to Use
 
@@ -407,8 +410,8 @@ npm run memory:normalize   # Normalize frontmatter (also runs during npx ai-work
 
 - Uses `INIT_CWD` to install against the consuming project (not the package dir)
 - Local changes are always preserved unless `--force` is used
-- Project-owned files (`AGENTS.project.md`, `opencode.json`, `.prettierignore`, learned knowledge) are created if absent and never overwritten or pruned after that, even with `--force`
-- Do not add `AGENTS.project.md` or `opencode.json` to `package.json` `files`: both are scaffolded create-if-absent and must never ship from the package
+- Project-owned files (`AGENTS.project.md`, root `opencode.json`, `.prettierignore`, learned knowledge) are created if absent and never overwritten or pruned after that, even with `--force`
+- Do not add `AGENTS.project.md` or root `opencode.json` to `package.json` `files`: both are scaffolded create-if-absent and must never ship from the package. The managed `.opencode/opencode.json` is different — it **is** shipped and synced
 - `AGENTS.md` is the main instruction file agents should read
 - Package assumes the public npm registry
 - Playwright MCP integration is documented in [`docs/playwright-mcp-configuration.md`](https://github.com/abarcenas29/ai-workflow-template/blob/main/docs/playwright-mcp-configuration.md)
